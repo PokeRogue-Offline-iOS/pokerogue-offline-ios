@@ -1,0 +1,113 @@
+name: Build PokeRogueOffline IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Clone PokeRogue fork
+        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/PokeRogue-Offline-iOS/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Install PokeRogue dependencies
+        working-directory: pokerogue-src
+        run: pnpm install
+
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build
+
+      - name: Install Capacitor
+        working-directory: pokerogue-src
+        run: |
+          pnpm add @capacitor/core @capacitor/cli @capacitor/ios
+
+      - name: Configure Capacitor
+        working-directory: pokerogue-src
+        run: |
+          cat > capacitor.config.json << 'EOF'
+          {
+            "appId": "xyz.scooom.pokerogueoffline",
+            "appName": "PokeRogueOffline",
+            "webDir": "dist",
+            "server": {
+              "androidScheme": "https"
+            },
+            "ios": {
+              "contentInset": "always"
+            }
+          }
+          EOF
+
+      - name: Add iOS platform
+        working-directory: pokerogue-src
+        run: npx cap add ios
+
+      - name: Sync Capacitor
+        working-directory: pokerogue-src
+        run: npx cap sync ios
+
+      - name: Copy and resize app icon
+        run: |
+          sips -z 1024 1024 pokerogue-src/assets/logo512.png --out pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/icon.png
+
+      - name: Build Xcode project (unsigned)
+        run: |
+          xcodebuild \
+            -project pokerogue-src/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            CODE_SIGNING_ALLOWED=NO \
+            CONFIGURATION_BUILD_DIR=$PWD/build
+
+      - name: Find built app
+        run: find build -name "*.app" -type d
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r "build/App.app" Payload/
+          zip -r PokeRogueOffline.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PokeRogueOffline
+          path: PokeRogueOffline.ipa
+          retention-days: 30
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pokerogue_version.outputs.version }}-${{ github.run_number }}
+          name: PokeRogueOffline v${{ steps.pokerogue_version.outputs.version }}
+          files: PokeRogueOffline.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
