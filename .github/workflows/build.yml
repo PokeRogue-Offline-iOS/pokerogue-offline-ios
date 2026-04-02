@@ -39,7 +39,7 @@ jobs:
         working-directory: pokerogue-src
         env:
           VITE_BYPASS_LOGIN: '1'
-        run: pnpm build
+        run: pnpm build --mode app
 
       - name: Install Capacitor
         working-directory: pokerogue-src
