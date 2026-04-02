@@ -71,6 +71,21 @@ jobs:
         working-directory: pokerogue-src
         run: npx cap sync ios
 
+      - name: Configure iOS app settings
+        working-directory: pokerogue-src
+        run: |
+          /usr/libexec/PlistBuddy -c "Delete :UISupportedInterfaceOrientations" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationLandscapeLeft" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:1 string UIInterfaceOrientationLandscapeRight" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :UIStatusBarHidden true" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType public.app-category.games" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.games" ios/App/App/Info.plist || true
+
+      - name: Find AppIcon files
+        working-directory: pokerogue-src
+        run: find ios/App/App/Assets.xcassets/AppIcon.appiconset -type f
+
       - name: Copy and resize app icon
         run: |
           sips -z 1024 1024 pokerogue-src/assets/logo512.png --out pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/icon.png
