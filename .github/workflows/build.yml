@@ -86,9 +86,9 @@ jobs:
         working-directory: pokerogue-src
         run: find ios/App/App/Assets.xcassets/AppIcon.appiconset -type f
 
-      - name: Copy and resize app icon
+      - name: Copy app icon
         run: |
-          sips -z 1024 1024 pokerogue-src/assets/logo512.png --out pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/icon.png
+          cp appIcon.png pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
 
       - name: Build Xcode project (unsigned)
         run: |
