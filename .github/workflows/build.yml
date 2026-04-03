@@ -71,6 +71,12 @@ jobs:
         working-directory: pokerogue-src
         run: npx cap sync ios
 
+      - name: Set app version
+        working-directory: pokerogue-src
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.pokerogue_version.outputs.version }}" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.pokerogue_version.outputs.version }}" ios/App/App/Info.plist
+
       - name: Configure iOS app settings
         working-directory: pokerogue-src
         run: |
