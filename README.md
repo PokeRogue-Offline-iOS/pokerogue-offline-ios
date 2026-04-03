@@ -20,7 +20,7 @@ Go to the [Releases](../../releases) tab and download `PokeRogueOffline.ipa` fro
 LiveContainer lets you run IPAs inside a container without using up your sideloading slots.
 
 **First-time setup:**
-1. Install **iLoader** on your PC/Mac from [GitHub](https://github.com/khcrysalis/iloader)
+1. Install **iLoader** on your PC/Mac from [GitHub](https://github.com/nab138/iloader)
 2. Connect your iPhone via USB and open iLoader
 3. Sign in with your Apple ID
 4. Select **LiveContainer + SideStore** and install it
