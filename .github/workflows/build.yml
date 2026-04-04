@@ -28,7 +28,7 @@ jobs:
       - name: Get PokeRogue version
         id: pokerogue_version
         run: |
-          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          VERSION=0.$(node -p "require('./pokerogue-src/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Install PokeRogue dependencies
