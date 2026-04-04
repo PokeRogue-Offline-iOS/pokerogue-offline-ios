@@ -11,11 +11,11 @@ An offline iOS wrapper for PokéRogue, built with Capacitor. Play fully offline 
 
 ## Getting the IPA
 
-Go to the [Releases](../../releases) tab and download `PokeRogueOffline.ipa` from the latest release.
+Go to the [Releases](https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases) and download `PokeRogueOffline.ipa` from the latest release.
 
 ## Installing the IPA
 
-### Option 1: LiveContainer + SideStore (Recommended — unlimited apps, no 7-day limit with paid cert)
+### Option 1: LiveContainer + SideStore (Recommended — unlimited apps)
 
 LiveContainer lets you run IPAs inside a container without using up your sideloading slots.
 
