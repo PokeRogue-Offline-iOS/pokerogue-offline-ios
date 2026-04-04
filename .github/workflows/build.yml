@@ -23,7 +23,7 @@ jobs:
         run: npm install -g pnpm
 
       - name: Clone PokeRogue fork
-        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/PokeRogue-Offline-iOS/pokerogue.git pokerogue-src
+        run: git clone --recurse-submodules --depth 1 --branch withiOSFix https://github.com/PokeRogue-Offline-iOS/pokerogue.git pokerogue-src
 
       - name: Get PokeRogue version
         id: pokerogue_version
