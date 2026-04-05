@@ -9,10 +9,19 @@ const injection = `
       label: "Unlock Everything",
       handler: () => {
         fetch("/full_unlocks.prsv")
-          .then(r => r.blob())
-          .then(blob => {
-            const file = new File([blob], "full_unlocks.prsv", { type: "application/octet-stream" });
-            globalScene.gameData.importData(GameDataType.SYSTEM, file);
+          .then(r => r.arrayBuffer())
+          .then(buffer => {
+            const blob = new Blob([buffer]);
+            const file = new File([blob], "full_unlocks.prsv");
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const dataKey = \`system_\${loggedInUser?.username}\`;
+              let dataStr = AES.decrypt(e.target?.result?.toString(), saveKey).toString(enc.Utf8);
+              dataStr = globalScene.gameData.convertSystemDataStr(dataStr);
+              localStorage.setItem(dataKey, encrypt(dataStr, bypassLogin));
+              window.location.reload();
+            };
+            reader.readAsText(file);
           });
         ui.revertMode();
         return true;
