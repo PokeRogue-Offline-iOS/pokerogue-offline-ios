@@ -37,7 +37,7 @@ jobs:
             -o pokerogue-src/full_unlocks.prsv
 
       - name: Inject unlock everything button
-        run: node scripts/inject-unlock.js
+        run: node ${{ github.workspace }}/scripts/inject-unlock.js
 
 
       - name: Install PokeRogue dependencies
