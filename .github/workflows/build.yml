@@ -36,6 +36,10 @@ jobs:
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
             -o pokerogue-src/full_unlocks.prsv
 
+      - name: Find menu handler
+        run: find pokerogue-src/src -name "menu-ui-handler.ts"
+
+
       - name: Inject unlock everything button
         run: node ${{ github.workspace }}/scripts/inject-unlock-all.js
 
