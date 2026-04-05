@@ -27,7 +27,7 @@ const anchor = `manageDataOptions.push({
 
 if (!content.includes(anchor)) {
   console.error('Anchor not found in menu-ui-handler.ts — skipping injection');
-  process.exit(0);
+  process.exit(1);
 }
 
 content = content.replace(anchor, injection + '\n  ' + anchor);
