@@ -31,6 +31,51 @@ jobs:
           VERSION=0.$(node -p "require('./pokerogue-src/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Download full unlocks save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
+            -o pokerogue-src/public/full_unlocks.prsv
+
+      - name: Inject unlock everything button
+        run: |
+          node << 'EOF'
+          const fs = require('fs');
+          const path = 'pokerogue-src/src/ui/handlers/menu-ui-handler.ts';
+          let content = fs.readFileSync(path, 'utf8');
+
+          const injection = `
+          if (isApp) {
+            manageDataOptions.push({
+              label: "Unlock Everything",
+              handler: () => {
+                fetch("/full_unlocks.prsv")
+                  .then(r => r.blob())
+                  .then(blob => {
+                    const file = new File([blob], "full_unlocks.prsv", { type: "application/octet-stream" });
+                    globalScene.gameData.importData(GameDataType.SYSTEM, file);
+                  });
+                ui.revertMode();
+                return true;
+              },
+              keepOpen: false,
+            });
+          }
+          `;
+
+          const anchor = `manageDataOptions.push({
+          label: i18next.t("menuUiHandler:cancel"),`;
+
+          if (!content.includes(anchor)) {
+            console.error('Anchor not found in menu-ui-handler.ts');
+            process.exit(1);
+          }
+
+          content = content.replace(anchor, injection + '\n  ' + anchor);
+          fs.writeFileSync(path, content);
+          console.log('Injection successful');
+EOF
+
+
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
         run: pnpm install
