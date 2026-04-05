@@ -34,7 +34,7 @@ jobs:
       - name: Download full unlocks save file
         run: |
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
-            -o pokerogue-src/public/full_unlocks.prsv
+            -o pokerogue-src/full_unlocks.prsv
 
       - name: Inject unlock everything button
         run: node scripts/inject-unlock.js
@@ -49,6 +49,9 @@ jobs:
         env:
           VITE_BYPASS_LOGIN: '1'
         run: pnpm build --mode app
+
+      - name: Copy save file to dist
+        run: cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
       - name: Install Capacitor
         working-directory: pokerogue-src
