@@ -51,13 +51,15 @@ jobs:
         run: |
           cat > capacitor.config.json << 'CAPEOF'
           {
-            "appId": "xyz.scooom.pokerogueoffline",
-            "appName": "PokeRogueOffline",
+            "appId": "xyz.scooom.pkr",
+            "appName": "PokéRogue Offline",
             "webDir": "dist",
             "ios": {
               "contentInset": "never",
               "scrollEnabled": false,
-              "backgroundColor": "#000000"
+              "backgroundColor": "#000000",
+              "allowsLinkPreview": false,
+              "allowsBackForwardNavigationGestures": false
             }
           }
           CAPEOF
