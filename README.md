@@ -7,7 +7,7 @@ An offline iOS wrapper for PokéRogue, built with Capacitor. Play fully offline 
 - Fully offline — no internet required after install
 - Local saves that persist between sessions
 - Import saves from your online account
-- Based on the latest `main` branch of the fork
+- Based on the latest `main` branch of [pagefaultgames / pokerogue](https://github.com/pagefaultgames/pokerogue/)
 
 ## Getting the IPA
 
