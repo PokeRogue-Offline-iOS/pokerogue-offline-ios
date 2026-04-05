@@ -37,16 +37,7 @@ jobs:
             -o pokerogue-src/public/full_unlocks.prsv
 
       - name: Inject unlock everything button
-              run: node -e "
-                const fs = require('fs');
-                const path = 'pokerogue-src/src/ui/handlers/menu-ui-handler.ts';
-                let content = fs.readFileSync(path, 'utf8');
-                const injection = \`if (isApp) { manageDataOptions.push({ label: 'Unlock Everything', handler: () => { fetch('/full_unlocks.prsv').then(r => r.blob()).then(blob => { const file = new File([blob], 'full_unlocks.prsv', { type: 'application/octet-stream' }); globalScene.gameData.importData(GameDataType.SYSTEM, file); }); ui.revertMode(); return true; }, keepOpen: false }); }\`;
-                const anchor = 'manageDataOptions.push({';
-                content = content.replace(anchor, injection + '\n  ' + anchor);
-                fs.writeFileSync(path, content);
-                console.log('Injection successful');
-              "
+        run: node scripts/inject-unlock.js
 
 
       - name: Install PokeRogue dependencies
