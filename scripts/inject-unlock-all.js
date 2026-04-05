@@ -22,8 +22,8 @@ const injection = `
   }
 `;
 
-const anchor = `manageDataOptions.push({
-    label: i18next.t("menuUiHandler:cancel"),`;
+const anchor = `    manageDataOptions.push({
+      label: i18next.t("menuUiHandler:cancel"),`;
 
 if (!content.includes(anchor)) {
   console.error('Anchor not found in menu-ui-handler.ts — skipping injection');
