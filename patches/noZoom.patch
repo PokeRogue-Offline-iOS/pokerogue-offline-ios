@@ -1,0 +1,29 @@
+From 5f4fe96c67664119531c8a25197025628b6e0206 Mon Sep 17 00:00:00 2001
+From: Jerald Johnson <97370685+Scoooom@users.noreply.github.com>
+Date: Sat, 4 Apr 2026 18:36:01 -0500
+Subject: [PATCH] add viewport flags to prevent double tap zooming
+
+---
+ index.html | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/index.html b/index.html
+index fb87b55ea2c9..e104a80b29da 100644
+--- a/index.html
++++ b/index.html
+@@ -29,7 +29,7 @@
+ 	<link rel="apple-touch-icon" href="./logo512.png" />
+ 	<link rel="shortcut icon" type="image/png" href="./logo512.png" />
+ 	<link rel="canonical" href="https://pokerogue.net" />
+-	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
++	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+ 	<style type="text/css">
+ 		@font-face {
+ 			font-family: 'emerald';
+@@ -151,4 +151,4 @@
+ 	<script type="module" src="./src/main.ts"></script>
+ 	<script src="./src/touch-controls.ts" type="module"></script>
+ </body>
+-</html>
+\ No newline at end of file
++</html>

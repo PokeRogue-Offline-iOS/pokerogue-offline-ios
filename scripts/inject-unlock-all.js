@@ -24,12 +24,7 @@ const injection = `
             reader.onload = (e) => {
               try {
                 const dataKey = \`system_\${loggedInUser?.username}\`;
-                alert("dataKey: " + dataKey);
-                let dataStr = AES.decrypt(e.target?.result?.toString(), saveKey).toString(enc.Utf8);
-                alert("decrypted length: " + dataStr.length);
-                dataStr = globalScene.gameData.convertSystemDataStr(dataStr);
-                alert("converted, saving...");
-                localStorage.setItem(dataKey, encrypt(dataStr, bypassLogin));
+                localStorage.setItem(dataKey, e.target?.result?.toString());
                 window.location.reload();
               } catch(err) {
                 alert("Error: " + err.message);

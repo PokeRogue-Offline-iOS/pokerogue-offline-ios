@@ -1,0 +1,272 @@
+From fba3bf61e6a7f964a42d78efecac376922e774ec Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Sat, 4 Apr 2026 13:00:58 -0500
+Subject: [PATCH 1/4] Fix iOS import data with visible upload button
+
+---
+ src/system/game-data.ts | 75 +++++++++++++++++++++++++++++++++++++++--
+ src/touch-controls.ts   | 10 ++++++
+ 2 files changed, 83 insertions(+), 2 deletions(-)
+
+diff --git a/src/system/game-data.ts b/src/system/game-data.ts
+index 540620a504f6..d4a198d669c0 100644
+--- a/src/system/game-data.ts
++++ b/src/system/game-data.ts
+@@ -4,6 +4,7 @@ import { defaultStarterSpecies, saveKey } from "#app/constants";
+ import { getGameMode } from "#app/game-mode";
+ import { globalScene } from "#app/global-scene";
+ import Overrides from "#app/overrides";
++import { isIOS } from "#app/touch-controls";
+ import { Tutorial } from "#app/tutorial";
+ import { speciesEggMoves } from "#balance/moves/egg-moves";
+ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
+@@ -1375,8 +1376,71 @@ export class GameData {
+     saveFile.id = "saveFile";
+     saveFile.type = "file";
+     saveFile.accept = ".prsv";
+-    saveFile.style.display = "none";
++    
++    // iOS requires user interaction with a visible element to trigger file input
++    if (isIOS()) {
++      // Create a visible button for iOS
++      const uploadButton = document.createElement("button");
++      uploadButton.id = "iosUploadButton";
++      uploadButton.textContent = "Select File to Import";
++      uploadButton.style.cssText = `
++        position: fixed;
++        top: 50%;
++        left: 50%;
++        transform: translate(-50%, -50%);
++        padding: 15px 30px;
++        font-size: 18px;
++        font-family: Arial, sans-serif;
++        background-color: #4CAF50;
++        color: white;
++        border: none;
++        border-radius: 8px;
++        cursor: pointer;
++        z-index: 10000;
++        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
++      `;
++      
++      // Create overlay
++      const overlay = document.createElement("div");
++      overlay.id = "iosUploadOverlay";
++      overlay.style.cssText = `
++        position: fixed;
++        top: 0;
++        left: 0;
++        width: 100%;
++        height: 100%;
++        background-color: rgba(0,0,0,0.7);
++        z-index: 9999;
++      `;
++      
++      // Add file input to the button (hidden but functional on iOS)
++      saveFile.style.display = "none";
++      
++      // Handle button click to trigger file input
++      uploadButton.onclick = () => {
++        saveFile.click();
++      };
++      
++      // Handle overlay click to cancel
++      overlay.onclick = () => {
++        overlay.remove();
++        uploadButton.remove();
++        saveFile.remove();
++      };
++      
++      document.body.appendChild(overlay);
++      document.body.appendChild(uploadButton);
++    } else {
++      saveFile.style.display = "none";
++    }
++    
+     saveFile.addEventListener("change", e => {
++      // Remove iOS UI elements if they exist
++      const overlay = document.getElementById("iosUploadOverlay");
++      const button = document.getElementById("iosUploadButton");
++      if (overlay) overlay.remove();
++      if (button) button.remove();
++      
+       const reader = new FileReader();
+ 
+       reader.onload = (_ => {
+@@ -1478,7 +1542,14 @@ export class GameData {
+ 
+       reader.readAsText((e.target as any).files[0]);
+     });
+-    saveFile.click();
++    
++    // Only auto-click on non-iOS devices
++    if (!isIOS()) {
++      saveFile.click();
++    }
++    
++    // Append the file input to body for iOS compatibility
++    document.body.appendChild(saveFile);
+   }
+ 
+   private initDexData(): void {
+diff --git a/src/touch-controls.ts b/src/touch-controls.ts
+index d031af9ef4cb..f0d65daa1d41 100644
+--- a/src/touch-controls.ts
++++ b/src/touch-controls.ts
+@@ -251,3 +251,13 @@ export function isMobile(): boolean {
+   })(navigator.userAgent || navigator.vendor || window["opera"]);
+   return ret;
+ }
++
++/**
++ * Detect if the current device is running iOS (iPhone, iPad, or iPod)
++ * @returns true if the device is running iOS
++ */
++export function isIOS(): boolean {
++  const userAgent = navigator.userAgent || navigator.vendor || (window as any)["opera"];
++  // Check for iPhone, iPad, or iPod
++  return /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
++}
+
+From 7e607ff9aee49fc6c3384a6899a031a5d53a188c Mon Sep 17 00:00:00 2001
+From: Jerald Johnson <97370685+Scoooom@users.noreply.github.com>
+Date: Sat, 4 Apr 2026 13:54:15 -0500
+Subject: [PATCH 2/4] Fix Lint Errors
+
+---
+ src/system/game-data.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/system/game-data.ts b/src/system/game-data.ts
+index d4a198d669c0..dfc49aa58d7a 100644
+--- a/src/system/game-data.ts
++++ b/src/system/game-data.ts
+@@ -1438,8 +1438,8 @@ export class GameData {
+       // Remove iOS UI elements if they exist
+       const overlay = document.getElementById("iosUploadOverlay");
+       const button = document.getElementById("iosUploadButton");
+-      if (overlay) overlay.remove();
+-      if (button) button.remove();
++      if (overlay) { overlay.remove(); }
++      if (button) { button.remove(); }
+       
+       const reader = new FileReader();
+ 
+
+From 25781e6d2e75fc19c65f9f3c590688b84866bd79 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Sat, 4 Apr 2026 14:15:58 -0500
+Subject: [PATCH 3/4] more lint fixes
+
+---
+ src/system/game-data.ts | 28 ++++++++++++++++------------
+ 1 file changed, 16 insertions(+), 12 deletions(-)
+
+diff --git a/src/system/game-data.ts b/src/system/game-data.ts
+index dfc49aa58d7a..6ca5dc6dba93 100644
+--- a/src/system/game-data.ts
++++ b/src/system/game-data.ts
+@@ -1376,7 +1376,7 @@ export class GameData {
+     saveFile.id = "saveFile";
+     saveFile.type = "file";
+     saveFile.accept = ".prsv";
+-    
++
+     // iOS requires user interaction with a visible element to trigger file input
+     if (isIOS()) {
+       // Create a visible button for iOS
+@@ -1399,7 +1399,7 @@ export class GameData {
+         z-index: 10000;
+         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+       `;
+-      
++
+       // Create overlay
+       const overlay = document.createElement("div");
+       overlay.id = "iosUploadOverlay";
+@@ -1412,35 +1412,39 @@ export class GameData {
+         background-color: rgba(0,0,0,0.7);
+         z-index: 9999;
+       `;
+-      
++
+       // Add file input to the button (hidden but functional on iOS)
+       saveFile.style.display = "none";
+-      
++
+       // Handle button click to trigger file input
+       uploadButton.onclick = () => {
+         saveFile.click();
+       };
+-      
++
+       // Handle overlay click to cancel
+       overlay.onclick = () => {
+         overlay.remove();
+         uploadButton.remove();
+         saveFile.remove();
+       };
+-      
++
+       document.body.appendChild(overlay);
+       document.body.appendChild(uploadButton);
+     } else {
+       saveFile.style.display = "none";
+     }
+-    
++
+     saveFile.addEventListener("change", e => {
+       // Remove iOS UI elements if they exist
+       const overlay = document.getElementById("iosUploadOverlay");
+       const button = document.getElementById("iosUploadButton");
+-      if (overlay) { overlay.remove(); }
+-      if (button) { button.remove(); }
+-      
++      if (overlay) {
++        overlay.remove();
++      }
++      if (button) {
++        button.remove();
++      }
++
+       const reader = new FileReader();
+ 
+       reader.onload = (_ => {
+@@ -1542,12 +1546,12 @@ export class GameData {
+ 
+       reader.readAsText((e.target as any).files[0]);
+     });
+-    
++
+     // Only auto-click on non-iOS devices
+     if (!isIOS()) {
+       saveFile.click();
+     }
+-    
++
+     // Append the file input to body for iOS compatibility
+     document.body.appendChild(saveFile);
+   }
+
+From d424ac1ea6119ab6b005b1270a0c249e38dc6a8c Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Sat, 4 Apr 2026 14:52:55 -0500
+Subject: [PATCH 4/4] Correctly detect iPad
+
+---
+ src/touch-controls.ts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/touch-controls.ts b/src/touch-controls.ts
+index f0d65daa1d41..8f0192808281 100644
+--- a/src/touch-controls.ts
++++ b/src/touch-controls.ts
+@@ -259,5 +259,7 @@ export function isMobile(): boolean {
+ export function isIOS(): boolean {
+   const userAgent = navigator.userAgent || navigator.vendor || (window as any)["opera"];
+   // Check for iPhone, iPad, or iPod
+-  return /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
++  const userAgentCheck = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
++  const iPadSpecificCheck = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
++  return userAgentCheck || iPadSpecificCheck;
+ }
