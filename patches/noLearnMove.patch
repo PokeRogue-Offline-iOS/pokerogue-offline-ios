@@ -1,0 +1,443 @@
+From 35939cf8bc6a5f58f76fcb99851f66db4981c811 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 07:06:43 +0000
+Subject: [PATCH 01/16] add hideMoveSkipConfirm booleon
+
+---
+ src/battle-scene.ts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/battle-scene.ts b/src/battle-scene.ts
+index ea93f441d37a..2d127a2fe852 100644
+--- a/src/battle-scene.ts
++++ b/src/battle-scene.ts
+@@ -192,6 +192,7 @@ export class BattleScene extends SceneBase {
+   public enableMoveInfo = true;
+   public enableRetries = false;
+   public hideIvs = false;
++  public hideMoveSkipConfirm = false;
+   // TODO: Remove all plain numbers in place of enums or `const object` equivalents for clarity
+   /**
+    * Determines the condition for a notification should be shown for Candy Upgrades
+
+From 5f5606303cd9c3ad89627fa1c2dba72bdb260479 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 07:09:01 +0000
+Subject: [PATCH 02/16] Add Hide_Move_Skip_Confirm to the settings, and adjust
+ hideMoveSkipConfirm; require reload to make turning it on slightly annoying
+
+---
+ src/system/settings/settings.ts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/system/settings/settings.ts b/src/system/settings/settings.ts
+index d69028be6966..b077a24d6e55 100644
+--- a/src/system/settings/settings.ts
++++ b/src/system/settings/settings.ts
+@@ -148,6 +148,7 @@ export const SettingKeys = {
+   Battle_Style: "BATTLE_STYLE",
+   Enable_Retries: "ENABLE_RETRIES",
+   Hide_IVs: "HIDE_IVS",
++  Hide_Move_Skip_Confirm: "HIDE_MOVE_SKIP_CONFIRM",
+   Tutorials: "TUTORIALS",
+   Touch_Controls: "TOUCH_CONTROLS",
+   Vibration: "VIBRATION",
+@@ -373,6 +374,14 @@ export const Setting: Setting[] = [
+     default: 0,
+     type: SettingType.GENERAL,
+   },
++  {
++    key: SettingKeys.Hide_Move_Skip_Confirm,
++    label: i18next.t("settings:hideIvs"),
++    options: OFF_ON,
++    default: 1,
++    requireReload: true,
++    type: SettingType.GENERAL,
++  },
+   {
+     key: SettingKeys.Tutorials,
+     label: i18next.t("settings:tutorials"),
+@@ -810,6 +819,9 @@ export function setSetting(setting: string, value: number): boolean {
+     case SettingKeys.Hide_IVs:
+       globalScene.hideIvs = Setting[index].options[value].value === "On";
+       break;
++    case SettingKeys.Hide_Move_Skip_Confirm:
++      globalScene.hideMoveSkipConfirm = Setting[index].options[value].value === "On";
++      break;
+     case SettingKeys.Skip_Seen_Dialogues:
+       globalScene.skipSeenDialogues = Setting[index].options[value].value === "On";
+       break;
+
+From 0e9f0dfe0a1a5930dfe8e3683489e94af7bd72b7 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 07:13:38 +0000
+Subject: [PATCH 03/16] End execution of rejectMoveAndEnd without prompt if
+ hideMoveSkipConfirm is on
+
+---
+ src/phases/learn-move-phase.ts | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/phases/learn-move-phase.ts b/src/phases/learn-move-phase.ts
+index bbd1d0f5a2ec..170ae8953716 100644
+--- a/src/phases/learn-move-phase.ts
++++ b/src/phases/learn-move-phase.ts
+@@ -139,6 +139,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+    * @param Pokemon The Pokemon learning the move
+    */
+   async rejectMoveAndEnd(move: Move, pokemon: Pokemon) {
++    if (globalScene.hideMoveSkipConfirm) {
++      return;
++    }
+     await globalScene.ui.showTextPromise(
+       i18next.t("battle:learnMoveStopTeaching", { moveName: move.name }),
+       undefined,
+
+From 1aecb18d4e5aea59fbb662cf330607b27b0858e2 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 07:15:13 +0000
+Subject: [PATCH 04/16] add new language key
+
+---
+ src/system/settings/settings.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/system/settings/settings.ts b/src/system/settings/settings.ts
+index b077a24d6e55..cd59cfaa1393 100644
+--- a/src/system/settings/settings.ts
++++ b/src/system/settings/settings.ts
+@@ -376,7 +376,7 @@ export const Setting: Setting[] = [
+   },
+   {
+     key: SettingKeys.Hide_Move_Skip_Confirm,
+-    label: i18next.t("settings:hideIvs"),
++    label: i18next.t("settings:hideMoveSkipConfirm"),
+     options: OFF_ON,
+     default: 1,
+     requireReload: true,
+
+From 536201ecb85c4591ac1a64f979fe6d2e00af3081 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 08:02:21 +0000
+Subject: [PATCH 05/16] Show the did not learn text if skipped
+
+---
+ src/phases/learn-move-phase.ts | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/src/phases/learn-move-phase.ts b/src/phases/learn-move-phase.ts
+index 170ae8953716..fc8441fa2d12 100644
+--- a/src/phases/learn-move-phase.ts
++++ b/src/phases/learn-move-phase.ts
+@@ -87,7 +87,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+       () => {
+         // No
+         globalScene.ui.setMode(this.messageMode);
+-        this.rejectMoveAndEnd(move, pokemon);
++        this.rejectMoveAndEnd(move, pokemon, true);
+       },
+     );
+   }
+@@ -113,7 +113,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+       move,
+       (moveIndex: number) => {
+         if (moveIndex === 4) {
+-          globalScene.ui.setMode(this.messageMode).then(() => this.rejectMoveAndEnd(move, pokemon));
++          globalScene.ui.setMode(this.messageMode).then(() => this.rejectMoveAndEnd(move, pokemon, false));
+           return;
+         }
+         const forgetSuccessText = i18next.t("battle:learnMoveForgetSuccess", {
+@@ -138,8 +138,19 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+    * @param move The Move to be learned
+    * @param Pokemon The Pokemon learning the move
+    */
+-  async rejectMoveAndEnd(move: Move, pokemon: Pokemon) {
+-    if (globalScene.hideMoveSkipConfirm) {
++  async rejectMoveAndEnd(move: Move, pokemon: Pokemon, skippable: boolean) {
++    if (globalScene.hideMoveSkipConfirm && skippable) {
++      globalScene.ui.setMode(this.messageMode);
++      globalScene.ui
++        .showTextPromise(
++          i18next.t("battle:learnMoveNotLearned", {
++            pokemonName: getPokemonNameWithAffix(pokemon),
++            moveName: move.name,
++          }),
++          undefined,
++          true,
++        )
++        .then(() => this.end());
+       return;
+     }
+     await globalScene.ui.showTextPromise(
+
+From 772bb747c9202ce36a102eb195f0f1a8bafb2208 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 08:02:56 +0000
+Subject: [PATCH 06/16] Default new option to off
+
+---
+ src/system/settings/settings.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/system/settings/settings.ts b/src/system/settings/settings.ts
+index cd59cfaa1393..335c27dd9929 100644
+--- a/src/system/settings/settings.ts
++++ b/src/system/settings/settings.ts
+@@ -378,7 +378,7 @@ export const Setting: Setting[] = [
+     key: SettingKeys.Hide_Move_Skip_Confirm,
+     label: i18next.t("settings:hideMoveSkipConfirm"),
+     options: OFF_ON,
+-    default: 1,
++    default: 0,
+     requireReload: true,
+     type: SettingType.GENERAL,
+   },
+
+From 27a80eca4e106578b76107baec80ef63684c0ed9 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 08:04:20 +0000
+Subject: [PATCH 07/16] Show the did not learn text if skipped
+
+---
+ src/phases/learn-move-phase.ts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/phases/learn-move-phase.ts b/src/phases/learn-move-phase.ts
+index fc8441fa2d12..00188f342102 100644
+--- a/src/phases/learn-move-phase.ts
++++ b/src/phases/learn-move-phase.ts
+@@ -87,7 +87,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+       () => {
+         // No
+         globalScene.ui.setMode(this.messageMode);
+-        this.rejectMoveAndEnd(move, pokemon, true);
++        this.rejectMoveAndEnd(move, pokemon);
+       },
+     );
+   }
+@@ -113,7 +113,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+       move,
+       (moveIndex: number) => {
+         if (moveIndex === 4) {
+-          globalScene.ui.setMode(this.messageMode).then(() => this.rejectMoveAndEnd(move, pokemon, false));
++          globalScene.ui.setMode(this.messageMode).then(() => this.rejectMoveAndEnd(move, pokemon));
+           return;
+         }
+         const forgetSuccessText = i18next.t("battle:learnMoveForgetSuccess", {
+@@ -138,8 +138,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+    * @param move The Move to be learned
+    * @param Pokemon The Pokemon learning the move
+    */
+-  async rejectMoveAndEnd(move: Move, pokemon: Pokemon, skippable: boolean) {
+-    if (globalScene.hideMoveSkipConfirm && skippable) {
++  async rejectMoveAndEnd(move: Move, pokemon: Pokemon) {
++    if (globalScene.hideMoveSkipConfirm) {
+       globalScene.ui.setMode(this.messageMode);
+       globalScene.ui
+         .showTextPromise(
+
+From 03e195e162ef62d433f1132b0785816d4285f596 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 08:13:41 +0000
+Subject: [PATCH 08/16] enable the option when the setting is set to Off
+
+---
+ src/system/settings/settings.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/system/settings/settings.ts b/src/system/settings/settings.ts
+index 335c27dd9929..c87d0e0a27ca 100644
+--- a/src/system/settings/settings.ts
++++ b/src/system/settings/settings.ts
+@@ -378,7 +378,7 @@ export const Setting: Setting[] = [
+     key: SettingKeys.Hide_Move_Skip_Confirm,
+     label: i18next.t("settings:hideMoveSkipConfirm"),
+     options: OFF_ON,
+-    default: 0,
++    default: 1,
+     requireReload: true,
+     type: SettingType.GENERAL,
+   },
+@@ -820,7 +820,7 @@ export function setSetting(setting: string, value: number): boolean {
+       globalScene.hideIvs = Setting[index].options[value].value === "On";
+       break;
+     case SettingKeys.Hide_Move_Skip_Confirm:
+-      globalScene.hideMoveSkipConfirm = Setting[index].options[value].value === "On";
++      globalScene.hideMoveSkipConfirm = Setting[index].options[value].value === "Off";
+       break;
+     case SettingKeys.Skip_Seen_Dialogues:
+       globalScene.skipSeenDialogues = Setting[index].options[value].value === "On";
+
+From faea03b7c42ea7124358b770774ef62078ce3e7f Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 19:31:23 +0000
+Subject: [PATCH 09/16] Add custo lables
+
+---
+ src/system/settings/settings.ts | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/src/system/settings/settings.ts b/src/system/settings/settings.ts
+index c87d0e0a27ca..e2e5773a8765 100644
+--- a/src/system/settings/settings.ts
++++ b/src/system/settings/settings.ts
+@@ -377,7 +377,16 @@ export const Setting: Setting[] = [
+   {
+     key: SettingKeys.Hide_Move_Skip_Confirm,
+     label: i18next.t("settings:hideMoveSkipConfirm"),
+-    options: OFF_ON,
++    options: [
++      {
++        value: "Off",
++        label: i18next.t("settings:skip"),,
++      },
++      {
++        value: "On",
++        label: i18next.t("settings:confirm"),
++      },
++    ],
+     default: 1,
+     requireReload: true,
+     type: SettingType.GENERAL,
+
+From b14ca7ffe79e11400a4f9e2358c1f42a781f2bb4 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 19:33:41 +0000
+Subject: [PATCH 10/16] fix typo
+
+---
+ src/system/settings/settings.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/system/settings/settings.ts b/src/system/settings/settings.ts
+index e2e5773a8765..2a1e07b7bae3 100644
+--- a/src/system/settings/settings.ts
++++ b/src/system/settings/settings.ts
+@@ -380,7 +380,7 @@ export const Setting: Setting[] = [
+     options: [
+       {
+         value: "Off",
+-        label: i18next.t("settings:skip"),,
++        label: i18next.t("settings:skip"),
+       },
+       {
+         value: "On",
+
+From 7b0a6f0477cb0578b1e7208545f9c33cfdc2f244 Mon Sep 17 00:00:00 2001
+From: "github-actions[bot]"
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Tue, 17 Feb 2026 19:42:25 +0000
+Subject: [PATCH 11/16] Update locales submodule
+
+---
+ locales | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/locales b/locales
+index 58073d46e426..22c232bd1df4 160000
+--- a/locales
++++ b/locales
+@@ -1 +1 @@
+-Subproject commit 58073d46e42634fbf5603218328b69afd51fbf60
++Subproject commit 22c232bd1df44205cdacbed4c2eba32584518246
+
+From be3e4eaf33475383c86ef3cac6e78ae4187b863c Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 21:21:59 +0000
+Subject: [PATCH 12/16] remove accidential clipboard paste
+
+---
+ test/test-utils/helpers/settings-helper.ts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/test/test-utils/helpers/settings-helper.ts b/test/test-utils/helpers/settings-helper.ts
+index 987e883f12d4..7b90c8dd3c37 100644
+--- a/test/test-utils/helpers/settings-helper.ts
++++ b/test/test-utils/helpers/settings-helper.ts
+@@ -56,6 +56,17 @@ export class SettingsHelper extends GameManagerHelper {
+     return this;
+   }
+ 
++  /**
++   * Toggle the option to skip level move confirmations
++   * @param enable - Whether to enable or disable level move confirmations
++   * @returns `this`
++   */
++  public skipLevelPrompt(enable: boolean): this {
++    this.game.scene.hideMoveSkipConfirm = enable;
++    this.log(`Skip Move Confirmtion ${enable ? "enabled" : "disabled"}!`);
++    return this;
++  }
++
+   /**
+    * Change the player character's selected gender.
+    * @param gender - The {@linkcode PlayerGender} to set
+
+From 691af8ab0574a88c13a63a9915723b78dba03202 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 22:18:26 +0000
+Subject: [PATCH 13/16] Add new test to ensure when hideMoveSkipConfirm is
+ enabled (Skip), you can cancel out of learnng move and go direct to did not
+ learn move
+
+---
+ test/phases/learn-move-phase.test.ts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/test/phases/learn-move-phase.test.ts b/test/phases/learn-move-phase.test.ts
+index 029c6e8ea8aa..6429bca86adb 100644
+--- a/test/phases/learn-move-phase.test.ts
++++ b/test/phases/learn-move-phase.test.ts
+@@ -93,4 +93,28 @@ describe("Learn Move Phase", () => {
+     expect(bulbasaur.level).toBeGreaterThanOrEqual(levelReq);
+     expect(bulbasaur.getMoveset().map(m => m?.moveId)).toEqual(prevMoveset);
+   });
++
++  it("pressing cancel multiple times will stop learning move when hideMoveSkipConfirm is on", async () => {
++    game.settings.skipLevelPrompt(true);
++    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
++    const bulbasaur = game.field.getPlayerPokemon();
++    const prevMoveset = [MoveId.SPLASH, MoveId.ABSORB, MoveId.ACID, MoveId.VINE_WHIP];
++    game.override.startingLevel(8).levelCap(9);
++    game.move.changeMoveset(bulbasaur, [MoveId.SPLASH, MoveId.ABSORB, MoveId.ACID, MoveId.VINE_WHIP]);
++    game.move.select(MoveId.SPLASH);
++    await game.doKillOpponents();
++
++    // queue up inputs to confirm dialog boxes
++    game.onNextPrompt("LearnMovePhase", UiMode.CONFIRM, () => {
++      game.scene.ui.processInput(Button.CANCEL);
++    });
++    game.onNextPrompt("LearnMovePhase", UiMode.MESSAGE, () => {
++      game.scene.ui.processInput(Button.CANCEL);
++    });
++    await game.phaseInterceptor.to("LearnMovePhase");
++
++    const levelReq = bulbasaur.getLevelMoves(5)[0][0];
++    expect(bulbasaur.level).toBeGreaterThanOrEqual(levelReq);
++    expect(bulbasaur.getMoveset().map(m => m?.moveId)).toEqual(prevMoveset);
++  });
+ });
+
+From 07fd35990b2b90c3ad8cd410f7eec8543ad97ede Mon Sep 17 00:00:00 2001
+From: Jerald Johnson <97370685+Scoooom@users.noreply.github.com>
+Date: Mon, 23 Feb 2026 21:41:59 -0600
+Subject: [PATCH 14/16] Update test/test-utils/helpers/settings-helper.ts
+
+Co-authored-by: Wlowscha <54003515+Wlowscha@users.noreply.github.com>
+---
+ test/test-utils/helpers/settings-helper.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/test-utils/helpers/settings-helper.ts b/test/test-utils/helpers/settings-helper.ts
+index 7b90c8dd3c37..fc6249a3a718 100644
+--- a/test/test-utils/helpers/settings-helper.ts
++++ b/test/test-utils/helpers/settings-helper.ts
+@@ -63,7 +63,7 @@ export class SettingsHelper extends GameManagerHelper {
+    */
+   public skipLevelPrompt(enable: boolean): this {
+     this.game.scene.hideMoveSkipConfirm = enable;
+-    this.log(`Skip Move Confirmtion ${enable ? "enabled" : "disabled"}!`);
++    this.log(`Skip Move Confirmation ${enable ? "enabled" : "disabled"}!`);
+     return this;
+   }
+
