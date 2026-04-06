@@ -22,11 +22,18 @@ const injection = `
             const file = new File([blob], "full_unlocks.prsv");
             const reader = new FileReader();
             reader.onload = (e) => {
-              const dataKey = \`system_\${loggedInUser?.username}\`;
-              let dataStr = AES.decrypt(e.target?.result?.toString(), saveKey).toString(enc.Utf8);
-              dataStr = globalScene.gameData.convertSystemDataStr(dataStr);
-              localStorage.setItem(dataKey, encrypt(dataStr, bypassLogin));
-              window.location.reload();
+              try {
+                const dataKey = \`system_\${loggedInUser?.username}\`;
+                alert("dataKey: " + dataKey);
+                let dataStr = AES.decrypt(e.target?.result?.toString(), saveKey).toString(enc.Utf8);
+                alert("decrypted length: " + dataStr.length);
+                dataStr = globalScene.gameData.convertSystemDataStr(dataStr);
+                alert("converted, saving...");
+                localStorage.setItem(dataKey, encrypt(dataStr, bypassLogin));
+                window.location.reload();
+              } catch(err) {
+                alert("Error: " + err.message);
+              }
             };
             reader.readAsText(file);
           })
