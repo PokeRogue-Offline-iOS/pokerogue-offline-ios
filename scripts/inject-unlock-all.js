@@ -34,9 +34,8 @@ const injection = `
             const reader = new FileReader();
             reader.onload = (e) => {
               try {
-                const dataKey = \`system_Guest\`;
+                const dataKey = \`data_Guest\`;
                 localStorage.setItem(dataKey, e.target?.result?.toString());
-                allert(e.target?.result?.toString());
                 window.location.reload();
               } catch(err) {
                 alert("Error: " + err.message);
