@@ -9,8 +9,15 @@ const injection = `
       label: "Unlock Everything",
       handler: () => {
         fetch("/full_unlocks.prsv")
-          .then(r => r.arrayBuffer())
+          .then(r => {
+            if (!r.ok) {
+              alert("Failed to load save file: " + r.status + " " + r.url);
+              return null;
+            }
+            return r.arrayBuffer();
+          })
           .then(buffer => {
+            if (!buffer) return;
             const blob = new Blob([buffer]);
             const file = new File([blob], "full_unlocks.prsv");
             const reader = new FileReader();
@@ -22,7 +29,8 @@ const injection = `
               window.location.reload();
             };
             reader.readAsText(file);
-          });
+          })
+          .catch(err => alert("Fetch error: " + err.message));
         ui.revertMode();
         return true;
       },
