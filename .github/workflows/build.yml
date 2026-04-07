@@ -39,10 +39,6 @@ jobs:
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh
 
-      - name: Inject unlock everything button
-        run: node ${{ github.workspace }}/scripts/inject-unlock-all.js
-
-
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
         run: pnpm install
