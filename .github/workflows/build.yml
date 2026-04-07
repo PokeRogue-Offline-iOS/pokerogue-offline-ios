@@ -36,12 +36,6 @@ jobs:
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
             -o pokerogue-src/full_unlocks.prsv
 
-      - name: Debug game-data end
-        run: tail -15 pokerogue-src/src/system/game-data.ts | cat -v
-
-      - name: Fail intentionally
-        run: exit 1
-
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh
 
