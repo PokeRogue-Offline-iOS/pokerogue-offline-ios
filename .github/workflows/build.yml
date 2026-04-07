@@ -129,6 +129,25 @@ jobs:
           zip -r PokeRogueOffline.ipa Payload
           rm -rf Payload
 
+      - name: Get IPA size
+        id: ipa_size
+        run: echo "size=$(wc -c < PokeRogueOffline.ipa)" >> $GITHUB_OUTPUT
+
+      - name: Update AltStore source
+        env:
+          APP_VERSION: ${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
+        run: node scripts/update-altstore-source.js
+
+      - name: Commit updated source.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add source.json
+          git commit -m "Update AltStore source for v${{ steps.pokerogue_version.outputs.version }}"
+          git push
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
