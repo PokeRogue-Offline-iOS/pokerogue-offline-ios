@@ -140,11 +140,11 @@ jobs:
           IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
         run: node scripts/update-altstore-source.js
 
-      - name: Commit updated source.json
+      - name: Commit updated repo.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add source.json
+          git add repo.json
           git commit -m "Update AltStore source for v${{ steps.pokerogue_version.outputs.version }}"
           git push
 
