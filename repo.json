@@ -2,7 +2,7 @@
   "name": "PokeRogue Offline",
   "subtitle": "Unofficial offline iOS client for PokéRogue",
   "description": "An unofficial offline wrapper for PokéRogue, built by Scooom. Play fully offline with local saves, or import your save from pokerogue.net.",
-  "iconURL": "https://pkr.scooom.xyz/appIcon.png",
+  "iconURL": "https://pkr.scooom.xyz/scooom.png",
   "website": "https://pkr.scooom.xyz/",
   "tintColor": "#da3838",
   "apps": [
