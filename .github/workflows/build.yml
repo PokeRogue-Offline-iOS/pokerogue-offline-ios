@@ -37,7 +37,7 @@ jobs:
             -o pokerogue-src/full_unlocks.prsv
 
       - name: Debug game-data end
-        run: tail -15 pokerogue-src/src/system/game-data.ts | cat -A
+        run: tail -15 pokerogue-src/src/system/game-data.ts | cat -v
 
       - name: Fail intentionally
         run: exit 1
