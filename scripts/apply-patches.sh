@@ -20,14 +20,31 @@ apply_patch() {
   echo "Applied: $file"
 }
 
+apply_submodule_patch() {
+  local file="$1"
+  local submodule="$2"
+  local full_path="$PATCHES_DIR/$file"
+  echo "Applying: $file to $TARGET_DIR/$submodule"
+  git -C "$TARGET_DIR/$submodule" apply "$full_path"
+  echo "Applied: $file"
+}
+
 # Add patch files here:
 # apply_patch "01-fix-something.patch"
 
+# Patch to apply full unlock button
 apply_patch "add-import-data-from-url.js"
 apply_patch "inject-unlock-all.js"
+
+# patch to implement PKR 7077
+apply_submodule_patch "skipMoveStrings.patch" "locales"
+apply_patch "noLearnMove.patch"
+
+
 #apply_patch "iosImport.patch"
-#apply_patch "noLearnMove.patch"
 #apply_patch "noZoom.patch"
+
+# Patch in version string for offline client
 apply_patch "offlineBanner.patch"
 
 
