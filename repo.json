@@ -15,26 +15,7 @@
       "iconURL": "https://pkr.scooom.xyz/appIcon.png",
       "tintColor": "#da3838",
       "category": "games",
-      "versions": [
-        {
-          "version": "v0.1.11.18.39",
-          "buildVersion": "39",
-          "date": "2026-04-07",
-          "localizedDescription": "PokéRogue Offline 0.1.11.18 — based on the latest PokéRogue main branch.",
-          "downloadURL": "https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/download/v0.1.11.18-39/PokeRogueOffline.ipa",
-          "size": 523987127,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "v0.1.11.18.38",
-          "buildVersion": "38",
-          "date": "2026-04-07",
-          "localizedDescription": "PokéRogue Offline 0.1.11.18 — based on the latest PokéRogue main branch.",
-          "downloadURL": "https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/download/v0.1.11.18-38/PokeRogueOffline.ipa",
-          "size": 523987127,
-          "minOSVersion": "15.0"
-        }
-      ]
+      "versions": []
     }
   ],
   "news": []
