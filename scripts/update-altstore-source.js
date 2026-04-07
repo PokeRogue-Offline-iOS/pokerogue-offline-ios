@@ -15,7 +15,7 @@ if (!version || !buildNumber) {
   process.exit(1);
 }
 
-const sourcePath = path.join(__dirname, '../repo.json');
+const sourcePath = path.join(__dirname, '../docs/repo.json');
 const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
 
 const newVersion = {

@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PokéRogue Offline — iOS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --maroon:       #800000;
+      --maroon-deep:  #4a0000;
+      --maroon-mid:   #600000;
+      --maroon-light: #a83232;
+      --maroon-glow:  #c84040;
+      --gold:         #c9a84c;
+      --gold-pale:    #e8d5a0;
+      --cream:        #f5ede0;
+      --parchment:    #ede0cc;
+      --ash:          #1a0a0a;
+      --smoke:        #2a1010;
+      --text:         #e8d5b0;
+      --text-dim:     #a89070;
+      --border:       rgba(201, 168, 76, 0.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--ash);
+      color: var(--text);
+      font-family: 'Crimson Pro', Georgia, serif;
+      font-size: 18px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2.5rem;
+      height: 56px;
+      background: rgba(16, 4, 4, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(201, 168, 76, 0.12);
+      transition: border-color 0.3s;
+    }
+    nav.scrolled { border-bottom-color: rgba(201, 168, 76, 0.25); }
+    .nav-logo {
+      font-family: "Cinzel", serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--cream);
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .nav-logo img { width: 26px; height: 26px; border-radius: 6px; border: 1px solid rgba(201,168,76,0.3); }
+    .nav-links { display: flex; align-items: center; gap: 0.25rem; list-style: none; }
+    .nav-links a {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 0.4rem 0.85rem;
+      border-radius: 2px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-links a:hover { color: var(--gold); background: rgba(201,168,76,0.07); }
+    .nav-download {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      text-decoration: none;
+      padding: 0.4rem 1rem;
+      border: 1px solid rgba(201,168,76,0.4);
+      border-radius: 2px;
+      transition: all 0.2s;
+    }
+    .nav-download:hover { background: rgba(201,168,76,0.1); border-color: var(--gold); color: var(--cream); }
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 0.25rem;
+      background: none;
+      border: none;
+    }
+    .nav-hamburger span { display: block; width: 22px; height: 1.5px; background: var(--gold); transition: all 0.25s; }
+    .nav-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+    .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+    .nav-mobile {
+      display: none;
+      position: fixed;
+      top: 56px; left: 0; right: 0;
+      background: rgba(16,4,4,0.97);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(201,168,76,0.2);
+      padding: 1.5rem 2.5rem;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 499;
+    }
+    .nav-mobile.open { display: flex; }
+    .nav-mobile a {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(201,168,76,0.08);
+      transition: color 0.2s;
+    }
+    .nav-mobile a:hover { color: var(--gold); }
+    .nav-mobile a:last-child { border-bottom: none; color: var(--gold); }
+    @media (max-width: 700px) {
+      .nav-links, .nav-download { display: none; }
+      .nav-hamburger { display: flex; }
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.5;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      padding-top: 5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 4rem 2rem;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 40%, rgba(128,0,0,0.35) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 20% 80%, rgba(74,0,0,0.2) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 80% 20%, rgba(100,0,0,0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-emblem {
+      width: 120px;
+      height: 120px;
+      border-radius: 24px;
+      border: 2px solid var(--gold);
+      box-shadow:
+        0 0 0 6px rgba(201,168,76,0.1),
+        0 0 40px rgba(128,0,0,0.6),
+        0 0 80px rgba(128,0,0,0.3);
+      margin-bottom: 2.5rem;
+      animation: emblem-glow 3s ease-in-out infinite alternate;
+      object-fit: cover;
+    }
+
+    @keyframes emblem-glow {
+      from { box-shadow: 0 0 0 6px rgba(201,168,76,0.1), 0 0 40px rgba(128,0,0,0.6), 0 0 80px rgba(128,0,0,0.3); }
+      to   { box-shadow: 0 0 0 6px rgba(201,168,76,0.2), 0 0 60px rgba(200,64,64,0.7), 0 0 120px rgba(128,0,0,0.4); }
+    }
+
+    .hero-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+
+    .hero-title {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(2.8rem, 8vw, 6rem);
+      font-weight: 900;
+      line-height: 1.0;
+      color: var(--cream);
+      text-shadow:
+        0 0 60px rgba(200,64,64,0.5),
+        0 2px 4px rgba(0,0,0,0.8);
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.02em;
+    }
+
+    .hero-title span {
+      color: var(--maroon-glow);
+      text-shadow: 0 0 40px rgba(200,64,64,0.8);
+    }
+
+    .hero-subtitle {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(1rem, 3vw, 1.4rem);
+      font-weight: 400;
+      color: var(--gold-pale);
+      letter-spacing: 0.15em;
+      margin-bottom: 2.5rem;
+      opacity: 0.85;
+    }
+
+    .hero-desc {
+      max-width: 540px;
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      font-style: italic;
+      margin-bottom: 3rem;
+      line-height: 1.8;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.85rem 2rem;
+      font-family: 'Cinzel', serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-decoration: none;
+      border-radius: 3px;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .btn-primary {
+      background: var(--maroon);
+      color: var(--gold-pale);
+      border: 1px solid var(--gold);
+      box-shadow: 0 0 20px rgba(128,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .btn-primary:hover {
+      background: var(--maroon-light);
+      box-shadow: 0 0 35px rgba(200,64,64,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+      transform: translateY(-1px);
+      color: var(--cream);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--gold);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--gold);
+      background: rgba(201,168,76,0.08);
+      transform: translateY(-1px);
+    }
+
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin: 0 auto 4rem;
+      max-width: 600px;
+      padding: 0 2rem;
+      opacity: 0.5;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+    }
+
+    .divider-icon {
+      color: var(--gold);
+      font-size: 1.2rem;
+    }
+
+    /* ── SECTIONS ── */
+    section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 2rem 6rem;
+    }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--maroon-glow);
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 600;
+      color: var(--cream);
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .section-intro {
+      color: var(--text-dim);
+      font-style: italic;
+      margin-bottom: 3rem;
+      font-size: 1.05rem;
+    }
+
+    /* ── INSTALL CARDS ── */
+    .install-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .install-card {
+      background: linear-gradient(135deg, rgba(74,0,0,0.4) 0%, rgba(26,10,10,0.6) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2rem 2.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+
+    .install-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(to right, transparent, var(--maroon-light), transparent);
+    }
+
+    .install-card:hover {
+      border-color: rgba(201,168,76,0.4);
+      box-shadow: 0 4px 30px rgba(128,0,0,0.2);
+    }
+
+    .install-card.recommended::before {
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .card-num {
+      font-family: 'Cinzel', serif;
+      font-size: 0.7rem;
+      color: var(--maroon-glow);
+      letter-spacing: 0.2em;
+    }
+
+    .card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--cream);
+      margin-top: 0.3rem;
+    }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.3rem 0.7rem;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+
+    .badge-recommended {
+      background: rgba(201,168,76,0.15);
+      color: var(--gold);
+      border: 1px solid rgba(201,168,76,0.4);
+    }
+
+    .badge-simple {
+      background: rgba(128,0,0,0.2);
+      color: var(--maroon-glow);
+      border: 1px solid rgba(128,0,0,0.4);
+    }
+
+    .steps {
+      list-style: none;
+      counter-reset: step;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .steps li {
+      counter-increment: step;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      font-size: 1rem;
+      color: var(--text);
+    }
+
+    .steps li::before {
+      content: counter(step);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--maroon-glow);
+      background: rgba(128,0,0,0.2);
+      border: 1px solid rgba(200,64,64,0.3);
+      border-radius: 2px;
+      min-width: 1.6rem;
+      height: 1.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 0.15rem;
+      flex-shrink: 0;
+    }
+
+    .steps a {
+      color: var(--gold);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(201,168,76,0.3);
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .steps a:hover {
+      color: var(--cream);
+      border-color: var(--cream);
+    }
+
+    .card-note {
+      margin-top: 1.25rem;
+      padding: 0.85rem 1.2rem;
+      background: rgba(201,168,76,0.05);
+      border-left: 2px solid rgba(201,168,76,0.4);
+      font-size: 0.92rem;
+      color: var(--text-dim);
+      font-style: italic;
+      border-radius: 0 3px 3px 0;
+    }
+
+    .steps-sub {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(201,168,76,0.1);
+    }
+
+    .steps-sub-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── ALTSTORE SECTION ── */
+    .altstore-box {
+      background: linear-gradient(135deg, rgba(74,0,0,0.5) 0%, rgba(26,10,10,0.7) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .altstore-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+    }
+
+    .repo-url {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: var(--gold-pale);
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.75rem 1.25rem;
+      margin: 1.5rem 0;
+      word-break: break-all;
+      display: block;
+    }
+
+    /* ── AUTHOR ── */
+    .author-box {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      background: linear-gradient(135deg, rgba(74,0,0,0.3) 0%, rgba(26,10,10,0.5) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2rem 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .author-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 2px solid var(--gold);
+      box-shadow: 0 0 20px rgba(128,0,0,0.4);
+      flex-shrink: 0;
+      object-fit: cover;
+    }
+
+    .author-info {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .author-name {
+      font-family: 'Cinzel', serif;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--cream);
+      margin-bottom: 0.25rem;
+    }
+
+    .author-handle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--gold);
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+    }
+
+    .author-links {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .author-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 0.4rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      transition: all 0.2s;
+      letter-spacing: 0.05em;
+    }
+
+    .author-link:hover {
+      color: var(--gold);
+      border-color: rgba(201,168,76,0.5);
+      background: rgba(201,168,76,0.06);
+    }
+
+    .discord-link {
+      color: var(--maroon-glow);
+      border-color: rgba(200,64,64,0.3);
+    }
+
+    .discord-link:hover {
+      color: var(--cream);
+      border-color: var(--maroon-glow);
+      background: rgba(200,64,64,0.08);
+    }
+
+    /* ── DISCLAIMER ── */
+    .disclaimer {
+      text-align: center;
+      padding: 3rem 2rem;
+      border-top: 1px solid rgba(201,168,76,0.1);
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      font-style: italic;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.9;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      color: var(--gold-pale);
+      background: rgba(0,0,0,0.25);
+      padding: 0.15em 0.4em;
+      border-radius: 2px;
+      border: 1px solid rgba(201,168,76,0.15);
+    }
+
+    /* ── SCROLL REVEAL ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 600px) {
+      .hero { padding: 3rem 1.5rem; }
+      section { padding: 0 1.5rem 4rem; }
+      .install-card { padding: 1.5rem; }
+      .altstore-box { padding: 1.5rem; }
+      .author-box { padding: 1.5rem; gap: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav id="top-nav">
+    <a href="#" class="nav-logo">
+      <img src="https://pkr.scooom.xyz/appIcon.webp" alt="PokéRogue Offline" />
+      PokéRogue Offline
+    </a>
+    <ul class="nav-links">
+      <li><a href="#install">Install</a></li>
+      <li><a href="#altstore">AltStore</a></li>
+      <li><a href="#save">Save Data</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <a href="https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/latest" class="nav-download">↓ Download</a>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <div class="nav-mobile" id="mobile-menu">
+    <a href="#install" onclick="closeMenu()">Install</a>
+    <a href="#altstore" onclick="closeMenu()">AltStore</a>
+    <a href="#save" onclick="closeMenu()">Save Data</a>
+    <a href="#contact" onclick="closeMenu()">Contact</a>
+    <a href="https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/latest">↓ Download IPA</a>
+  </div>
+
+
+  <!-- ── HERO ── -->
+  <div class="hero">
+    <img
+      src="/appIcon.webp"
+      alt="Scooom"
+      class="hero-emblem"
+    />
+    <p class="hero-eyebrow">Unofficial iOS Client</p>
+    <h1 class="hero-title">PokéRogue<br/><span>Offline</span></h1>
+    <p class="hero-subtitle">Play Anywhere. No Internet Required.</p>
+    <p class="hero-desc">
+      A fully offline iOS wrapper for PokéRogue — the browser-based Pokémon roguelite.
+      Save locally, import from your online account, and battle on the go.
+    </p>
+    <div class="hero-cta">
+      <a href="https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/latest" class="btn btn-primary">
+        ↓ Download IPA
+      </a>
+      <a href="https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios" class="btn btn-secondary">
+        View on GitHub
+      </a>
+    </div>
+  </div>
+
+  <div class="divider"><span class="divider-icon">✦</span></div>
+
+  <!-- ── INSTALL ── -->
+  <span id="install"></span>
+  <section>
+    <div class="reveal">
+      <p class="section-label">Getting Started</p>
+      <h2 class="section-title">Installing the App</h2>
+      <p class="section-intro">
+        Since this isn't on the App Store, you'll need to sideload it. Choose the method that works best for you.
+      </p>
+    </div>
+
+    <div class="install-grid">
+
+      <!-- OPTION 1 -->
+      <div class="install-card recommended reveal">
+        <div class="card-header">
+          <div>
+            <p class="card-num">Option 01</p>
+            <h3 class="card-title">LiveContainer + SideStore</h3>
+          </div>
+          <span class="badge badge-recommended">Recommended</span>
+        </div>
+        <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+          Unlimited apps with no slot limits. Signs the IPA automatically — no extra tools needed after setup.
+        </p>
+
+        <p class="steps-sub-title">First-time setup</p>
+        <ol class="steps">
+          <li>Install <a href="https://github.com/khcrysalis/iloader" target="_blank">iLoader</a> on your PC or Mac</li>
+          <li>Connect your iPhone via USB and open iLoader</li>
+          <li>Sign in with your Apple ID</li>
+          <li>Select <strong>LiveContainer + SideStore</strong> and install</li>
+          <li>Open LiveContainer and complete setup by importing the certificate from SideStore</li>
+        </ol>
+
+        <div class="steps-sub">
+          <p class="steps-sub-title">Installing PokéRogue Offline</p>
+          <ol class="steps">
+            <li>Download <code>PokeRogueOffline.ipa</code> to your iPhone via Safari or Files</li>
+            <li>Open LiveContainer and tap <strong>+</strong> in the top right</li>
+            <li>Select the IPA file</li>
+            <li>Tap the app icon to launch</li>
+          </ol>
+        </div>
+
+        <div class="card-note">
+          LiveContainer signs the app with your SideStore certificate automatically — no manual signing needed.
+        </div>
+      </div>
+
+      <!-- OPTION 2 -->
+      <div class="install-card reveal">
+        <div class="card-header">
+          <div>
+            <p class="card-num">Option 02</p>
+            <h3 class="card-title">SideStore</h3>
+          </div>
+          <span class="badge badge-simple">Up to 3 apps</span>
+        </div>
+        <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+          Wireless refresh, no PC needed after setup. Limited to 3 sideloaded apps at once.
+        </p>
+        <ol class="steps">
+          <li>Install SideStore via iLoader or AltServer</li>
+          <li>Open SideStore and tap <strong>+</strong> in My Apps</li>
+          <li>Select <code>PokeRogueOffline.ipa</code></li>
+          <li>Apps must be refreshed every 7 days — can be automated with a Shortcuts automation</li>
+        </ol>
+      </div>
+
+      <!-- OPTION 3 -->
+      <div class="install-card reveal">
+        <div class="card-header">
+          <div>
+            <p class="card-num">Option 03</p>
+            <h3 class="card-title">Feather / Sideloadly</h3>
+          </div>
+          <span class="badge badge-simple">Already a user?</span>
+        </div>
+        <p style="color: var(--text-dim); font-size:0.97rem;">
+          If you already use Feather or Sideloadly, just sign and install the IPA as you normally would. No special steps needed.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="divider"><span class="divider-icon">✦</span></div>
+
+  <!-- ── ALTSTORE ── -->
+  <span id="altstore"></span>
+  <section>
+    <div class="reveal">
+      <p class="section-label">AltStore Compatible</p>
+      <h2 class="section-title">Add to AltStore</h2>
+      <p class="section-intro">
+        Get notified of updates automatically by adding the source repo to AltStore or SideStore.
+      </p>
+    </div>
+
+    <div class="altstore-box reveal">
+      <p style="margin-bottom:0.5rem; color: var(--text);">
+        Add the following URL as a source in AltStore or SideStore:
+      </p>
+      <code class="repo-url">https://pkr.scooom.xyz/repo.json</code>
+      <p style="color: var(--text-dim); font-size:0.95rem; font-style:italic;">
+        Note: AltStore support is newly added and hasn't been fully tested yet. If you run into any issues, please report them in the Discord channel below.
+      </p>
+
+      <div style="margin-top:1.75rem;">
+        <p class="steps-sub-title">How to add a source in AltStore</p>
+        <ol class="steps">
+          <li>Open AltStore and go to the <strong>Browse</strong> tab</li>
+          <li>Tap <strong>Sources</strong> in the top right corner</li>
+          <li>Tap <strong>+</strong> and paste the URL above</li>
+          <li>PokéRogue Offline will appear in Browse — tap to install</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"><span class="divider-icon">✦</span></div>
+
+  <!-- ── IMPORT SAVE ── -->
+  <span id="save"></span>
+  <section>
+    <div class="reveal">
+      <p class="section-label">Save Data</p>
+      <h2 class="section-title">Import Your Online Save</h2>
+      <p class="section-intro">
+        Already have progress on pokerogue.net? Bring it into the app.
+      </p>
+    </div>
+    <div class="install-card reveal">
+      <ol class="steps">
+        <li>Go to <a href="https://pokerogue.net" target="_blank">pokerogue.net</a> in a browser and log in</li>
+        <li>Navigate to <strong>Menu → Manage Data → Export Data</strong></li>
+        <li>Open PokéRogue Offline on your device</li>
+        <li>Navigate to <strong>Menu → Manage Data → Import Data</strong></li>
+        <li>Select the exported file</li>
+      </ol>
+    </div>
+  </section>
+
+  <div class="divider"><span class="divider-icon">✦</span></div>
+
+  <!-- ── AUTHOR ── -->
+  <span id="contact"></span>
+  <section>
+    <div class="reveal">
+      <p class="section-label">Made by</p>
+      <h2 class="section-title">Contact & Support</h2>
+      <p class="section-intro">
+        Questions, bugs, or feedback? Find me on the PokéRogue Discord.
+      </p>
+    </div>
+
+    <div class="author-box reveal">
+      <img
+        src="/scooom.png"
+        alt="Scooom avatar"
+        class="author-avatar"
+      />
+      <div class="author-info">
+        <p class="author-name">Scooom</p>
+        <p class="author-handle">Discord: scooom</p>
+        <div class="author-links">
+          <a
+            href="https://discord.com/channels/1125469663833370665/1237830192102244352"
+            target="_blank"
+            class="author-link discord-link"
+          >
+            ♯ offline-and-modding
+          </a>
+          <a
+            href="https://github.com/Scoooom"
+            target="_blank"
+            class="author-link"
+          >
+            ↗ GitHub
+          </a>
+        </div>
+        <p style="margin-top:1rem; font-size:0.88rem; color:var(--text-dim); font-style:italic;">
+          To access <strong>#offline-and-modding</strong>, grab the <strong>Dev</strong> role from
+          <a href="https://discord.com/channels/1125469663833370665/1194825607738052621" target="_blank" style="color:var(--gold); text-decoration:none; border-bottom:1px solid rgba(201,168,76,0.3);">#select-roles</a>
+          first.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DISCLAIMER ── -->
+  <div class="disclaimer reveal">
+    PokéRogue Offline is an unofficial fan project and is not affiliated with or endorsed by the PokéRogue team.
+    PokéRogue is developed by <a href="https://github.com/pagefaultgames" target="_blank" style="color:var(--gold-pale); text-decoration:none;">PageFaultGames</a>.
+    This app is intended for personal use only.
+  </div>
+
+  <script>
+
+    // Nav scroll effect
+    const nav = document.getElementById('top-nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // Hamburger
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+    hamburger.addEventListener('click', () => {
+      hamburger.classList.toggle('open');
+      mobileMenu.classList.toggle('open');
+    });
+
+    function closeMenu() {
+      hamburger.classList.remove('open');
+      mobileMenu.classList.remove('open');
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          setTimeout(() => e.target.classList.add('visible'), i * 80);
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>
