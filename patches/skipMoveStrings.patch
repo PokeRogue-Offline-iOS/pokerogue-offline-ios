@@ -1,0 +1,112 @@
+From a6dc35fa6b6637e8ef9aba01c1cb8c15cf3929e7 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 08:21:46 +0000
+Subject: [PATCH 1/5] Add hideMoveSkipConfirm key
+
+---
+ en/settings.json | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/en/settings.json b/en/settings.json
+index f334cdec5..789fb8e34 100644
+--- a/en/settings.json
++++ b/en/settings.json
+@@ -26,6 +26,7 @@
+   "battleStyle": "Battle Style",
+   "enableRetries": "Enable Retries",
+   "hideIvs": "Hide IV scanner",
++  "hideMoveSkipConfirm": "Confirm Skipping Move"
+   "tutorials": "Tutorials",
+   "touchControls": "Touch Controls",
+   "vibrations": "Vibrations",
+
+From 2d3ef12e49aa298ee0dd1cec2fcb0935d9ddba94 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 08:26:56 +0000
+Subject: [PATCH 2/5] opps
+
+---
+ en/settings.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/en/settings.json b/en/settings.json
+index 789fb8e34..8a108d55e 100644
+--- a/en/settings.json
++++ b/en/settings.json
+@@ -26,7 +26,7 @@
+   "battleStyle": "Battle Style",
+   "enableRetries": "Enable Retries",
+   "hideIvs": "Hide IV scanner",
+-  "hideMoveSkipConfirm": "Confirm Skipping Move"
++  "hideMoveSkipConfirm": "Confirm Skipping Move",
+   "tutorials": "Tutorials",
+   "touchControls": "Touch Controls",
+   "vibrations": "Vibrations",
+
+From 18e9f96385693eb17e3756d8f09156d53fde843b Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 09:49:46 +0000
+Subject: [PATCH 3/5] More clear wording
+
+---
+ en/settings.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/en/settings.json b/en/settings.json
+index 8a108d55e..b9c2caec6 100644
+--- a/en/settings.json
++++ b/en/settings.json
+@@ -26,7 +26,7 @@
+   "battleStyle": "Battle Style",
+   "enableRetries": "Enable Retries",
+   "hideIvs": "Hide IV scanner",
+-  "hideMoveSkipConfirm": "Confirm Skipping Move",
++  "hideMoveSkipConfirm": "Confirm When Refusing Moves",
+   "tutorials": "Tutorials",
+   "touchControls": "Touch Controls",
+   "vibrations": "Vibrations",
+
+From 9d0246c176572731a45a4835002e7114c41886c4 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 19:06:02 +0000
+Subject: [PATCH 4/5] Update text
+
+---
+ en/settings.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/en/settings.json b/en/settings.json
+index b9c2caec6..482747f85 100644
+--- a/en/settings.json
++++ b/en/settings.json
+@@ -26,7 +26,7 @@
+   "battleStyle": "Battle Style",
+   "enableRetries": "Enable Retries",
+   "hideIvs": "Hide IV scanner",
+-  "hideMoveSkipConfirm": "Confirm When Refusing Moves",
++  "hideMoveSkipConfirm": "Level Move Confirmation",
+   "tutorials": "Tutorials",
+   "touchControls": "Touch Controls",
+   "vibrations": "Vibrations",
+
+From 77a184d96f89e5964e4606debf099a5f6dcea40d Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 17 Feb 2026 19:26:53 +0000
+Subject: [PATCH 5/5] Add confirm tag
+
+---
+ en/settings.json | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/en/settings.json b/en/settings.json
+index 482747f85..f19cf9054 100644
+--- a/en/settings.json
++++ b/en/settings.json
+@@ -2,6 +2,7 @@
+   "boy": "Boy",
+   "girl": "Girl",
+   "general": "General",
++  "confirm": "Confirm",
+   "display": "Display",
+   "audio": "Audio",
+   "gamepad": "Gamepad",
