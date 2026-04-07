@@ -26,7 +26,7 @@ apply_patch "inject-unlock-all.js"
 #apply_patch "iosImport.patch"
 #apply_patch "noLearnMove.patch"
 #apply_patch "noZoom.patch"
-#apply_patch "offlineBanner.patch"
+apply_patch "offlineBanner.patch"
 
 
 echo "All patches applied successfully."
