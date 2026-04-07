@@ -6,17 +6,6 @@ let content = fs.readFileSync(filePath, 'utf8');
 const injection = `
   if (isApp) {
     manageDataOptions.push({
-      label: "Debug: Show Storage Keys",
-      handler: () => {
-        const keys = Object.keys(localStorage);
-        alert(keys.join("\\n") || "No keys found");
-        return true;
-      },
-      keepOpen: true,
-    });
-  }
-  if (isApp) {
-    manageDataOptions.push({
       label: "Unlock Everything",
       handler: () => {
         globalScene.gameData.importDataFromUrl("/full_unlocks.prsv");
