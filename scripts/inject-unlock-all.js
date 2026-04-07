@@ -19,34 +19,7 @@ const injection = `
     manageDataOptions.push({
       label: "Unlock Everything",
       handler: () => {
-        fetch("/full_unlocks.prsv")
-          .then(r => {
-            if (!r.ok) {
-              alert("Failed to load save file: " + r.status + " " + r.url);
-              return null;
-            }
-            return r.arrayBuffer();
-          })
-          .then(buffer => {
-            if (!buffer) return;
-            const blob = new Blob([buffer]);
-            const file = new File([blob], "full_unlocks.prsv");
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              try {
-                const dataKey = \`data_Guest\`;
-                const saveData = e.target?.result?.toString();
-                alert("Current Data: \n"+localStorage.getItem(dataKey));
-                alert("New Data: "+saveData);
-                localStorage.setItem(dataKey, saveData);
-                window.location.reload();
-              } catch(err) {
-                alert("Error: " + err.message);
-              }
-            };
-            reader.readAsText(file);
-          })
-          .catch(err => alert("Fetch error: " + err.message));
+        globalScene.gameData.importDataFromUrl("/full_unlocks.prsv");
         ui.revertMode();
         return true;
       },
