@@ -15,7 +15,17 @@
       "iconURL": "https://pkr.scooom.xyz/appIcon.png",
       "tintColor": "#da3838",
       "category": "games",
-      "versions": []
+      "versions": [
+        {
+          "version": "v0.1.11.18.46",
+          "buildVersion": "46",
+          "date": "2026-04-07",
+          "localizedDescription": "PokéRogue Offline 0.1.11.18 — based on the latest PokéRogue main branch.",
+          "downloadURL": "https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/download/v0.1.11.18-46/PokeRogueOffline.ipa",
+          "size": 523987076,
+          "minOSVersion": "15.0"
+        }
+      ]
     }
   ],
   "news": []
