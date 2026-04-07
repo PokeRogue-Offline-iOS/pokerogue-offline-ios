@@ -12,10 +12,11 @@ apply_patch() {
 # Add patch files here:
 # apply_patch "01-fix-something.patch"
 
-apply_patch "iosImport.patch"
-apply_patch "noLearnMove.patch"
-apply_patch "noZoom.patch"
-apply_patch "offlineBanner.patch"
+apply_patch "add-import-data-from-url.patch"
+#apply_patch "iosImport.patch"
+#apply_patch "noLearnMove.patch"
+#apply_patch "noZoom.patch"
+#apply_patch "offlineBanner.patch"
 
 
 echo "All patches applied successfully."

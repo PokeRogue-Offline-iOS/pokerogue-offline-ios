@@ -36,7 +36,8 @@ const injection = `
               try {
                 const dataKey = \`data_Guest\`;
                 const saveData = e.target?.result?.toString();
-                alert(saveData);
+                alert("Current Data: \n"+localStorage.getItem(dataKey));
+                alert("New Data: "+saveData);
                 localStorage.setItem(dataKey, saveData);
                 window.location.reload();
               } catch(err) {
