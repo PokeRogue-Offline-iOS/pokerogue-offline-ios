@@ -37,12 +37,13 @@ apply_patch "add-import-data-from-url.js"
 apply_patch "inject-unlock-all.js"
 
 # patch to implement PKR 7077
-apply_submodule_patch "skipMoveStrings.patch" "locales"
 apply_patch "noLearnMove.patch"
 
+# Patch to implement PKR 7222
+apply_patch "iosImport.patch"
 
-#apply_patch "iosImport.patch"
-#apply_patch "noZoom.patch"
+# Patch to implement PKR 7223
+apply_patch "noZoom.patch"
 
 # Patch in version string for offline client
 apply_patch "offlineBanner.patch"
