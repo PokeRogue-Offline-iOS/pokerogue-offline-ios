@@ -22,6 +22,7 @@ apply_patch() {
 # apply_patch "01-fix-something.patch"
 
 apply_patch "add-import-data-from-url.js"
+apply_patch "inject-unlock-all.js"
 #apply_patch "iosImport.patch"
 #apply_patch "noLearnMove.patch"
 #apply_patch "noZoom.patch"
