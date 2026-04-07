@@ -6,18 +6,20 @@ PATCHES_DIR="$SCRIPT_DIR/../patches"
 TARGET_DIR="pokerogue-src"
 
 apply_patch() {
-  local file="$PATCHES_DIR/$1"
-  echo "Applying: $1"
-  if [[ "$1" == *.patch ]]; then
-    git -C "$TARGET_DIR" apply "../$file"
-  elif [[ "$1" == *.js ]]; then
-    node "$file"
+  local file="$1"
+  local full_path="$PATCHES_DIR/$file"
+  echo "Applying: $file"
+  if [[ "$file" == *.patch ]]; then
+    git -C "$TARGET_DIR" apply "$full_path"
+  elif [[ "$file" == *.js ]]; then
+    node "$full_path"
   else
-    echo "Unknown file type: $1"
+    echo "Unknown file type: $file"
     exit 1
   fi
-  echo "Applied: $1"
+  echo "Applied: $file"
 }
+
 # Add patch files here:
 # apply_patch "01-fix-something.patch"
 
