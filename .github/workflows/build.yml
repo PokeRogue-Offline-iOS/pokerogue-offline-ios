@@ -36,12 +36,12 @@ jobs:
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
             -o pokerogue-src/full_unlocks.prsv
 
+      - name: Apply patches
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh
+
       - name: Inject unlock everything button
         run: node ${{ github.workspace }}/scripts/inject-unlock-all.js
 
-#      - name: Apply patches
-#        run: bash ${{ github.workspace }}/scripts/apply-patches.sh
-# Disabled for now
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
