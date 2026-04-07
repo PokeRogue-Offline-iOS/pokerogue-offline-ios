@@ -5,7 +5,9 @@ const version = process.env.APP_VERSION;
 const buildNumber = process.env.BUILD_NUMBER;
 const date = new Date().toISOString().split('T')[0];
 const ipaSize = parseInt(process.env.IPA_SIZE || '0');
-const tag = `v${version}`;
+const tag = `v${version}-${buildNumber}`;
+const version2 = `v${version}.${buildNumber}`;
+
 const downloadURL = `https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/download/${tag}/PokeRogueOffline.ipa`;
 
 if (!version || !buildNumber) {
@@ -17,7 +19,7 @@ const sourcePath = path.join(__dirname, '../repo.json');
 const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
 
 const newVersion = {
-  version: version,
+  version: version2,
   buildVersion: buildNumber,
   date: date,
   localizedDescription: `PokéRogue Offline ${version} — based on the latest PokéRogue main branch.`,

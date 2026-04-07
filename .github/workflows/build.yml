@@ -135,7 +135,7 @@ jobs:
 
       - name: Update AltStore source
         env:
-          APP_VERSION: ${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}
+          APP_VERSION: ${{ steps.pokerogue_version.outputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
           IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
         run: node scripts/update-altstore-source.js
