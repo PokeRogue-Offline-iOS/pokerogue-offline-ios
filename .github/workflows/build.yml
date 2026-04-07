@@ -36,13 +36,12 @@ jobs:
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
             -o pokerogue-src/full_unlocks.prsv
 
+      - name: Apply patches
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh
+        
       - name: Inject build number into banner
         run: |
           sed -i '' 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
-
-
-      - name: Apply patches
-        run: bash ${{ github.workspace }}/scripts/apply-patches.sh
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
