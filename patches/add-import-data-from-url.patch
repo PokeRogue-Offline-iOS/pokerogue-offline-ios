@@ -1,6 +1,6 @@
 --- a/src/system/game-data.ts
 +++ b/src/system/game-data.ts
-@@ -2073,4 +2073,21 @@ export class GameData {
+@@ -2073,4 +2073,22 @@ export class GameData {
      }
    }
 +
