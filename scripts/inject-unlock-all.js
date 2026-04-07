@@ -35,7 +35,9 @@ const injection = `
             reader.onload = (e) => {
               try {
                 const dataKey = \`data_Guest\`;
-                localStorage.setItem(dataKey, e.target?.result?.toString());
+                const saveData = e.target?.result?.toString();
+                alert(saveData);
+                localStorage.setItem(dataKey, saveData);
                 window.location.reload();
               } catch(err) {
                 alert("Error: " + err.message);
