@@ -3,24 +3,25 @@ const fs = require('fs');
 const filePath = 'pokerogue-src/src/ui/handlers/title-ui-handler.ts';
 let content = fs.readFileSync(filePath, 'utf8');
 
-const anchor = `    this.titleContainer.add([
-      logo,
-      this.usernameLabel,
-      this.playerCountLabel,
-      this.splashMessageText,
-      this.appVersionText,
-    ]);`;
+const anchor1 = `    return i18next.t("menu:loggedInAs", { username: displayName });`;
 
 if (!content.includes(anchor)) {
-  console.warn('Anchor not found — skipping');
+  console.warn('loggedInAs Anchor not found — skipping');
   process.exit(1);
 }
 
-content = content.replace(anchor, `    this.titleContainer.add([
-      logo,
-      this.splashMessageText,
-      this.appVersionText,
-    ]);`);
+content = content.replace(anchor1, `    return "";`);
+
+const anchor2 = `    this.playerCountLabel = addTextObject(labelPosX, 0, \`? ${i18next.t("menu:playersOnline")}\`, TextStyle.MESSAGE, {`;
+
+if (!content.includes(anchor)) {
+  console.warn('playerCountLabel Anchor not found — skipping');
+  process.exit(1);
+}
+
+content = content.replace(anchor2, `    this.playerCountLabel = addTextObject(labelPosX, 0, \`\`, TextStyle.MESSAGE, {`);
+
+
 
 fs.writeFileSync(filePath, content);
 console.log('Online labels removed successfully');
