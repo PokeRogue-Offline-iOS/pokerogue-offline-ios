@@ -12,7 +12,7 @@ if (!content.includes(anchor1)) {
 
 content = content.replace(anchor1, `    return "";`);
 
-const anchor2 = `    this.playerCountLabel = addTextObject(labelPosX, 0, \`? ${i18next.t("menu:playersOnline")}\`, TextStyle.MESSAGE, {`;
+const anchor2 = `    this.playerCountLabel = addTextObject(labelPosX, 0, \`? \${i18next.t("menu:playersOnline")}\`, TextStyle.MESSAGE, {`;
 
 if (!content.includes(anchor2)) {
   console.warn('playerCountLabel Anchor not found — skipping');
