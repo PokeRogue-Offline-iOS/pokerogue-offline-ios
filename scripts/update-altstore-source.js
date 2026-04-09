@@ -34,5 +34,5 @@ source.apps[0].versions.unshift(newVersion);
 // Keep only the last 5 versions to avoid the file growing forever
 source.apps[0].versions = source.apps[0].versions.slice(0, 5);
 
-//fs.writeFileSync(sourcePath, JSON.stringify(source, null, 2));
+fs.writeFileSync(sourcePath, JSON.stringify(source, null, 2));
 console.log(`Updated source.json with version ${version} (build ${buildNumber})`);
