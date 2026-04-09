@@ -12,14 +12,14 @@ if (!content.includes(anchor1)) {
 
 content = content.replace(anchor1, `    return "";`);
 
-const anchor2 = `    this.playerCountLabel = addTextObject(labelPosX, 0, \`? \${i18next.t("menu:playersOnline")}\`, TextStyle.MESSAGE, {`;
+const anchor2 = `    this.titleContainer.add([`;
 
 if (!content.includes(anchor2)) {
-  console.warn('playerCountLabel Anchor not found — skipping');
+  console.warn('titleContainer.add Anchor not found — skipping');
   process.exit(1);
 }
-
-content = content.replace(anchor2, `    this.playerCountLabel = addTextObject(labelPosX, 0, \`\`, TextStyle.MESSAGE, {`);
+const injection = `this.playerCountLabel.setText(\`\`);`;
+content = content.replace(anchor2, injection + '\n  ' + anchor);
 
 
 
