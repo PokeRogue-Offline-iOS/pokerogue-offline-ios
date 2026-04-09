@@ -48,5 +48,7 @@ apply_patch "noZoom.patch"
 # Patch in version string for offline client
 apply_patch "offlineBanner.patch"
 
+# Patch out logged in as and online count
+apply_patch "update-title-labels.js"
 
 echo "All patches applied successfully."
