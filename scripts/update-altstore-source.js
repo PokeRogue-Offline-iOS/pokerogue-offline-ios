@@ -6,9 +6,9 @@ const buildNumber = process.env.BUILD_NUMBER;
 const date = new Date().toISOString().split('T')[0];
 const ipaSize = parseInt(process.env.IPA_SIZE || '0');
 const tag = `v${version}-${buildNumber}`;
-const version2 = `v${version}.${buildNumber}`;
+const version2 = `${version}.${buildNumber}`;
 
-const downloadURL = `https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/download/${tag}/PokeRogueOffline.ipa`;
+const downloadURL = `https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases/download/v${tag}/PokeRogueOffline.ipa`;
 
 if (!version || !buildNumber) {
   console.error('Missing APP_VERSION or BUILD_NUMBER');
