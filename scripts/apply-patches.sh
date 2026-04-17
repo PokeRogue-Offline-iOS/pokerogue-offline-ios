@@ -51,4 +51,6 @@ apply_patch "offlineBanner.patch"
 # Patch out logged in as and online count
 apply_patch "update-title-labels.js"
 
+apply_patch "export-fix.js"
+
 echo "All patches applied successfully."
