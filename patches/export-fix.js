@@ -41,8 +41,8 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
         // On native we write to the cache directory and open the OS share sheet.
         // On web we keep the original blob-URL anchor approach.
         if ((window as any).Capacitor?.isNativePlatform?.()) {
-          const { Filesystem, Directory } = await import("@capacitor/filesystem");
-          const { Share } = await import("@capacitor/share");
+          const { Filesystem, Directory } = import("@capacitor/filesystem");
+          const { Share } = import("@capacitor/share");
 
           const encryptedString = encryptedData.toString();
           const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
