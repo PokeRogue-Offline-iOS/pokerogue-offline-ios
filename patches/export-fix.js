@@ -48,18 +48,18 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
           const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
           const fileName = \`\${dataKey}.prsv\`;
 
-          await Filesystem.writeFile({
+          Filesystem.writeFile({
             path: fileName,
             data: base64,
             directory: Directory.Cache,
           });
 
-          const { uri } = await Filesystem.getUri({
+          const { uri } = Filesystem.getUri({
             path: fileName,
             directory: Directory.Cache,
           });
 
-          await Share.share({
+          Share.share({
             title: "Export Save Data",
             url: uri,
             dialogTitle: "Save your .prsv file",
