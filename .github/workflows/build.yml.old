@@ -59,7 +59,7 @@ jobs:
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
-          pnpm add @capacitor/core @capacitor/cli @capacitor/ios @capacitor/filesystem @capacitor/share
+          pnpm add @capacitor/core @capacitor/cli @capacitor/ios
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
@@ -106,7 +106,6 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType public.app-category.games" ios/App/App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.games" ios/App/App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :UIHomeIndicatorAutoHidden bool true" ios/App/App/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :NSDocumentsFolderUsageDescription string 'Required to save your exported game data file.'" ios/App/App/Info.plist || true
 
       - name: Copy app icon
         run: |
