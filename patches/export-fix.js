@@ -8,6 +8,9 @@
  * @capacitor/filesystem + @capacitor/share on native, and keeps the original
  * blob-URL path for web builds.
  *
+ * Uses Promise.then() chaining instead of async/await so the patch is safe
+ * regardless of whether the enclosing function is async or not.
+ *
  * Targets: src/system/game-data.ts
  */
 
@@ -25,8 +28,7 @@ if (!fs.existsSync(TARGET)) {
 let src = fs.readFileSync(TARGET, "utf8");
 
 // ---------------------------------------------------------------------------
-// The original export block (appears once per export type, but the blob/link
-// pattern is identical). We match on the tightest unique anchor we can.
+// The original export block in game-data.ts
 // ---------------------------------------------------------------------------
 const ORIGINAL = `const blob = new Blob([encryptedData.toString()], {
           type: "text/json",
@@ -37,32 +39,37 @@ const ORIGINAL = `const blob = new Blob([encryptedData.toString()], {
         link.click();
         link.remove();`;
 
+// Uses .then() chaining so no async context is required
 const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file downloads.
         // On native we write to the cache directory and open the OS share sheet.
         // On web we keep the original blob-URL anchor approach.
         if ((window as any).Capacitor?.isNativePlatform?.()) {
-          const { Filesystem, Directory } = await import("@capacitor/filesystem");
-          const { Share } = await import("@capacitor/share");
-
           const encryptedString = encryptedData.toString();
           const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
           const fileName = \`\${dataKey}.prsv\`;
 
-          await Filesystem.writeFile({
-            path: fileName,
-            data: base64,
-            directory: Directory.Cache,
-          });
-
-          const { uri } = await Filesystem.getUri({
-            path: fileName,
-            directory: Directory.Cache,
-          });
-
-          await Share.share({
-            title: "Export Save Data",
-            url: uri,
-            dialogTitle: "Save your .prsv file",
+          Promise.all([
+            import("@capacitor/filesystem"),
+            import("@capacitor/share"),
+          ]).then(([{ Filesystem, Directory }, { Share }]) => {
+            Filesystem.writeFile({
+              path: fileName,
+              data: base64,
+              directory: Directory.Cache,
+            }).then(() => {
+              return Filesystem.getUri({
+                path: fileName,
+                directory: Directory.Cache,
+              });
+            }).then(({ uri }) => {
+              return Share.share({
+                title: "Export Save Data",
+                url: uri,
+                dialogTitle: "Save your .prsv file",
+              });
+            }).catch((err: any) => {
+              console.error("Capacitor export failed:", err);
+            });
           });
         } else {
           const blob = new Blob([encryptedData.toString()], {
@@ -91,7 +98,6 @@ if (occurrences > 1) {
 
 const patched = src.split(ORIGINAL).join(REPLACEMENT);
 
-// Sanity check — make sure we actually changed something
 if (patched === src) {
   console.error("ERROR: Replacement produced no change. Something went wrong.");
   process.exit(1);
@@ -105,6 +111,3 @@ console.log("");
 console.log("NOTE: Ensure the following Capacitor plugins are installed:");
 console.log("  npm install @capacitor/filesystem @capacitor/share");
 console.log("  npx cap sync");
-console.log("");
-console.log("Android: add WRITE_EXTERNAL_STORAGE permission to AndroidManifest.xml");
-console.log("iOS:     add NSDocumentsFolderUsageDescription to Info.plist");
