@@ -4,14 +4,11 @@
  * Fixes save data export (Export Data / Export Session) in Capacitor native builds.
  *
  * On native Capacitor platforms, blob URL downloads via <a download> are silently
- * blocked by the WebView. This patch wraps the export logic to use
- * @capacitor/filesystem + @capacitor/share on native, and keeps the original
- * blob-URL path for web builds.
+ * blocked by the WebView. This patch wraps the export logic to use the Capacitor
+ * plugin globals (injected at runtime by the native bridge) instead of imports,
+ * which avoids Vite trying to resolve @capacitor/* packages at build time.
  *
- * Uses Promise.then() chaining instead of async/await so the patch is safe
- * regardless of whether the enclosing function is async or not.
- *
- * Targets: src/system/game-data.ts
+ * Targets: pokerogue-src/src/system/game-data.ts
  */
 
 const fs = require("fs");
@@ -39,29 +36,29 @@ const ORIGINAL = `const blob = new Blob([encryptedData.toString()], {
         link.click();
         link.remove();`;
 
-// Uses .then() chaining so no async context is required
+// Access Capacitor plugins via the runtime globals that the native bridge injects.
+// This avoids any import statement, so Vite has nothing to resolve at build time.
+// Capacitor injects window.Capacitor and registers plugins under
+// window.Capacitor.Plugins.Filesystem / .Share before the app JS runs.
 const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file downloads.
-        // On native we write to the cache directory and open the OS share sheet.
-        // On web we keep the original blob-URL anchor approach.
-        if ((window as any).Capacitor?.isNativePlatform?.()) {
-          const encryptedString = encryptedData.toString();
-          const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
-          const fileName = \`\${dataKey}.prsv\`;
-
-          Promise.all([
-            import("@capacitor/filesystem"),
-            import("@capacitor/share"),
-          ]).then(([{ Filesystem, Directory }, { Share }]) => {
+        // On native, use the Capacitor plugin globals injected by the native bridge.
+        // These are available at runtime without any import statement, so Vite
+        // does not need to resolve @capacitor/* packages during the build.
+        const cap = (window as any).Capacitor;
+        if (cap?.isNativePlatform?.()) {
+          const Filesystem = cap.Plugins?.Filesystem;
+          const Share = cap.Plugins?.Share;
+          if (Filesystem && Share) {
+            const encryptedString = encryptedData.toString();
+            const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
+            const fileName = \`\${dataKey}.prsv\`;
             Filesystem.writeFile({
               path: fileName,
               data: base64,
-              directory: Directory.Cache,
+              directory: "CACHE",
             }).then(() => {
-              return Filesystem.getUri({
-                path: fileName,
-                directory: Directory.Cache,
-              });
-            }).then(({ uri }) => {
+              return Filesystem.getUri({ path: fileName, directory: "CACHE" });
+            }).then(({ uri }: { uri: string }) => {
               return Share.share({
                 title: "Export Save Data",
                 url: uri,
@@ -70,7 +67,9 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
             }).catch((err: any) => {
               console.error("Capacitor export failed:", err);
             });
-          });
+          } else {
+            console.error("Capacitor Filesystem or Share plugin not available.");
+          }
         } else {
           const blob = new Blob([encryptedData.toString()], {
             type: "text/json",
@@ -107,7 +106,3 @@ fs.writeFileSync(TARGET, patched, "utf8");
 
 console.log(`Patched ${occurrences} occurrence(s) in ${TARGET}`);
 console.log("Capacitor export fix applied successfully.");
-console.log("");
-console.log("NOTE: Ensure the following Capacitor plugins are installed:");
-console.log("  npm install @capacitor/filesystem @capacitor/share");
-console.log("  npx cap sync");
