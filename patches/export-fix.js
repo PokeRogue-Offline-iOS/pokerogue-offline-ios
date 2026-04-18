@@ -1,16 +1,23 @@
 #!/usr/bin/env node
 /**
  * Patch: capacitor-export-fix.js
- * Fixes save data export (Export Data / Export Session) in Capacitor native builds.
  *
- * Fixes:
- *   - Blob URL downloads don't work in Capacitor WebView → use Filesystem + Share plugins
- *   - .prsv extension stripped by iOS share sheet → write to Documents directory
- *   - A button spam after share sheet dismisses → pause the entire Phaser game loop
- *     while the share sheet is open, resume it after dismissal with a drain delay
+ * Fixes save data export in Capacitor native (iOS) builds.
  *
- * Uses Capacitor plugin globals (window.Capacitor.Plugins.*) rather than imports
- * so Vite has nothing to resolve at build time.
+ * Problem 1 — Filename loses .prsv extension:
+ *   iOS strips unknown extensions in the share sheet because it doesn't know
+ *   the UTI for .prsv. We register a custom UTI in Info.plist (see build.yml)
+ *   so iOS treats .prsv as a known document type and preserves the extension.
+ *
+ * Problem 2 — A button spam while share sheet is open:
+ *   game.pause() stops Phaser's RAF loop but the WebView still dispatches
+ *   touch/pointer events into the DOM which Phaser's input queue replays on
+ *   resume. Fix: attach a capturing event listener that swallows ALL input
+ *   events at the window level while the sheet is open, then remove it after
+ *   a drain delay once the sheet dismisses.
+ *
+ * Problem 3 — Content under notch (handled in build.yml):
+ *   viewport-fit=cover + StatusBar overlaysWebView:false in capacitor.config.
  *
  * Targets: pokerogue-src/src/system/game-data.ts
  */
@@ -40,12 +47,6 @@ const ORIGINAL = `const blob = new Blob([encryptedData.toString()], {
         link.click();
         link.remove();`;
 
-// Pause the entire Phaser game loop while the share sheet is open.
-// globalScene.game.pause() stops the RAF loop entirely — no update ticks,
-// no input polling, no gamepad reads. This is the nuclear option but it's
-// the only reliable way to prevent button events from leaking through.
-// globalScene.game.resume() restarts it. We add a 500ms delay after the
-// share sheet resolves to drain any buffered events before resuming.
 const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file downloads.
         // On native, use the Capacitor plugin globals injected by the native bridge.
         const cap = (window as any).Capacitor;
@@ -57,8 +58,30 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
             const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
             const fileName = \`\${dataKey}.prsv\`;
 
-            // Pause the entire Phaser game loop so no input events (gamepad,
-            // keyboard, touch) can fire while the native share sheet is open.
+            // --- Input lockout ---
+            // Swallow ALL input events at the window level with a capturing
+            // listener. This fires before Phaser or any other handler sees the
+            // event, so nothing leaks through regardless of what game.pause()
+            // does or doesn't stop.
+            const swallowInput = (e: Event) => {
+              e.stopImmediatePropagation();
+              e.preventDefault();
+            };
+            const INPUT_EVENTS = [
+              "keydown", "keyup", "keypress",
+              "pointerdown", "pointerup", "pointermove",
+              "touchstart", "touchend", "touchmove",
+              "mousedown", "mouseup", "click",
+            ];
+            const attachSwallow = () => INPUT_EVENTS.forEach(t =>
+              window.addEventListener(t, swallowInput, { capture: true, passive: false })
+            );
+            const detachSwallow = () => INPUT_EVENTS.forEach(t =>
+              window.removeEventListener(t, swallowInput, { capture: true })
+            );
+
+            // Also pause Phaser so the game loop doesn't tick while locked.
+            attachSwallow();
             globalScene.game.pause();
 
             Filesystem.writeFile({
@@ -69,21 +92,29 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
               return Filesystem.getUri({ path: fileName, directory: "DOCUMENTS" });
             }).then(({ uri }: { uri: string }) => {
               return Share.share({
+                // Pass the full filename so iOS uses it as the suggested save
+                // name. The custom UTI registered in Info.plist (see build.yml)
+                // tells iOS that .prsv is a known type so it won't strip it.
                 title: fileName,
                 url: uri,
                 dialogTitle: \`Save \${fileName}\`,
               });
             }).then(() => {
-              // Share sheet dismissed. Wait for buffered input events to expire
-              // before resuming the game loop, then close the menu.
+              // Share sheet dismissed. Keep swallowing input for a drain period
+              // so any buffered events from the dismiss gesture don't fire,
+              // then resume and close the menu.
               setTimeout(() => {
+                detachSwallow();
                 globalScene.game.resume();
                 globalScene.ui.revertMode();
-              }, 500);
+              }, 600);
             }).catch((err: any) => {
+              // User cancelled or error — still clean up so nothing is stuck.
               console.error("Capacitor export failed:", err);
-              // Always resume so the player isn't stuck on a frozen screen.
-              globalScene.game.resume();
+              setTimeout(() => {
+                detachSwallow();
+                globalScene.game.resume();
+              }, 600);
             });
           } else {
             console.error("Capacitor Filesystem or Share plugin not available.");
@@ -121,6 +152,5 @@ if (patched === src) {
 }
 
 fs.writeFileSync(TARGET, patched, "utf8");
-
 console.log(`Patched ${occurrences} occurrence(s) in ${TARGET}`);
 console.log("Capacitor export fix applied successfully.");
