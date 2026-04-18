@@ -70,7 +70,7 @@ jobs:
           cat > capacitor.config.json << 'CAPEOF'
           {
             "appId": "xyz.scooom.pkr",
-            "appName": "PokŽRogue Offline",
+            "appName": "PokÃ©Rogue Offline",
             "webDir": "dist",
             "ios": {
               "contentInset": "never",
@@ -121,7 +121,7 @@ jobs:
         run: |
           /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes array" ios/App/App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0 dict" ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeName string PokŽRogue Save Data" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeName string PokÃ©Rogue Save Data" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes array" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes:0 string xyz.scooom.pkr.prsv" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSHandlerRank string Owner" ios/App/App/Info.plist
@@ -129,7 +129,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations array" ios/App/App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0 dict" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeIdentifier string xyz.scooom.pkr.prsv" ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeDescription string PokŽRogue Save Data" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeDescription string PokÃ©Rogue Save Data" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo array" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:0 string public.data" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification dict" ios/App/App/Info.plist
