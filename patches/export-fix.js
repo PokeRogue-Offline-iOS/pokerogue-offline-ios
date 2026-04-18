@@ -6,9 +6,8 @@
  * Fixes:
  *   - Blob URL downloads don't work in Capacitor WebView → use Filesystem + Share plugins
  *   - .prsv extension stripped by iOS share sheet → write to Documents directory
- *     (iOS preserves extensions for files shared from Documents, unlike Cache)
- *   - A button spam after share sheet dismisses → disable/re-enable Phaser input
- *     around the share sheet lifetime, close menu on dismiss
+ *   - A button spam after share sheet dismisses → pause the entire Phaser game loop
+ *     while the share sheet is open, resume it after dismissal with a drain delay
  *
  * Uses Capacitor plugin globals (window.Capacitor.Plugins.*) rather than imports
  * so Vite has nothing to resolve at build time.
@@ -41,21 +40,14 @@ const ORIGINAL = `const blob = new Blob([encryptedData.toString()], {
         link.click();
         link.remove();`;
 
-// Key fixes for the extension issue:
-//
-// 1. Write to Directory.Documents instead of Directory.Cache.
-//    iOS respects the filename (including extension) for files shared from
-//    the Documents directory. Files shared from Cache often have their
-//    extension stripped because iOS can't identify the UTI for unknown types
-//    in the sandboxed cache path.
-//
-// 2. The fileName variable already appends .prsv correctly, but we make it
-//    explicit and also pass it as the `title` in Share.share so the iOS
-//    share sheet shows the correct name in the AirDrop/Files preview.
+// Pause the entire Phaser game loop while the share sheet is open.
+// globalScene.game.pause() stops the RAF loop entirely — no update ticks,
+// no input polling, no gamepad reads. This is the nuclear option but it's
+// the only reliable way to prevent button events from leaking through.
+// globalScene.game.resume() restarts it. We add a 500ms delay after the
+// share sheet resolves to drain any buffered events before resuming.
 const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file downloads.
         // On native, use the Capacitor plugin globals injected by the native bridge.
-        // These are available at runtime without any import statement, so Vite
-        // does not need to resolve @capacitor/* packages during the build.
         const cap = (window as any).Capacitor;
         if (cap?.isNativePlatform?.()) {
           const Filesystem = cap.Plugins?.Filesystem;
@@ -63,17 +55,11 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
           if (Filesystem && Share) {
             const encryptedString = encryptedData.toString();
             const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
-
-            // Ensure the filename always has the .prsv extension.
-            // Use Documents (not Cache) so iOS preserves the extension
-            // when the share sheet hands the file to Files / AirDrop / etc.
             const fileName = \`\${dataKey}.prsv\`;
 
-            // Disable Phaser input immediately to prevent A-button spam
-            // while the native share sheet is in the foreground.
-            (globalScene as any).input?.keyboard?.disableGlobalCapture?.();
-            (globalScene as any).input?.gamepad?.disconnectAll?.();
-            (globalScene as any).input?.enabled && ((globalScene as any).input.enabled = false);
+            // Pause the entire Phaser game loop so no input events (gamepad,
+            // keyboard, touch) can fire while the native share sheet is open.
+            globalScene.game.pause();
 
             Filesystem.writeFile({
               path: fileName,
@@ -83,26 +69,21 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
               return Filesystem.getUri({ path: fileName, directory: "DOCUMENTS" });
             }).then(({ uri }: { uri: string }) => {
               return Share.share({
-                // Pass the filename as the title so iOS uses it as the
-                // suggested save name in the share sheet preview.
                 title: fileName,
                 url: uri,
                 dialogTitle: \`Save \${fileName}\`,
               });
             }).then(() => {
-              // Share sheet dismissed — wait a short moment for any buffered
-              // touch/button events to drain before re-enabling input.
+              // Share sheet dismissed. Wait for buffered input events to expire
+              // before resuming the game loop, then close the menu.
               setTimeout(() => {
-                (globalScene as any).input.enabled = true;
-                (globalScene as any).input?.keyboard?.enableGlobalCapture?.();
-                // Close the Manage Data menu and return to the previous screen.
+                globalScene.game.resume();
                 globalScene.ui.revertMode();
-              }, 300);
+              }, 500);
             }).catch((err: any) => {
               console.error("Capacitor export failed:", err);
-              // Re-enable input so the player isn't left with a frozen screen.
-              (globalScene as any).input.enabled = true;
-              (globalScene as any).input?.keyboard?.enableGlobalCapture?.();
+              // Always resume so the player isn't stuck on a frozen screen.
+              globalScene.game.resume();
             });
           } else {
             console.error("Capacitor Filesystem or Share plugin not available.");
