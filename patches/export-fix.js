@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 /**
  * Patch: capacitor-export-fix.js
- * Fixes save data export (Export Data / Export Session) in Capacitor native (iOS) builds.
  *
- * Problems fixed:
- *   1. Blob URL downloads don't work in Capacitor WebView → use Filesystem + Share plugins
- *   2. A button held down after export → call globalScene.inputController.deactivatePressedKey()
- *      before opening the share sheet. When the user taps "Export Data", touchstart fires and
- *      locks the button down. The OS then steals the touch to open the share sheet, so touchend
- *      never fires and the game thinks the button is still held. deactivatePressedKey() clears
- *      all touch intervals, empties buttonLock, and removes active classes — exactly what
- *      touchend would have done.
- *   3. .prsv extension preserved → write to Documents directory + custom UTI in Info.plist
+ * Fixes save data export in Capacitor native (iOS) builds.
+ *
+ * The core problem is that iOS requires a genuine user gesture (a real DOM tap)
+ * to open a share sheet. The game's touch controls use Phaser's input pipeline
+ * which is completely separate from the DOM — so by the time the export handler
+ * runs, there is no live user gesture that iOS will accept for Share.share().
+ *
+ * Solution: when running natively, instead of immediately triggering the share,
+ * inject a fullscreen DOM overlay with a single "Save File" button. The user
+ * taps that button — a real DOM touchend on a real HTMLButtonElement — which
+ * iOS accepts as a genuine gesture. The share sheet opens from there, and the
+ * overlay removes itself on completion or dismissal.
+ *
+ * This completely bypasses Phaser's touch system, so there is no button-lock
+ * or held-key issue.
  *
  * Targets: pokerogue-src/src/system/game-data.ts
  */
@@ -29,7 +34,8 @@ if (!fs.existsSync(TARGET)) {
 
 let src = fs.readFileSync(TARGET, "utf8");
 
-const ORIGINAL = `const blob = new Blob([encryptedData.toString()], {
+const ORIGINAL = `        const encryptedData = AES.encrypt(dataStr, saveKey);
+        const blob = new Blob([encryptedData.toString()], {
           type: "text/json",
         });
         const link = document.createElement("a");
@@ -38,22 +44,83 @@ const ORIGINAL = `const blob = new Blob([encryptedData.toString()], {
         link.click();
         link.remove();`;
 
-const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file downloads.
-        // On native, use the Capacitor plugin globals injected by the native bridge.
+const REPLACEMENT = `        const encryptedData = AES.encrypt(dataStr, saveKey);
+
         const cap = (window as any).Capacitor;
         if (cap?.isNativePlatform?.()) {
-          const Filesystem = cap.Plugins?.Filesystem;
-          const Share = cap.Plugins?.Share;
-          if (Filesystem && Share) {
-            const encryptedString = encryptedData.toString();
-            const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
-            const fileName = \`\${dataKey}.prsv\`;
+          // On iOS, Share.share() requires a genuine DOM user gesture to open
+          // the share sheet. Phaser's touch pipeline doesn't count. So we inject
+          // a fullscreen overlay with a real HTML button — the user taps it,
+          // iOS sees a legitimate gesture, and the share sheet opens cleanly.
+          const encryptedString = encryptedData.toString();
+          const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
+          const fileName = \`\${dataKey}.prsv\`;
 
-            // Release any held touch buttons before the OS steals the touch
-            // to show the share sheet. Without this, the touchend event for
-            // the "Export Data" tap never fires into the game, leaving the
-            // button locked in a held-down state indefinitely.
-            globalScene.inputController.deactivatePressedKey();
+          // --- Build overlay ---
+          const overlay = document.createElement("div");
+          overlay.id = "cap-export-overlay";
+          Object.assign(overlay.style, {
+            position:         "fixed",
+            inset:            "0",
+            zIndex:           "99999",
+            display:          "flex",
+            flexDirection:    "column",
+            alignItems:       "center",
+            justifyContent:   "center",
+            background:       "rgba(0,0,0,0.72)",
+            fontFamily:       "sans-serif",
+          });
+
+          const label = document.createElement("p");
+          label.textContent = \`Save \${fileName}\`;
+          Object.assign(label.style, {
+            color:        "#fff",
+            fontSize:     "18px",
+            marginBottom: "24px",
+            textAlign:    "center",
+            padding:      "0 24px",
+          });
+
+          const btn = document.createElement("button");
+          btn.textContent = "📁 Save to Files";
+          Object.assign(btn.style, {
+            padding:       "18px 40px",
+            fontSize:      "20px",
+            fontWeight:    "bold",
+            background:    "#da3838",
+            color:         "#fff",
+            border:        "none",
+            borderRadius:  "12px",
+            cursor:        "pointer",
+            marginBottom:  "16px",
+            minWidth:      "200px",
+          });
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.textContent = "Cancel";
+          Object.assign(cancelBtn.style, {
+            padding:      "12px 32px",
+            fontSize:     "16px",
+            background:   "transparent",
+            color:        "#aaa",
+            border:       "1px solid #aaa",
+            borderRadius: "8px",
+            cursor:       "pointer",
+          });
+
+          const removeOverlay = () => overlay.parentNode?.removeChild(overlay);
+
+          btn.addEventListener("click", () => {
+            btn.disabled = true;
+            btn.textContent = "Opening…";
+
+            const Filesystem = cap.Plugins?.Filesystem;
+            const Share = cap.Plugins?.Share;
+            if (!Filesystem || !Share) {
+              console.error("Capacitor Filesystem or Share plugin not available.");
+              removeOverlay();
+              return;
+            }
 
             Filesystem.writeFile({
               path: fileName,
@@ -68,14 +135,25 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
                 dialogTitle: \`Save \${fileName}\`,
               });
             }).then(() => {
+              removeOverlay();
               globalScene.ui.revertMode();
             }).catch((err: any) => {
               console.error("Capacitor export failed:", err);
+              removeOverlay();
             });
-          } else {
-            console.error("Capacitor Filesystem or Share plugin not available.");
-          }
+          });
+
+          cancelBtn.addEventListener("click", () => {
+            removeOverlay();
+          });
+
+          overlay.appendChild(label);
+          overlay.appendChild(btn);
+          overlay.appendChild(cancelBtn);
+          document.body.appendChild(overlay);
+
         } else {
+          // Web: original blob download path
           const blob = new Blob([encryptedData.toString()], {
             type: "text/json",
           });
