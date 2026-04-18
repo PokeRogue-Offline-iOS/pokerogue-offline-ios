@@ -41,25 +41,25 @@ const REPLACEMENT = `// Capacitor native builds cannot use blob URLs for file do
         // On native we write to the cache directory and open the OS share sheet.
         // On web we keep the original blob-URL anchor approach.
         if ((window as any).Capacitor?.isNativePlatform?.()) {
-          const { Filesystem, Directory } = import("@capacitor/filesystem");
-          const { Share } = import("@capacitor/share");
+          const { Filesystem, Directory } = await import("@capacitor/filesystem");
+          const { Share } = await import("@capacitor/share");
 
           const encryptedString = encryptedData.toString();
           const base64 = btoa(unescape(encodeURIComponent(encryptedString)));
           const fileName = \`\${dataKey}.prsv\`;
 
-          Filesystem.writeFile({
+          await Filesystem.writeFile({
             path: fileName,
             data: base64,
             directory: Directory.Cache,
           });
 
-          const { uri } = Filesystem.getUri({
+          const { uri } = await Filesystem.getUri({
             path: fileName,
             directory: Directory.Cache,
           });
 
-          Share.share({
+          await Share.share({
             title: "Export Save Data",
             url: uri,
             dialogTitle: "Save your .prsv file",
