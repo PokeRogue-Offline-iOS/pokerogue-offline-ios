@@ -32,6 +32,9 @@ apply_submodule_patch() {
 # Add patch files here:
 # apply_patch "01-fix-something.patch"
 
+# Patch to implement 7230
+apply_patch "7230.patch"
+
 # Patch to apply full unlock button
 apply_patch "add-import-data-from-url.js"
 apply_patch "inject-unlock-all.js"
@@ -58,7 +61,5 @@ apply_patch "export-fix.js"
 # Patch to implement PKR 7269
 apply_patch "randomizer.patch"
 
-# Patch to implement 7230
-apply_patch "7230.patch"
 
 echo "All patches applied successfully."
