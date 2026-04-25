@@ -33,7 +33,7 @@ Four of those fixes are improvements I've submitted to the PokéRogue team for i
 
 ## Getting the IPA
 
-Go to the [Releases](https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases) and download `PokeRogueOffline.ipa` from the latest release.
+Go to the [Releases](https://github.com/PokeRogue-Offline/pokerogue-offline/releases) and download `PokeRogueOffline.ipa` from the latest release.
 
 ## Installing the IPA
 
@@ -77,7 +77,7 @@ If you already use Feather or Sideloadly, just sign and install the IPA as you n
 
 # Android
 
-Go to the [Releases](https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases) and download `PokeRogueOffline.ipa` from the latest release.
+Go to the [Releases](https://github.com/PokeRogue-Offline/pokerogue-offline/releases) and download `PokeRogueOffline.ipa` from the latest release.
 - Enable "Install from Unknown Sources" in Settings
 - Download and install the APK
 - Note: APK is debug-signed, you may need to allow installation
