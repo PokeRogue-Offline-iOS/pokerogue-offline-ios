@@ -1,0 +1,35 @@
+From 6d5134e1f631873124f928a90cb26839501526f0 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.xyz>
+Date: Tue, 7 Apr 2026 20:20:25 -0500
+Subject: [PATCH] Remove no longer used Consent Pref menu option
+
+---
+ src/ui/handlers/menu-ui-handler.ts | 15 ---------------
+ 1 file changed, 15 deletions(-)
+
+diff --git a/src/ui/handlers/menu-ui-handler.ts b/src/ui/handlers/menu-ui-handler.ts
+index 4c1bc05c5a8c..afd4defa259e 100644
+--- a/src/ui/handlers/menu-ui-handler.ts
++++ b/src/ui/handlers/menu-ui-handler.ts
+@@ -324,21 +324,6 @@ export class MenuUiHandler extends MessageUiHandler {
+         },
+         keepOpen: true,
+       },
+-      {
+-        label: i18next.t("menuUiHandler:consentPreferences"),
+-        handler: () => {
+-          const consentLink = document.querySelector(".termly-display-preferences") as HTMLInputElement;
+-          const clickEvent = new MouseEvent("click", {
+-            view: window,
+-            bubbles: true,
+-            cancelable: true,
+-          });
+-          consentLink.dispatchEvent(clickEvent);
+-          consentLink.focus();
+-          return true;
+-        },
+-        keepOpen: true,
+-      },
+     );
+     if (isBeta || isDev) {
+       manageDataOptions.push({

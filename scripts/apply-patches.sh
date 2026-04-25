@@ -58,4 +58,7 @@ apply_patch "export-fix.js"
 # Patch to implement PKR 7269
 apply_patch "randomizer.patch"
 
+# Patch to implement 7230
+apply_patch "7230.patch"
+
 echo "All patches applied successfully."
