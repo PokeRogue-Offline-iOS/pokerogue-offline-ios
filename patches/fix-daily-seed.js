@@ -68,7 +68,12 @@ ${i2}      ? Overrides.DAILY_RUN_SEED_OVERRIDE
 ${i2}      : JSON.stringify(Overrides.DAILY_RUN_SEED_OVERRIDE);
 ${i2}  generateDaily(seed);
 ${i2}} else {
-${i2}  fetch("https://api.pokerogue.net/daily/seed")
+${i2}  fetch("https://api.pokerogue.net/daily/seed", {
+${i2}    headers: {
+${i2}      "Origin": "https://pokerogue.net",
+${i2}      "Referer": "https://pokerogue.net/",
+${i2}    },
+${i2}  })
 ${i2}    .then(r => {
 ${i2}      if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
 ${i2}      return r.text();
