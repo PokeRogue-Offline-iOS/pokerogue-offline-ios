@@ -164,16 +164,9 @@ jobs:
       - name: Extract version from IPA
         id: version
         run: |
-          unzip -o PokeRogueOffline.ipa -d ipa_inspect > /dev/null
-          PLIST=$(find ipa_inspect -name Info.plist | head -1)
-          VERSION=$(python3 -c "
-          import plistlib
-          with open('$PLIST', 'rb') as f:
-              pl = plistlib.load(f)
-          print(pl.get('CFBundleShortVersionString', 'unknown'))
-          ")
+          VERSION=$(curl -s https://raw.githubusercontent.com/pagefaultgames/pokerogue/refs/heads/main/package.json | jq -r '.version')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          rm -rf ipa_inspect
+          echo "Found Version: ${VERSION}"
 
       # -----------------------------------------------------------------------
       # Publish the combined GitHub release.
