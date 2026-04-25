@@ -17,11 +17,25 @@ const injection = `
     manageDataOptions.push({
       label: "FULL RESET",
       handler: () => {
-        globalScene.gameData.deleteData();
-        ui.revertMode();
+        ui.showText("Are you sure you want to delete ALL data? This cannot be undone.", null, () => {
+          ui.setOverlayMode(
+            UiMode.CONFIRM,
+            () => {
+              globalScene.gameData.deleteData();
+              ui.revertMode();
+              ui.showText("", 0);
+            },
+            () => {
+              ui.revertMode();
+              ui.showText("", 0);
+            },
+            false,
+            -98,
+          );
+        });
         return true;
       },
-      keepOpen: false,
+      keepOpen: true,
     });
   }
 `;
