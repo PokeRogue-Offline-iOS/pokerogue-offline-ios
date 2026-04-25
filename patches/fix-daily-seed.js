@@ -84,7 +84,7 @@ ${i2}      generateDaily(fetchedSeed);
 ${i2}    })
 ${i2}    .catch(() => {
 ${i2}      console.warn("Could not fetch daily seed from API — prompting player.");
-${i2}      globalScene.ui.showText("Could not reach the server.\nPlay offline daily instead?", null, () => {
+${i2}      globalScene.ui.showText("Could not reach the server. Play offline daily instead?", null, () => {
 ${i2}        globalScene.ui.setOverlayMode(
 ${i2}          UiMode.CONFIRM,
 ${i2}          () => {
