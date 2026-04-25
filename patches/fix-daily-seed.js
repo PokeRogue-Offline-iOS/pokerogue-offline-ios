@@ -17,6 +17,8 @@
  *   If the fetch fails (truly offline), fall back to the existing date-based
  *   seed so the daily run still works.
  *
+ * Uses a regex anchor so minor upstream changes don't break the match.
+ *
  * Targets: pokerogue-src/src/phases/title-phase.ts
  */
 
@@ -37,53 +39,50 @@ if (src.includes("fix-daily-seed")) {
   process.exit(0);
 }
 
-// The offline branch that generates the date-based seed
-const ORIGINAL = `      } else {
-        // Grab first 10 chars of ISO date format (YYYY-MM-DD) and convert to base64
-        let seed: string = btoa(new Date().toISOString().slice(0, 10));
-        if (Overrides.DAILY_RUN_SEED_OVERRIDE != null) {
-          seed =
-            typeof Overrides.DAILY_RUN_SEED_OVERRIDE === "string"
-              ? Overrides.DAILY_RUN_SEED_OVERRIDE
-              : JSON.stringify(Overrides.DAILY_RUN_SEED_OVERRIDE);
-        }
-        generateDaily(seed);
-      }`;
+// Match the offline else-branch regardless of minor upstream whitespace/comment changes.
+// Requires: btoa(new Date().toISOString()...) assignment and a generateDaily() call.
+const PATTERN = /([ \t]*\} else \{\n(?:[ \t]*\/\/[^\n]*\n)*[ \t]*let seed[^\n]*btoa\(new Date[\s\S]*?generateDaily\(seed\);\n[ \t]*\})/;
 
-const REPLACEMENT = `      } else {
-        // fix-daily-seed: try to fetch the real daily seed from the live API so
-        // the offline daily run matches the website. Falls back to the local
-        // date-based seed if the device has no internet connection.
-        const fallbackSeed: string = btoa(new Date().toISOString().slice(0, 10));
-        let seed: string = fallbackSeed;
-        if (Overrides.DAILY_RUN_SEED_OVERRIDE != null) {
-          seed =
-            typeof Overrides.DAILY_RUN_SEED_OVERRIDE === "string"
-              ? Overrides.DAILY_RUN_SEED_OVERRIDE
-              : JSON.stringify(Overrides.DAILY_RUN_SEED_OVERRIDE);
-          generateDaily(seed);
-        } else {
-          fetch("https://api.pokerogue.net/daily/seed")
-            .then(r => {
-              if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
-              return r.text();
-            })
-            .then(fetchedSeed => {
-              console.log("Daily seed fetched from live API.");
-              generateDaily(fetchedSeed);
-            })
-            .catch(() => {
-              console.warn("Could not fetch daily seed from API — using date-based fallback.");
-              generateDaily(fallbackSeed);
-            });
-        }
-      }`;
-
-if (!src.includes(ORIGINAL)) {
+const match = src.match(PATTERN);
+if (!match) {
   console.error("ERROR: Could not find the offline daily seed block in title-phase.ts.");
   console.error("The file may have been updated upstream. Manual inspection required.");
   process.exit(1);
 }
+
+const ORIGINAL = match[1];
+// Detect indentation from the matched block's first line
+const indent = ORIGINAL.match(/^([ \t]*)/)[1];
+const i  = indent;
+const i2 = i + "  ";
+
+const REPLACEMENT = `${i}} else {
+${i2}// fix-daily-seed: try to fetch the real daily seed from the live API so
+${i2}// the offline daily run matches the website. Falls back to the local
+${i2}// date-based seed if the device has no internet connection.
+${i2}const fallbackSeed: string = btoa(new Date().toISOString().slice(0, 10));
+${i2}if (Overrides.DAILY_RUN_SEED_OVERRIDE != null) {
+${i2}  const seed =
+${i2}    typeof Overrides.DAILY_RUN_SEED_OVERRIDE === "string"
+${i2}      ? Overrides.DAILY_RUN_SEED_OVERRIDE
+${i2}      : JSON.stringify(Overrides.DAILY_RUN_SEED_OVERRIDE);
+${i2}  generateDaily(seed);
+${i2}} else {
+${i2}  fetch("https://api.pokerogue.net/daily/seed")
+${i2}    .then(r => {
+${i2}      if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
+${i2}      return r.text();
+${i2}    })
+${i2}    .then(fetchedSeed => {
+${i2}      console.log("Daily seed fetched from live API.");
+${i2}      generateDaily(fetchedSeed);
+${i2}    })
+${i2}    .catch(() => {
+${i2}      console.warn("Could not fetch daily seed from API — using date-based fallback.");
+${i2}      generateDaily(fallbackSeed);
+${i2}    });
+${i2}}
+${i}}`;
 
 fs.writeFileSync(TARGET, src.replace(ORIGINAL, REPLACEMENT), "utf8");
 console.log(`Patched daily seed in ${TARGET}`);
