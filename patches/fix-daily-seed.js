@@ -68,39 +68,46 @@ ${i2}      ? Overrides.DAILY_RUN_SEED_OVERRIDE
 ${i2}      : JSON.stringify(Overrides.DAILY_RUN_SEED_OVERRIDE);
 ${i2}  generateDaily(seed);
 ${i2}} else {
-${i2}  fetch("https://api.pokerogue.net/daily/seed", {
-${i2}    headers: {
-${i2}      "Origin": "https://pokerogue.net",
-${i2}      "Referer": "https://pokerogue.net/",
-${i2}    },
-${i2}  })
-${i2}    .then(r => {
-${i2}      if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
-${i2}      return r.text();
-${i2}    })
-${i2}    .then(fetchedSeed => {
-${i2}      console.log("Daily seed fetched from live API.");
-${i2}      generateDaily(fetchedSeed);
-${i2}    })
-${i2}    .catch(() => {
-${i2}      console.warn("Could not fetch daily seed from API — prompting player.");
-${i2}      globalScene.ui.showText("Could not reach the server. Play offline daily instead?", null, () => {
-${i2}        globalScene.ui.setOverlayMode(
-${i2}          UiMode.CONFIRM,
-${i2}          () => {
-${i2}            globalScene.ui.revertMode();
-${i2}            globalScene.ui.showText("", 0);
-${i2}            generateDaily(fallbackSeed);
-${i2}          },
-${i2}          () => {
-${i2}            globalScene.ui.revertMode();
-${i2}            globalScene.ui.showText("", 0);
-${i2}          },
-${i2}          false,
-${i2}          -98,
-${i2}        );
+${i2}  const todayUtc = new Date().toISOString().slice(0, 10);
+${i2}  const cachedDate = localStorage.getItem("daily_seed_date");
+${i2}  const cachedSeed = localStorage.getItem("daily_seed");
+${i2}  if (cachedDate === todayUtc && cachedSeed) {
+${i2}    console.log("Daily seed loaded from cache.");
+${i2}    generateDaily(cachedSeed);
+${i2}  } else {
+${i2}    fetch("https://pokerogue-offline.github.io/pokerogue-offline/daily-seed.txt")
+${i2}      .then(r => {
+${i2}        if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
+${i2}        return r.text();
+${i2}      })
+${i2}      .then(fetchedSeed => {
+${i2}        const seed = fetchedSeed.trim();
+${i2}        localStorage.setItem("daily_seed_date", todayUtc);
+${i2}        localStorage.setItem("daily_seed", seed);
+${i2}        console.log("Daily seed fetched from GitHub Pages and cached.");
+${i2}        generateDaily(seed);
+${i2}      })
+${i2}      .catch(() => {
+${i2}        console.warn("Could not fetch daily seed — prompting player.");
+${i2}        globalScene.ui.showText("Could not reach the server. Play offline daily instead?", null, () => {
+${i2}          globalScene.ui.setOverlayMode(
+${i2}            UiMode.CONFIRM,
+${i2}            () => {
+${i2}              globalScene.ui.revertMode();
+${i2}              globalScene.ui.showText("", 0);
+${i2}              generateDaily(fallbackSeed);
+${i2}            },
+${i2}            () => {
+${i2}              globalScene.ui.revertMode();
+${i2}              globalScene.ui.showText("", 0);
+${i2}              globalScene.phaseManager.toTitleScreen();
+${i2}            },
+${i2}            false,
+${i2}            -98,
+${i2}          );
+${i2}        });
 ${i2}      });
-${i2}    });
+${i2}  }
 ${i2}}
 ${i}}`;
 
