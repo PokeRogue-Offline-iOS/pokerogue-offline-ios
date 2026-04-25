@@ -170,7 +170,7 @@ jobs:
 
       - name: Rename resulting APK
         run: |
-          UNSIGNED="pokerogue-src/android/app/build/outputs/apk/release/app-debug.apk"
+          UNSIGNED="pokerogue-src/android/app/build/outputs/apk/debug/app-debug.apk"
           SIGNED="PokeRogueOffline.apk"
           cp -v $UNSIGNED $SIGNED
 
