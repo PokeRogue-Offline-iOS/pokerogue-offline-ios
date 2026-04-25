@@ -123,7 +123,7 @@ jobs:
           OLD_PKG_PATH=$(find android/app/src/main/java -name "MainActivity.java" | head -1 | xargs dirname)
           NEW_PKG_PATH="android/app/src/main/java/xyz/scooom/pkr"
           mkdir -p "$NEW_PKG_PATH"
-          cp "$OLD_PKG_PATH/MainActivity.java" "$NEW_PKG_PATH/MainActivity.java"
+          cp -u "$OLD_PKG_PATH/MainActivity.java" "$NEW_PKG_PATH/MainActivity.java"
           rm -rf android/app/src/main/java/com
  
           # Update package declaration in MainActivity.java
