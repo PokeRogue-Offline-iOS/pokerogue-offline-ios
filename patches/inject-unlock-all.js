@@ -110,7 +110,7 @@ if (!content.includes(ADMIN_ORIGINAL)) {
 // Uses `this.showText` (not `ui.showText`) so the message renders in the
 // correct in-game message box UI, matching all other menu confirm dialogs.
 
-const CONFIRM_TEXT = `This is an unofficial feature for convenience only. It is not part of normal play and may reduce your enjoyment of the game. Are you sure?`;
+const CONFIRM_TEXT = `This may reduce your enjoyment of the game. Are you sure?`;
 
 const injection = `    if (isApp) {
       manageDataOptions.push({
