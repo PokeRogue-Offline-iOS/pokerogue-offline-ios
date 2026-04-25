@@ -112,27 +112,9 @@ jobs:
         working-directory: pokerogue-src
         run: npx cap sync android
 
-      - name: Fix Android package ID and permissions
+      - name: Fix Android permissions
         working-directory: pokerogue-src
         run: |
-          # ---- Package ID ----
-          # cap add android uses the appId from capacitor.config.json as the
-          # applicationId in build.gradle, but the Java source directory and
-          # namespace still use the template default (com.getcapacitor.myapp).
-          # We need to rename the source directory and update all references.
-          OLD_PKG_PATH=$(find android/app/src/main/java -name "MainActivity.java" | head -1 | xargs dirname)
-          NEW_PKG_PATH="android/app/src/main/java/xyz/scooom/pkr"
-          mkdir -p "$NEW_PKG_PATH"
-          cp -u "$OLD_PKG_PATH/MainActivity.java" "$NEW_PKG_PATH/MainActivity.java"
-          rm -rf android/app/src/main/java/com
- 
-          # Update package declaration in MainActivity.java
-          sed -i 's/^package .*/package xyz.scooom.pkr;/' "$NEW_PKG_PATH/MainActivity.java"
- 
-          # Update namespace in build.gradle
-          sed -i 's/namespace = "[^"]*"/namespace = "xyz.scooom.pkr"/' android/app/build.gradle
-          sed -i 's/applicationId "[^"]*"/applicationId "xyz.scooom.pkr"/' android/app/build.gradle
-
           # ---- Permissions ----
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           grep -q "WRITE_EXTERNAL_STORAGE" $MANIFEST || \
