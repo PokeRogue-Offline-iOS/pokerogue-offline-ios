@@ -25,6 +25,12 @@ const injection = `
       })
       .catch(err => alert("importDataFromUrl failed:" + err));
   }
+
+  public deleteData(): void {
+    const dataKey = \`data_\${loggedInUser?.username}\`;
+    localStorage.removeItem(dataKey);
+    window.location.reload();
+ }
 `;
 
 const anchor = `  migrateStarterAbilities(systemData: SystemSaveData, initialStarterData?: StarterData): void {`;
