@@ -16,123 +16,102 @@ jobs:
         uses: actions/checkout@v4
 
       # -----------------------------------------------------------------------
-      # Trigger both build workflows, passing this run's ID so each build
-      # names its artifact  release-<this_run_id>-ios / ...-android  which we
-      # can look up unambiguously even if other builds are running in parallel.
+      # Record a timestamp just before triggering each build, then locate the
+      # resulting run ID by finding the first run created after that moment.
+      # This avoids any dependency on workflow inputs being queryable via API.
       # -----------------------------------------------------------------------
       - name: Trigger iOS build
         id: trigger_ios
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh workflow run build-ios.yml \
-            --ref "${{ github.ref_name }}" \
-            --field release_run_id="${{ github.run_id }}"
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run build-ios.yml --ref "${{ github.ref_name }}"
+          echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       - name: Trigger Android build
         id: trigger_android
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh workflow run build-android.yml \
-            --ref "${{ github.ref_name }}" \
-            --field release_run_id="${{ github.run_id }}"
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run build-android.yml --ref "${{ github.ref_name }}"
+          echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       # -----------------------------------------------------------------------
-      # Give the runners a moment to register before we start polling.
+      # Locate the run IDs by polling for runs created after the trigger
+      # timestamps. Retry for up to 2 minutes to allow GitHub to register them.
       # -----------------------------------------------------------------------
-      - name: Wait for builds to start
-        run: sleep 15
+      - name: Locate run IDs
+        id: runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          IOS_AFTER: ${{ steps.trigger_ios.outputs.triggered_after }}
+          ANDROID_AFTER: ${{ steps.trigger_android.outputs.triggered_after }}
+        run: |
+          set -e
+
+          locate_run() {
+            local workflow="$1"
+            local after="$2"
+            local label="$3"
+
+            for i in $(seq 1 24); do
+              RUN_ID=$(gh api \
+                "repos/$REPO/actions/workflows/${workflow}/runs?per_page=5&created=>=${after}" \
+                --jq '.workflow_runs | sort_by(.created_at) | .[0].id // empty')
+              if [ -n "$RUN_ID" ]; then
+                echo "Found $label run: $RUN_ID"
+                echo "$RUN_ID"
+                return 0
+              fi
+              echo "Waiting for $label run to appear... (attempt $i/24)"
+              sleep 5
+            done
+
+            echo "ERROR: Timed out locating $label run ID."
+            return 1
+          }
+
+          IOS_RUN_ID=$(locate_run "build-ios.yml" "$IOS_AFTER" "iOS")
+          ANDROID_RUN_ID=$(locate_run "build-android.yml" "$ANDROID_AFTER" "Android")
+
+          echo "ios_run_id=$IOS_RUN_ID" >> $GITHUB_OUTPUT
+          echo "android_run_id=$ANDROID_RUN_ID" >> $GITHUB_OUTPUT
 
       # -----------------------------------------------------------------------
-      # Poll until both child runs reach a terminal state.
-      # We identify each run by looking for runs that were triggered after this
-      # workflow started and carry the matching release_run_id input.
+      # Poll until both runs reach a terminal state.
       # Timeout after 90 minutes (iOS builds on macos-latest can be slow).
       # -----------------------------------------------------------------------
       - name: Wait for builds to complete
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          RELEASE_RUN_ID: ${{ github.run_id }}
+          IOS_RUN_ID: ${{ steps.runs.outputs.ios_run_id }}
+          ANDROID_RUN_ID: ${{ steps.runs.outputs.android_run_id }}
         run: |
           set -e
 
-          TIMEOUT=5400   # 90 minutes in seconds
-          POLL=30        # check every 30 seconds
+          TIMEOUT=5400  # 90 minutes
+          POLL=30
           ELAPSED=0
 
-          ios_run_id=""
-          android_run_id=""
-
-          echo "Locating child run IDs..."
-
-          # Keep trying to find the run IDs until both are found or we time out
-          while [ -z "$ios_run_id" ] || [ -z "$android_run_id" ]; do
-            if [ -z "$ios_run_id" ]; then
-              ios_run_id=$(gh api \
-                "repos/$REPO/actions/workflows/build-ios.yml/runs?per_page=10" \
-                --jq ".workflow_runs[] |
-                  select(.status != \"completed\" or .conclusion == null) |
-                  select(.inputs.release_run_id == \"$RELEASE_RUN_ID\") |
-                  .id" | head -1)
-              # Also check recently completed runs in case it already finished
-              if [ -z "$ios_run_id" ]; then
-                ios_run_id=$(gh api \
-                  "repos/$REPO/actions/workflows/build-ios.yml/runs?per_page=10" \
-                  --jq ".workflow_runs[] |
-                    select(.inputs.release_run_id == \"$RELEASE_RUN_ID\") |
-                    .id" | head -1)
-              fi
-              [ -n "$ios_run_id" ] && echo "Found iOS run: $ios_run_id"
-            fi
-
-            if [ -z "$android_run_id" ]; then
-              android_run_id=$(gh api \
-                "repos/$REPO/actions/workflows/build-android.yml/runs?per_page=10" \
-                --jq ".workflow_runs[] |
-                  select(.inputs.release_run_id == \"$RELEASE_RUN_ID\") |
-                  .id" | head -1)
-              [ -n "$android_run_id" ] && echo "Found Android run: $android_run_id"
-            fi
-
-            if [ -z "$ios_run_id" ] || [ -z "$android_run_id" ]; then
-              ELAPSED=$((ELAPSED + POLL))
-              if [ $ELAPSED -ge $TIMEOUT ]; then
-                echo "ERROR: Timed out waiting for child run IDs."
-                exit 1
-              fi
-              echo "Still looking for run IDs... (${ELAPSED}s elapsed)"
-              sleep $POLL
-            fi
-          done
-
-          echo "ios_run_id=$ios_run_id"     >> $GITHUB_ENV
-          echo "android_run_id=$android_run_id" >> $GITHUB_ENV
-
-          echo "Waiting for both builds to complete..."
-
           while true; do
-            ios_status=$(gh api "repos/$REPO/actions/runs/$ios_run_id" --jq '.status')
-            ios_conclusion=$(gh api "repos/$REPO/actions/runs/$ios_run_id" --jq '.conclusion')
-            android_status=$(gh api "repos/$REPO/actions/runs/$android_run_id" --jq '.status')
-            android_conclusion=$(gh api "repos/$REPO/actions/runs/$android_run_id" --jq '.conclusion')
+            IOS_STATUS=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID" --jq '.status')
+            IOS_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID" --jq '.conclusion')
+            ANDROID_STATUS=$(gh api "repos/$REPO/actions/runs/$ANDROID_RUN_ID" --jq '.status')
+            ANDROID_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$ANDROID_RUN_ID" --jq '.conclusion')
 
-            echo "iOS: $ios_status / $ios_conclusion  |  Android: $android_status / $android_conclusion  (${ELAPSED}s elapsed)"
+            echo "iOS: $IOS_STATUS / $IOS_CONCLUSION  |  Android: $ANDROID_STATUS / $ANDROID_CONCLUSION  (${ELAPSED}s elapsed)"
 
-            ios_done=false
-            android_done=false
-            [ "$ios_status" = "completed" ] && ios_done=true
-            [ "$android_status" = "completed" ] && android_done=true
-
-            if $ios_done && $android_done; then
-              # Both finished — check for failures
-              if [ "$ios_conclusion" != "success" ]; then
-                echo "ERROR: iOS build ended with conclusion: $ios_conclusion"
+            if [ "$IOS_STATUS" = "completed" ] && [ "$ANDROID_STATUS" = "completed" ]; then
+              if [ "$IOS_CONCLUSION" != "success" ]; then
+                echo "ERROR: iOS build ended with: $IOS_CONCLUSION"
                 exit 1
               fi
-              if [ "$android_conclusion" != "success" ]; then
-                echo "ERROR: Android build ended with conclusion: $android_conclusion"
+              if [ "$ANDROID_CONCLUSION" != "success" ]; then
+                echo "ERROR: Android build ended with: $ANDROID_CONCLUSION"
                 exit 1
               fi
               echo "Both builds succeeded."
@@ -154,11 +133,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          IOS_RUN_ID: ${{ steps.runs.outputs.ios_run_id }}
         run: |
-          gh api \
-            "repos/$REPO/actions/runs/$ios_run_id/artifacts" \
-            --jq '.artifacts[] | select(.name == "release-${{ github.run_id }}-ios") | .id' \
-            | xargs -I{} gh api "repos/$REPO/actions/artifacts/{}/zip" > ipa.zip
+          ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "PokeRogueOffline-iOS") | .id')
+          gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" > ipa.zip
           unzip ipa.zip -d ipa-out
           mv ipa-out/PokeRogueOffline.ipa ./PokeRogueOffline.ipa
 
@@ -166,35 +145,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          ANDROID_RUN_ID: ${{ steps.runs.outputs.android_run_id }}
         run: |
-          gh api \
-            "repos/$REPO/actions/runs/$android_run_id/artifacts" \
-            --jq '.artifacts[] | select(.name == "release-${{ github.run_id }}-android") | .id' \
-            | xargs -I{} gh api "repos/$REPO/actions/artifacts/{}/zip" > apk.zip
+          ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$ANDROID_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "PokeRogueOffline-Android") | .id')
+          gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" > apk.zip
           unzip apk.zip -d apk-out
           mv apk-out/PokeRogueOffline.apk ./PokeRogueOffline.apk
 
       # -----------------------------------------------------------------------
-      # Derive the version string from the IPA's embedded Info.plist so the
-      # release tag is consistent with what the build workflows produced.
+      # Derive the version string from the IPA's embedded Info.plist.
       # -----------------------------------------------------------------------
       - name: Extract version from IPA
         id: version
         run: |
           unzip -o PokeRogueOffline.ipa -d ipa_inspect > /dev/null
           PLIST=$(find ipa_inspect -name Info.plist | head -1)
-          # PlistBuddy is macOS-only; use python on ubuntu
-          VERSION=$(python3 - <<'EOF'
-          import plistlib, sys
-          with open("$PLIST", "rb") as f:
+          VERSION=$(python3 -c "
+          import plistlib
+          with open('$PLIST', 'rb') as f:
               pl = plistlib.load(f)
-          print(pl.get("CFBundleShortVersionString", "unknown"))
-          EOF
-          )
+          print(pl.get('CFBundleShortVersionString', 'unknown'))
+          ")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           rm -rf ipa_inspect
-        env:
-          PLIST: ${{ github.workspace }}/ipa_inspect/Payload/App.app/Info.plist
 
       # -----------------------------------------------------------------------
       # Publish the combined GitHub release.
