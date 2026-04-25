@@ -23,7 +23,7 @@ const injection = `
         };
         reader.readAsText(file);
       })
-      .catch(err => console.error("importDataFromUrl failed:", err));
+      .catch(err => alert("importDataFromUrl failed:" + err));
   }
 `;
 
