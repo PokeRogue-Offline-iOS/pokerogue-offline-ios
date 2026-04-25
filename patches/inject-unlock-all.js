@@ -17,7 +17,7 @@ const injection = `
     manageDataOptions.push({
       label: "FULL RESET",
       handler: () => {
-        globalScene.gameData.importDataFromUrl("/data_new.prsv");
+        globalScene.gameData.deleteData();
         ui.revertMode();
         return true;
       },
