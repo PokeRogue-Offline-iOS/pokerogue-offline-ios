@@ -27,8 +27,7 @@ const injection = `
   }
 
   public deleteData(): void {
-    const dataKey = \`data_\${loggedInUser?.username}\`;
-    localStorage.removeItem(dataKey);
+    localStorage.clear();
     window.location.reload();
  }
 `;
