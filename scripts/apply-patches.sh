@@ -53,4 +53,6 @@ apply_patch "update-title-labels.js"
 
 apply_patch "export-fix.js"
 
+apply_patch "randomizer.patch"
+
 echo "All patches applied successfully."
