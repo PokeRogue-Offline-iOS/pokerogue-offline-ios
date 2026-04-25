@@ -1,6 +1,6 @@
 # PokeRogueOffline (iOS)
 
-An offline iOS wrapper for PokéRogue, built with Capacitor. Play fully offline with local saves, or import your save from [pokerogue.net](https://pokerogue.net).
+An fully offline wrapper for PokéRogue, built with Capacitor. Play fully offline with local saves, or import your save from [pokerogue.net](https://pokerogue.net).
 
 ## Features
 
@@ -8,6 +8,28 @@ An offline iOS wrapper for PokéRogue, built with Capacitor. Play fully offline 
 - Local saves that persist between sessions
 - Import saves from your online account
 - Based on the latest `main` branch of [pagefaultgames / pokerogue](https://github.com/pagefaultgames/pokerogue/)
+
+## What's New
+
+### New Features
+- Added an **Unlock Everything** option in Manage Data — this instantly unlocks all starters, forms, and progression without needing to import a save manually.
+- Added an **Reset Everything** option in Manage Data — this deletes all current data. **USE WITH CAUTION**.
+
+- Includes the build number in the banner for support reasons.
+
+### Changes to How the App is Built
+The app pulls directly from the official PokéRogue source and applies a small set of targeted fixes on top of it. This means the app will always be up to date with whatever the official game ships, with no manual syncing required.
+
+Three of those fixes are improvements I've submitted to the PokéRogue team for inclusion in the main game. Once they're accepted, the app will automatically stop applying them and just use the official versions. The three pending changes are:
+
+- [#7077](https://github.com/pagefaultgames/pokerogue/pull/7077) — A new setting to skip the "are you sure?" prompt when choosing not to learn a move
+- [#7222](https://github.com/pagefaultgames/pokerogue/pull/7222) — A fix for the file import screen on iOS
+- [#7223](https://github.com/pagefaultgames/pokerogue/pull/7223) — A fix to stop the screen from accidentally zooming in when tapping quickly
+- [#7269](https://github.com/pagefaultgames/pokerogue/pull/7269) — Implements a Randomizer Challenge Mode
+  - Note: This will likely not be implented in favor of one made by the PokeRogue Develeopment team. This will be removed if so
+
+
+# iOS
 
 ## Getting the IPA
 
@@ -52,6 +74,14 @@ SideStore lets you sideload up to 3 apps and refresh them wirelessly without a P
 If you already use Feather or Sideloadly, just sign and install the IPA as you normally would.
 
 ---
+
+# Android
+
+Go to the [Releases](https://github.com/PokeRogue-Offline-iOS/pokerogue-offline-ios/releases) and download `PokeRogueOffline.ipa` from the latest release.
+- Enable "Install from Unknown Sources" in Settings
+- Download and install the APK
+- Note: APK is debug-signed, you may need to allow installation
+
 
 ## Importing your save
 
