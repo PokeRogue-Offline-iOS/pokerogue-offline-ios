@@ -1,0 +1,39 @@
+name: Fetch Daily Seed
+
+on:
+  schedule:
+    - cron: '5 0 * * *'  # 00:05 UTC daily, 5 minutes after seed rotation
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fetch daily seed
+        run: |
+          SEED=$(curl -sf \
+            -H "Origin: https://pokerogue.net" \
+            -H "Referer: https://pokerogue.net/" \
+            "https://api.pokerogue.net/daily/seed")
+
+          if [ -z "$SEED" ]; then
+            echo "ERROR: Failed to fetch daily seed."
+            exit 1
+          fi
+
+          echo -n "$SEED" > docs/daily-seed.txt
+          echo "Fetched seed: $SEED"
+
+      - name: Commit updated seed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/daily-seed.txt
+          git diff --staged --quiet || git commit -m "chore: update daily seed"
+          git push
