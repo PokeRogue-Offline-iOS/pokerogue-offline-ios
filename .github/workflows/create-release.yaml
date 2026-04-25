@@ -41,6 +41,7 @@ jobs:
       # -----------------------------------------------------------------------
       # Locate the run IDs by polling for runs created after the trigger
       # timestamps. Retry for up to 2 minutes to allow GitHub to register them.
+      # Run ID is written to a temp file to avoid capturing log lines in $().
       # -----------------------------------------------------------------------
       - name: Locate run IDs
         id: runs
@@ -56,6 +57,7 @@ jobs:
             local workflow="$1"
             local after="$2"
             local label="$3"
+            local outfile="$4"
 
             for i in $(seq 1 24); do
               RUN_ID=$(gh api \
@@ -63,7 +65,7 @@ jobs:
                 --jq '.workflow_runs | sort_by(.created_at) | .[0].id // empty')
               if [ -n "$RUN_ID" ]; then
                 echo "Found $label run: $RUN_ID"
-                echo "$RUN_ID"
+                echo "$RUN_ID" > "$outfile"
                 return 0
               fi
               echo "Waiting for $label run to appear... (attempt $i/24)"
@@ -74,8 +76,11 @@ jobs:
             return 1
           }
 
-          IOS_RUN_ID=$(locate_run "build-ios.yml" "$IOS_AFTER" "iOS")
-          ANDROID_RUN_ID=$(locate_run "build-android.yml" "$ANDROID_AFTER" "Android")
+          locate_run "build-ios.yml" "$IOS_AFTER" "iOS" /tmp/ios_run_id
+          locate_run "build-android.yml" "$ANDROID_AFTER" "Android" /tmp/android_run_id
+
+          IOS_RUN_ID=$(cat /tmp/ios_run_id)
+          ANDROID_RUN_ID=$(cat /tmp/android_run_id)
 
           echo "ios_run_id=$IOS_RUN_ID" >> $GITHUB_OUTPUT
           echo "android_run_id=$ANDROID_RUN_ID" >> $GITHUB_OUTPUT
