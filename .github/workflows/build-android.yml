@@ -153,6 +153,12 @@ jobs:
         working-directory: pokerogue-src/android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Rename resulting APK
+        run: |
+          UNSIGNED="pokerogue-src/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          SIGNED="PokeRogueOffline.apk"
+          cp -v $UNSIGNED $SIGNED
+
       # Artifact name is scoped to the release workflow's run ID when triggered
       # from the release workflow, so it can be unambiguously downloaded later.
       # Falls back to a standalone name when run independently.
