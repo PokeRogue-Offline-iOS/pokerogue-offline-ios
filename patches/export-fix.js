@@ -40,15 +40,15 @@ if (!fs.existsSync(TARGET)) {
 
 let src = fs.readFileSync(TARGET, "utf8");
 
-const ORIGINAL = `    const encryptedData = AES.encrypt(data, saveKey);
-    const blob = new Blob([encryptedData.toString()], {
-      type: "text/json",
-    });
-    const link = document.createElement("a");
-    link.href = window.URL.createObjectURL(blob);
-    link.download = \`\${dataKey}.prsv\`;
-    link.click();
-    link.remove();`;
+const ORIGINAL = `        const encryptedData = AES.encrypt(dataStr, saveKey);
+        const blob = new Blob([encryptedData.toString()], {
+          type: "text/json",
+        });
+        const link = document.createElement("a");
+        link.href = window.URL.createObjectURL(blob);
+        link.download = \`\${dataKey}.prsv\`;
+        link.click();
+        link.remove();`;
 
 const REPLACEMENT = `    const encryptedData = AES.encrypt(data, saveKey);
 
