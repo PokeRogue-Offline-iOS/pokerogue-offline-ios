@@ -87,7 +87,7 @@ jobs:
               "scrollEnabled": false,
               "backgroundColor": "#000000",
               "allowsLinkPreview": false,
-              "webContentsDebuggingEnabled": true
+              "webContentsDebuggingEnabled": true,
               "allowsBackForwardNavigationGestures": false
             },
             "plugins": {
@@ -99,6 +99,7 @@ jobs:
             }
           }
           CAPEOF
+          cat capacitor.config.json;
 
       - name: Add iOS platform
         working-directory: pokerogue-src
