@@ -113,7 +113,7 @@ jobs:
         run: npx cap sync android
 
       - name: Fix Android package ID and permissions
-        working-directory: pokevoid-src
+        working-directory: pokerogue-src
         run: |
           # ---- Package ID ----
           # cap add android uses the appId from capacitor.config.json as the
