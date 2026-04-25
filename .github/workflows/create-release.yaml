@@ -77,6 +77,8 @@ jobs:
           IOS_RUN_ID=$(locate_run "build-ios.yml" "$IOS_AFTER" "iOS")
           ANDROID_RUN_ID=$(locate_run "build-android.yml" "$ANDROID_AFTER" "Android")
 
+          sleep 30;
+
           echo "iOS Run ID: ${IOS_RUN_ID}";
           echo "Android Run ID: ${ANDROID_RUN_ID}";
 
