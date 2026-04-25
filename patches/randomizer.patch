@@ -1,0 +1,440 @@
+From 0a615442a93d7190fbfdb72f198d6c62d4ff8c70 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.com>
+Date: Fri, 24 Apr 2026 04:44:15 +0000
+Subject: [PATCH 1/3] fix removed battlertag
+
+---
+ package.json                                  |  2 +-
+ src/data/challenge.ts                         | 43 +++++++++++
+ .../encounters/clowning-around-encounter.ts   |  2 +-
+ .../encounters/weird-dream-encounter.ts       |  2 +-
+ src/data/randomizer-data.ts                   | 73 +++++++++++++++++++
+ src/enums/challenge-type.ts                   |  5 ++
+ src/enums/challenges.ts                       |  1 +
+ src/field/trainer.ts                          |  3 +
+ src/phases/attempt-capture-phase.ts           |  1 +
+ src/phases/encounter-phase.ts                 |  3 +
+ src/phases/select-starter-phase.ts            |  5 ++
+ src/system/game-data.ts                       |  6 ++
+ src/utils/challenge-utils.ts                  | 11 +++
+ 13 files changed, 154 insertions(+), 3 deletions(-)
+ create mode 100644 src/data/randomizer-data.ts
+
+diff --git a/package.json b/package.json
+index fe0388fe716a..7387d878cc83 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,7 @@
+   "scripts": {
+     "start:prod": "vite --mode production",
+     "start:beta": "vite --mode beta",
+-    "start:dev": "vite --mode development",
++    "start:dev": "__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=pkr.scooom.com vite --mode development",
+     "start:podman": "vite --mode development --host 0.0.0.0 --port $PORT",
+     "build": "vite build",
+     "build:beta": "vite build --mode beta",
+diff --git a/src/data/challenge.ts b/src/data/challenge.ts
+index 47294eca2a78..26b5f6e6b33a 100644
+--- a/src/data/challenge.ts
++++ b/src/data/challenge.ts
+@@ -5,6 +5,7 @@ import { globalScene } from "#app/global-scene";
+ import { defaultStarterSpeciesAndEvolutions } from "#balance/pokemon-evolutions";
+ import { type StarterSpeciesId, speciesStarterCosts } from "#balance/starters";
+ import type { PokemonSpecies } from "#data/pokemon-species";
++import { getRandomizerEntry } from "#data/randomizer-data";
+ import { AbilityAttr } from "#enums/ability-attr";
+ import { BattleType } from "#enums/battle-type";
+ import { Challenges } from "#enums/challenges";
+@@ -391,6 +392,15 @@ export abstract class Challenge {
+     return false;
+   }
+ 
++  /**
++   * An apply function for POKEMON_RANDOMIZE. Derived classes should alter this.
++   * @param pokemon - The Pokémon to randomize
++   * @returns Whether this function did anything
++   */
++  applyPokemonRandomize(pokemon: Pokemon): boolean {
++    return false;
++  }
++
+   /**
+    * An apply function for POKEMON_FUSION. Derived classes should alter this.
+    * @param pokemon - The Pokémon being checked
+@@ -1232,6 +1242,36 @@ export class PassivesChallenge extends Challenge {
+   }
+ }
+ 
++export class RandomizeChallenge extends Challenge {
++  constructor() {
++    super(Challenges.RANDOMIZE, 1);
++  }
++
++  override applyStarterModify(pokemon: Pokemon): boolean {
++    return this.applyPokemonRandomize(pokemon);
++  }
++
++  override applyPokemonRandomize(pokemon: Pokemon): boolean {
++    if (pokemon.isBoss()) {
++      return false;
++    }
++    const entry = getRandomizerEntry(pokemon.species.speciesId);
++    if (!entry) {
++      return false;
++    }
++    pokemon.customPokemonData.ability = entry.ability;
++    pokemon.customPokemonData.types = entry.types.slice();
++    return true;
++  }
++
++  static override loadChallenge(source: RandomizeChallenge | any): RandomizeChallenge {
++    const newChallenge = new RandomizeChallenge();
++    newChallenge.value = source.value;
++    newChallenge.severity = source.severity;
++    return newChallenge;
++  }
++}
++
+ /**
+  * @param source - A challenge to copy, or an object of a challenge's properties. Missing values are treated as defaults.
+  * @returns The challenge in question.
+@@ -1260,6 +1300,8 @@ export function copyChallenge(source: Challenge | any): Challenge {
+       return HardcoreChallenge.loadChallenge(source);
+     case Challenges.PASSIVES:
+       return PassivesChallenge.loadChallenge(source);
++    case Challenges.RANDOMIZE:
++      return RandomizeChallenge.loadChallenge(source);
+   }
+   throw new Error("Unknown challenge copied");
+ }
+@@ -1277,5 +1319,6 @@ export function initChallenges() {
+     new PassivesChallenge(),
+     new InverseBattleChallenge(),
+     new FlipStatChallenge(),
++    new RandomizeChallenge(),
+   );
+ }
+diff --git a/src/data/mystery-encounters/encounters/clowning-around-encounter.ts b/src/data/mystery-encounters/encounters/clowning-around-encounter.ts
+index c0606948df45..0a75a3ff23f2 100644
+--- a/src/data/mystery-encounters/encounters/clowning-around-encounter.ts
++++ b/src/data/mystery-encounters/encounters/clowning-around-encounter.ts
+@@ -80,7 +80,7 @@ export const ClowningAroundEncounter: MysteryEncounter = MysteryEncounterBuilder
+   MysteryEncounterType.CLOWNING_AROUND,
+ )
+   .withEncounterTier(MysteryEncounterTier.ULTRA)
+-  .withDisallowedChallenges(Challenges.SINGLE_TYPE)
++  .withDisallowedChallenges(Challenges.SINGLE_TYPE, Challenges.RANDOMIZE)
+   .withSceneWaveRangeRequirement(80, CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES[1])
+   .withAnimations(EncounterAnim.SMOKESCREEN)
+   .withAutoHideIntroVisuals(false)
+diff --git a/src/data/mystery-encounters/encounters/weird-dream-encounter.ts b/src/data/mystery-encounters/encounters/weird-dream-encounter.ts
+index d338c9ab4205..8a89c560338f 100644
+--- a/src/data/mystery-encounters/encounters/weird-dream-encounter.ts
++++ b/src/data/mystery-encounters/encounters/weird-dream-encounter.ts
+@@ -126,7 +126,7 @@ export const WeirdDreamEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
+   MysteryEncounterType.WEIRD_DREAM,
+ )
+   .withEncounterTier(MysteryEncounterTier.ROGUE)
+-  .withDisallowedChallenges(Challenges.SINGLE_TYPE, Challenges.SINGLE_GENERATION)
++  .withDisallowedChallenges(Challenges.SINGLE_TYPE, Challenges.SINGLE_GENERATION, Challenges.RANDOMIZE)
+   .withSceneWaveRangeRequirement(30, 140)
+   .withScenePartySizeRequirement(3, 6)
+   .withMaxAllowedEncounters(1)
+diff --git a/src/data/randomizer-data.ts b/src/data/randomizer-data.ts
+new file mode 100644
+index 000000000000..d08bf1af6c00
+--- /dev/null
++++ b/src/data/randomizer-data.ts
+@@ -0,0 +1,73 @@
++import { globalScene } from "#app/global-scene";
++import { allAbilities } from "#data/data-lists";
++import { AbilityId } from "#enums/ability-id";
++import { PokemonType } from "#enums/pokemon-type";
++import { SpeciesId } from "#enums/species-id";
++import { randSeedInt } from "#utils/common";
++import { getPokemonSpecies } from "#utils/pokemon-utils";
++
++const RANDOMIZER_SEED_OFFSET = 0x52414e44;
++
++export interface RandomizerEntry {
++  ability: AbilityId;
++  types: PokemonType[];
++}
++
++let randomizerMap: Map<number, RandomizerEntry> | null = null;
++
++const VALID_TYPES: PokemonType[] = (Object.values(PokemonType) as PokemonType[]).filter(
++  t => typeof t === "number" && t !== PokemonType.UNKNOWN && t !== PokemonType.STELLAR,
++);
++
++function buildValidAbilityPool(): AbilityId[] {
++  return allAbilities.filter(a => a.id !== AbilityId.NONE && !a.unimplemented).map(a => a.id);
++}
++
++function randomType(exclude?: PokemonType): PokemonType {
++  const pool = exclude !== undefined ? VALID_TYPES.filter(t => t !== exclude) : VALID_TYPES;
++  return pool[randSeedInt(pool.length)];
++}
++
++export function generateRandomizerMap(): void {
++  const abilityPool = buildValidAbilityPool();
++
++  globalScene.executeWithSeedOffset(() => {
++    const map = new Map<number, RandomizerEntry>();
++
++    for (const value of Object.values(SpeciesId)) {
++      if (typeof value !== "number") {
++        continue;
++      }
++      const speciesId = value as SpeciesId;
++      const species = getPokemonSpecies(speciesId);
++      if (!species) {
++        continue;
++      }
++
++      const ability = abilityPool[randSeedInt(abilityPool.length)];
++      const type1 = randomType();
++      const isDual = species.type2 !== null && species.type2 !== PokemonType.UNKNOWN;
++
++      let types: PokemonType[];
++      if (isDual) {
++        types = [type1, randomType(type1)];
++      } else if (randSeedInt(3) === 0) {
++        types = [type1, randomType(type1)];
++      } else {
++        types = [type1];
++      }
++
++      map.set(speciesId, { ability, types });
++    }
++
++    randomizerMap = map;
++  }, RANDOMIZER_SEED_OFFSET);
++}
++
++export function getRandomizerEntry(speciesId: number): RandomizerEntry | undefined {
++  return randomizerMap?.get(speciesId);
++}
++
++export function clearRandomizerMap(): void {
++  randomizerMap = null;
++}
+diff --git a/src/enums/challenge-type.ts b/src/enums/challenge-type.ts
+index f3a4b7c68f92..47e712827e7e 100644
+--- a/src/enums/challenge-type.ts
++++ b/src/enums/challenge-type.ts
+@@ -111,4 +111,9 @@ export enum ChallengeType {
+    * @see {@linkcode Challenge.applyPermanentFaint}
+    */
+   PREVENT_REVIVE,
++  /**
++   * Applies randomized ability and types to a pokemon
++   * @see {@linkcode Challenge.applyPokemonRandomize}
++   */
++  POKEMON_RANDOMIZE,
+ }
+diff --git a/src/enums/challenges.ts b/src/enums/challenges.ts
+index 777132c3e8b9..3eebe88650d9 100644
+--- a/src/enums/challenges.ts
++++ b/src/enums/challenges.ts
+@@ -10,4 +10,5 @@ export enum Challenges {
+   LIMITED_SUPPORT,
+   HARDCORE,
+   PASSIVES,
++  RANDOMIZE,
+ }
+diff --git a/src/field/trainer.ts b/src/field/trainer.ts
+index 80e1c4bfbe05..2888afbf0f95 100644
+--- a/src/field/trainer.ts
++++ b/src/field/trainer.ts
+@@ -4,6 +4,7 @@ import { signatureSpecies } from "#balance/signature-species";
+ import { EntryHazardTag } from "#data/arena-tag";
+ import type { PokemonSpecies } from "#data/pokemon-species";
+ import { ArenaTagSide } from "#enums/arena-tag-side";
++import { ChallengeType } from "#enums/challenge-type";
+ import { PartyMemberStrength } from "#enums/party-member-strength";
+ import { SpeciesId } from "#enums/species-id";
+ import { TeraAIMode } from "#enums/tera-ai-mode";
+@@ -16,6 +17,7 @@ import type { PersistentModifier } from "#modifiers/modifier";
+ import type { TrainerConfig } from "#trainers/trainer-config";
+ import { trainerConfigs } from "#trainers/trainer-config";
+ import { TrainerPartyCompoundTemplate, type TrainerPartyTemplate } from "#trainers/trainer-party-template";
++import { applyChallenges } from "#utils/challenge-utils";
+ import { randSeedInt, randSeedItem } from "#utils/common";
+ import { getRandomLocaleEntry } from "#utils/i18n";
+ import { getPokemonSpecies } from "#utils/pokemon-utils";
+@@ -432,6 +434,7 @@ export class Trainer extends Phaser.GameObjects.Container {
+           level,
+           !this.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER,
+         );
++        applyChallenges(ChallengeType.POKEMON_RANDOMIZE, ret);
+       },
+       this.config.hasStaticParty
+         ? this.config.getDerivedType() + ((index + 1) << 8)
+diff --git a/src/phases/attempt-capture-phase.ts b/src/phases/attempt-capture-phase.ts
+index ce24ddc70802..9977825057ac 100644
+--- a/src/phases/attempt-capture-phase.ts
++++ b/src/phases/attempt-capture-phase.ts
+@@ -313,6 +313,7 @@ export class AttemptCapturePhase extends PokemonPhase {
+             end();
+             return;
+           }
++          applyChallenges(ChallengeType.POKEMON_RANDOMIZE, pokemon);
+           if (globalScene.getPlayerParty().length === PLAYER_PARTY_MAX_SIZE) {
+             const promptRelease = () => {
+               globalScene.ui.showText(
+diff --git a/src/phases/encounter-phase.ts b/src/phases/encounter-phase.ts
+index 8cb027af89f8..26d9d80e2cc6 100644
+--- a/src/phases/encounter-phase.ts
++++ b/src/phases/encounter-phase.ts
+@@ -11,6 +11,7 @@ import { BattleSpec } from "#enums/battle-spec";
+ import { BattleType } from "#enums/battle-type";
+ import { BattlerIndex } from "#enums/battler-index";
+ import { BiomeId } from "#enums/biome-id";
++import { ChallengeType } from "#enums/challenge-type";
+ import { FieldPosition } from "#enums/field-position";
+ import { ModifierPoolType } from "#enums/modifier-pool-type";
+ import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+@@ -33,6 +34,7 @@ import { doTrainerExclamation } from "#mystery-encounters/encounter-phase-utils"
+ import { getGoldenBugNetSpecies } from "#mystery-encounters/encounter-pokemon-utils";
+ import { BattlePhase } from "#phases/battle-phase";
+ import { achvs } from "#system/achv";
++import { applyChallenges } from "#utils/challenge-utils";
+ import { randSeedInt, randSeedItem } from "#utils/common";
+ import i18next from "i18next";
+ 
+@@ -123,6 +125,7 @@ export class EncounterPhase extends BattlePhase {
+             TrainerSlot.NONE,
+             !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
+           );
++          applyChallenges(ChallengeType.POKEMON_RANDOMIZE, battle.enemyParty[e]);
+           if (globalScene.currentBattle.battleSpec === BattleSpec.FINAL_BOSS) {
+             battle.enemyParty[e].ivs.fill(31);
+           }
+diff --git a/src/phases/select-starter-phase.ts b/src/phases/select-starter-phase.ts
+index b1d4253d45f6..19ca3669d5cd 100644
+--- a/src/phases/select-starter-phase.ts
++++ b/src/phases/select-starter-phase.ts
+@@ -3,7 +3,9 @@ import Overrides from "#app/overrides";
+ import { Phase } from "#app/phase";
+ import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
+ import { Gender } from "#data/gender";
++import { generateRandomizerMap } from "#data/randomizer-data";
+ import { ChallengeType } from "#enums/challenge-type";
++import { Challenges } from "#enums/challenges";
+ import { UiMode } from "#enums/ui-mode";
+ import { overrideHeldItems, overrideModifiers } from "#modifiers/modifier";
+ import type { Starter } from "#types/save-data";
+@@ -41,6 +43,9 @@ export class SelectStarterPhase extends Phase {
+   initBattle(starters: Starter[]) {
+     const party = globalScene.getPlayerParty();
+     const loadPokemonAssets: Promise<void>[] = [];
++    if (globalScene.gameMode.challenges.some(c => c.id === Challenges.RANDOMIZE && c.value > 0)) {
++      generateRandomizerMap();
++    }
+     starters.forEach((starter: Starter, i: number) => {
+       if (!i && Overrides.STARTER_SPECIES_OVERRIDE) {
+         starter.speciesId = Overrides.STARTER_SPECIES_OVERRIDE;
+diff --git a/src/system/game-data.ts b/src/system/game-data.ts
+index 540620a504f6..255564955b8b 100644
+--- a/src/system/game-data.ts
++++ b/src/system/game-data.ts
+@@ -17,10 +17,12 @@ import type { Egg } from "#data/egg";
+ import { pokemonFormChanges } from "#data/pokemon-forms";
+ import type { PokemonSpecies } from "#data/pokemon-species";
+ import { loadPositionalTag } from "#data/positional-tags/load-positional-tag";
++import { generateRandomizerMap } from "#data/randomizer-data";
+ import { TerrainType } from "#data/terrain";
+ import { AbilityAttr } from "#enums/ability-attr";
+ import { BattleType } from "#enums/battle-type";
+ import { ChallengeType } from "#enums/challenge-type";
++import { Challenges } from "#enums/challenges";
+ import { Device } from "#enums/devices";
+ import { DexAttr } from "#enums/dex-attr";
+ import { GameDataType } from "#enums/game-data-type";
+@@ -936,6 +938,10 @@ export class GameData {
+ 
+     console.log("Seed:", globalScene.seed);
+ 
++    if (globalScene.gameMode.challenges.some(c => c.id === Challenges.RANDOMIZE && c.value > 0)) {
++      generateRandomizerMap();
++    }
++
+     globalScene.gameMode.trySetCustomDailyConfig(JSON.stringify(fromSession.dailyConfig));
+ 
+     globalScene.sessionPlayTime = fromSession.playTime || 0;
+diff --git a/src/utils/challenge-utils.ts b/src/utils/challenge-utils.ts
+index d702732819e3..9e75bc4338a0 100644
+--- a/src/utils/challenge-utils.ts
++++ b/src/utils/challenge-utils.ts
+@@ -270,6 +270,14 @@ export function applyChallenges(
+  */
+ export function applyChallenges(challengeType: ChallengeType.PREVENT_REVIVE, status: BooleanHolder): boolean;
+ 
++/**
++ * Apply all challenges that randomize a pokemon's ability and types
++ * @param challengeType - {@linkcode ChallengeType.POKEMON_RANDOMIZE}
++ * @param pokemon - The pokemon to randomize
++ * @returns `true` if any challenge was successfully applied, `false` otherwise
++ */
++export function applyChallenges(challengeType: ChallengeType.POKEMON_RANDOMIZE, pokemon: Pokemon): boolean;
++
+ export function applyChallenges(challengeType: ChallengeType, ...args: any[]): boolean {
+   let ret = false;
+   globalScene.gameMode.challenges.forEach(c => {
+@@ -344,6 +352,9 @@ export function applyChallenges(challengeType: ChallengeType, ...args: any[]): b
+         case ChallengeType.PREVENT_REVIVE:
+           ret ||= c.applyPreventRevive(args[0]);
+           break;
++        case ChallengeType.POKEMON_RANDOMIZE:
++          ret ||= c.applyPokemonRandomize(args[0]);
++          break;
+       }
+     }
+   });
+
+From 47404a95f59bf0e2264fdbd91408f9ff18a78920 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.com>
+Date: Fri, 24 Apr 2026 04:46:09 +0000
+Subject: [PATCH 2/3] Remove package.json changes
+
+---
+ package.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package.json b/package.json
+index 7387d878cc83..fe0388fe716a 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,7 @@
+   "scripts": {
+     "start:prod": "vite --mode production",
+     "start:beta": "vite --mode beta",
+-    "start:dev": "__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=pkr.scooom.com vite --mode development",
++    "start:dev": "vite --mode development",
+     "start:podman": "vite --mode development --host 0.0.0.0 --port $PORT",
+     "build": "vite build",
+     "build:beta": "vite build --mode beta",
+
+From a8318227254d7fbb24cb2bee11f6d53d088ee551 Mon Sep 17 00:00:00 2001
+From: Scooom <me@scooom.com>
+Date: Fri, 24 Apr 2026 05:10:33 +0000
+Subject: [PATCH 3/3] Fix lint error about negation test
+
+---
+ src/data/randomizer-data.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/data/randomizer-data.ts b/src/data/randomizer-data.ts
+index d08bf1af6c00..72a7c3fe1629 100644
+--- a/src/data/randomizer-data.ts
++++ b/src/data/randomizer-data.ts
+@@ -24,7 +24,7 @@ function buildValidAbilityPool(): AbilityId[] {
+ }
+ 
+ function randomType(exclude?: PokemonType): PokemonType {
+-  const pool = exclude !== undefined ? VALID_TYPES.filter(t => t !== exclude) : VALID_TYPES;
++  const pool = exclude === undefined ? VALID_TYPES : VALID_TYPES.filter(t => t !== exclude);
+   return pool[randSeedInt(pool.length)];
+ }
+ 
