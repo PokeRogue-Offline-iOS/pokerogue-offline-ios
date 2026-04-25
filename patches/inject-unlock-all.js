@@ -14,6 +14,15 @@ const injection = `
       },
       keepOpen: false,
     });
+    manageDataOptions.push({
+      label: "FULL RESET",
+      handler: () => {
+        globalScene.gameData.importDataFromUrl("/data_new.prsv");
+        ui.revertMode();
+        return true;
+      },
+      keepOpen: false,
+    });
   }
 `;
 
