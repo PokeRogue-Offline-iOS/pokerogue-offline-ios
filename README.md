@@ -20,11 +20,12 @@ An fully offline wrapper for PokéRogue, built with Capacitor. Play fully offlin
 ### Changes to How the App is Built
 The app pulls directly from the official PokéRogue source and applies a small set of targeted fixes on top of it. This means the app will always be up to date with whatever the official game ships, with no manual syncing required.
 
-Four of those fixes are improvements I've submitted to the PokéRogue team for inclusion in the main game. Once they're accepted, the app will automatically stop applying them and just use the official versions. The three pending changes are:
+Five of those fixes are improvements I've submitted to the PokéRogue team for inclusion in the main game. Once they're accepted, the app will automatically stop applying them and just use the official versions. The three pending changes are:
 
 - [#7077](https://github.com/pagefaultgames/pokerogue/pull/7077) — A new setting to skip the "are you sure?" prompt when choosing not to learn a move
 - [#7222](https://github.com/pagefaultgames/pokerogue/pull/7222) — A fix for the file import screen on iOS
 - [#7223](https://github.com/pagefaultgames/pokerogue/pull/7223) — A fix to stop the screen from accidentally zooming in when tapping quickly
+- [#7230](https://github.com/pagefaultgames/pokerogue/pull/7230) — Remove no longer used Consent Pref menu option
 - [#7269](https://github.com/pagefaultgames/pokerogue/pull/7269) — Implements a Randomizer Challenge Mode
   - Note: This will likely not be implented in favor of one made by the PokeRogue Develeopment team. This will be removed if so
 
