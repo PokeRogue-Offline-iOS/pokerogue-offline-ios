@@ -35,6 +35,8 @@ apply_submodule_patch() {
 # Patch to implement 7230
 apply_patch "7230.patch"
 
+apply_patch "fix-daily-seed.js"
+
 # Fix logo not displaying on android devices
 apply_patch "fix-android-image-paths.js"
 

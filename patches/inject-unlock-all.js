@@ -4,8 +4,6 @@ const filePath = 'pokerogue-src/src/ui/handlers/menu-ui-handler.ts';
 let content = fs.readFileSync(filePath, 'utf8');
 
 // ── 1. Remove "Change Password" from Manage Data ─────────────────────────────
-// It's part of a manageDataOptions.push( exportData, changePassword ) call.
-// We keep exportData and drop changePassword entirely.
 
 const CHANGE_PASSWORD_ORIGINAL = `    manageDataOptions.push(
       {
@@ -109,8 +107,8 @@ if (!content.includes(ADMIN_ORIGINAL)) {
 }
 
 // ── 3. Inject app-only options before the cancel button ───────────────────────
-// Adds: Unlock Everything (with confirm), Add Egg Vouchers (with confirm),
-// and FULL RESET (with confirm).
+// Uses `this.showText` (not `ui.showText`) so the message renders in the
+// correct in-game message box UI, matching all other menu confirm dialogs.
 
 const CONFIRM_TEXT = `This is an unofficial feature for convenience only. It is not part of normal play and may reduce your enjoyment of the game. Are you sure?`;
 
@@ -118,17 +116,21 @@ const injection = `    if (isApp) {
       manageDataOptions.push({
         label: "Unlock Everything",
         handler: () => {
-          ui.showText("${CONFIRM_TEXT}", null, () => {
+          this.showText("${CONFIRM_TEXT}", null, () => {
+            if (!this.active) {
+              this.showText("", 0);
+              return;
+            }
             ui.setOverlayMode(
               UiMode.CONFIRM,
               () => {
                 globalScene.gameData.importDataFromUrl("/full_unlocks.prsv");
                 ui.revertMode();
-                ui.showText("", 0);
+                this.showText("", 0);
               },
               () => {
                 ui.revertMode();
-                ui.showText("", 0);
+                this.showText("", 0);
               },
               false,
               -98,
@@ -141,7 +143,11 @@ const injection = `    if (isApp) {
       manageDataOptions.push({
         label: "Add Egg Vouchers",
         handler: () => {
-          ui.showText("${CONFIRM_TEXT}", null, () => {
+          this.showText("${CONFIRM_TEXT}", null, () => {
+            if (!this.active) {
+              this.showText("", 0);
+              return;
+            }
             ui.setOverlayMode(
               UiMode.CONFIRM,
               () => {
@@ -151,12 +157,12 @@ const injection = `    if (isApp) {
                 globalScene.gameData.voucherCounts[3] = (globalScene.gameData.voucherCounts[3] ?? 0) + 99;
                 globalScene.gameData.saveSystem().then(() => {
                   ui.revertMode();
-                  ui.showText("Added 99 of each egg voucher.", null, () => ui.showText("", 0), fixedInt(2000));
+                  this.showText("Added 99 of each egg voucher.", null, () => this.showText("", 0), fixedInt(2000));
                 });
               },
               () => {
                 ui.revertMode();
-                ui.showText("", 0);
+                this.showText("", 0);
               },
               false,
               -98,
@@ -169,17 +175,21 @@ const injection = `    if (isApp) {
       manageDataOptions.push({
         label: "FULL RESET",
         handler: () => {
-          ui.showText("Are you sure you want to delete ALL data? This cannot be undone.", null, () => {
+          this.showText("Are you sure you want to delete ALL data? This cannot be undone.", null, () => {
+            if (!this.active) {
+              this.showText("", 0);
+              return;
+            }
             ui.setOverlayMode(
               UiMode.CONFIRM,
               () => {
                 globalScene.gameData.deleteData();
                 ui.revertMode();
-                ui.showText("", 0);
+                this.showText("", 0);
               },
               () => {
                 ui.revertMode();
-                ui.showText("", 0);
+                this.showText("", 0);
               },
               false,
               -98,
