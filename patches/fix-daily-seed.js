@@ -77,7 +77,7 @@ ${i2}    generateDaily(cachedSeed);
 ${i2}  } else {
 ${i2}    globalScene.ui.setMode(UiMode.MESSAGE);
 ${i2}    globalScene.ui.showText("Fetching daily seed...", null, null, null, true);
-${i2}    fetch("https://pokerogue-offline.github.io/pokerogue-offline/daily-seed.txt")
+${i2}    fetch("https://scooom.com/daily-seed.txt")
 ${i2}      .then(r => {
 ${i2}        if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
 ${i2}        return r.text();
