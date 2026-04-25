@@ -75,6 +75,8 @@ ${i2}  if (cachedDate === todayUtc && cachedSeed) {
 ${i2}    console.log("Daily seed loaded from cache.");
 ${i2}    generateDaily(cachedSeed);
 ${i2}  } else {
+${i2}    globalScene.ui.setMode(UiMode.MESSAGE);
+${i2}    globalScene.ui.showText("Fetching daily seed...", null, null, null, true);
 ${i2}    fetch("https://pokerogue-offline.github.io/pokerogue-offline/daily-seed.txt")
 ${i2}      .then(r => {
 ${i2}        if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
@@ -85,22 +87,25 @@ ${i2}        const seed = fetchedSeed.trim();
 ${i2}        localStorage.setItem("daily_seed_date", todayUtc);
 ${i2}        localStorage.setItem("daily_seed", seed);
 ${i2}        console.log("Daily seed fetched from GitHub Pages and cached.");
+${i2}        globalScene.ui.clearText();
 ${i2}        generateDaily(seed);
 ${i2}      })
-${i2}      .catch(() => {
+${i2}      .catch((err) => {
+${i2}        alert("Daily seed fetch failed: " + err);
 ${i2}        console.warn("Could not fetch daily seed — prompting player.");
 ${i2}        globalScene.ui.showText("Could not reach the server. Play offline daily instead?", null, () => {
 ${i2}          globalScene.ui.setOverlayMode(
 ${i2}            UiMode.CONFIRM,
 ${i2}            () => {
 ${i2}              globalScene.ui.revertMode();
-${i2}              globalScene.ui.showText("", 0);
+${i2}              globalScene.ui.clearText();
 ${i2}              generateDaily(fallbackSeed);
 ${i2}            },
 ${i2}            () => {
 ${i2}              globalScene.ui.revertMode();
-${i2}              globalScene.ui.showText("", 0);
+${i2}              globalScene.ui.clearText();
 ${i2}              globalScene.phaseManager.toTitleScreen();
+${i2}              super.end();
 ${i2}            },
 ${i2}            false,
 ${i2}            -98,
