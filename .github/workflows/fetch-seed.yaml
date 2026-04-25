@@ -20,7 +20,8 @@ jobs:
           SEED=$(curl -sf \
             -H "Origin: https://pokerogue.net" \
             -H "Referer: https://pokerogue.net/" \
-            "https://api.pokerogue.net/daily/seed")
+            "https://scooom.com/daily-seed.txt")
+          echo "Seed Fetched: $SEED";
 
           if [ -z "$SEED" ]; then
             echo "ERROR: Failed to fetch daily seed."
