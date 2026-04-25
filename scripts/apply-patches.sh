@@ -35,6 +35,9 @@ apply_submodule_patch() {
 # Patch to implement 7230
 apply_patch "7230.patch"
 
+# Fix logo not displaying on android devices
+apply_patch "fix-android-image-paths.js"
+
 # Patch to apply full unlock button
 apply_patch "add-import-data-from-url.js"
 apply_patch "inject-unlock-all.js"
@@ -61,5 +64,7 @@ apply_patch "export-fix.js"
 # Patch to implement PKR 7269
 apply_patch "randomizer.patch"
 
+# Pause BGM on background
+apply_patch "background-audio-pause.js"
 
 echo "All patches applied successfully."
