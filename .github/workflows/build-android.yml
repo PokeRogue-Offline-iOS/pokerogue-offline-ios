@@ -109,6 +109,9 @@ jobs:
 
       - name: Copy app icon
         run: |
+          sudo apt-get update -q
+          sudo apt-get install -y imagemagick
+
           ICON_SRC="${{ github.workspace }}/appIcon.png"
           RES_DIR="pokerogue-src/android/app/src/main/res"
 
