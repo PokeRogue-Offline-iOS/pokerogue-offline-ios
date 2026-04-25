@@ -41,6 +41,11 @@ jobs:
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
             -o pokerogue-src/full_unlocks.prsv
 
+      - name: Download full unlocks save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/refs/heads/beta/test/utils/saves/data_new.prsv \
+            -o pokerogue-src/data_new.prsv
+
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh
 
