@@ -1,0 +1,161 @@
+name: Build PokeRogueOffline APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_run_id:
+        description: 'Run ID of the calling release workflow (used to name the artifact for pickup)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Clone PokeRogue
+        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        run: |
+          VERSION=0.$(node -p "require('./pokerogue-src/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download full unlocks save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
+            -o pokerogue-src/full_unlocks.prsv
+
+      - name: Apply patches
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh
+
+      - name: Inject build number into banner
+        run: |
+          sed -i 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+
+      - name: Install PokeRogue dependencies
+        working-directory: pokerogue-src
+        run: pnpm install
+
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build --mode app
+
+      - name: Apply post-build patches
+        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh
+
+      - name: Copy save file to dist
+        run: cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Install Capacitor
+        working-directory: pokerogue-src
+        run: |
+          pnpm add @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/share @capacitor/status-bar
+
+      - name: Configure Capacitor
+        working-directory: pokerogue-src
+        run: |
+          cat > capacitor.config.json << 'CAPEOF'
+          {
+            "appId": "xyz.scooom.pkr",
+            "appName": "PokéRogue Offline",
+            "webDir": "dist",
+            "android": {
+              "backgroundColor": "#000000",
+              "allowMixedContent": false,
+              "captureInput": true,
+              "webContentsDebuggingEnabled": false
+            },
+            "plugins": {
+              "StatusBar": {
+                "overlaysWebView": false,
+                "style": "DARK",
+                "backgroundColor": "#000000"
+              }
+            }
+          }
+          CAPEOF
+
+      - name: Add Android platform
+        working-directory: pokerogue-src
+        run: npx cap add android
+
+      - name: Sync Capacitor
+        working-directory: pokerogue-src
+        run: npx cap sync android
+
+      - name: Copy app icon
+        run: |
+          ICON_SRC="${{ github.workspace }}/appIcon.png"
+          RES_DIR="pokerogue-src/android/app/src/main/res"
+
+          convert "$ICON_SRC" -resize 48x48   "$RES_DIR/mipmap-mdpi/ic_launcher.png"
+          convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-hdpi/ic_launcher.png"
+          convert "$ICON_SRC" -resize 96x96   "$RES_DIR/mipmap-xhdpi/ic_launcher.png"
+          convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"
+          convert "$ICON_SRC" -resize 192x192 "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"
+
+          convert "$ICON_SRC" -resize 48x48   "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
+          convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
+          convert "$ICON_SRC" -resize 96x96   "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
+          convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
+          convert "$ICON_SRC" -resize 192x192 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
+
+          # Delete the adaptive icon XML directory so Android 8+ uses the
+          # plain PNGs instead of the default Capacitor adaptive icon which
+          # would otherwise override everything above.
+          rm -rf pokerogue-src/android/app/src/main/res/mipmap-anydpi-v26
+
+
+      - name: Set version in build.gradle
+        working-directory: pokerogue-src/android/app
+        run: |
+          VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3)
+          VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+
+          sed -i "s/versionCode .*/versionCode $VERSION_CODE/" build.gradle
+          sed -i "s/versionName .*/versionName \"$VERSION\"/" build.gradle
+
+      - name: Make gradlew executable
+        working-directory: pokerogue-src/android
+        run: chmod +x gradlew
+
+      - name: Build release APK (unsigned)
+        working-directory: pokerogue-src/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      # Artifact name is scoped to the release workflow's run ID when triggered
+      # from the release workflow, so it can be unambiguously downloaded later.
+      # Falls back to a standalone name when run independently.
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.release_run_id != '' && format('release-{0}-android', inputs.release_run_id) || 'PokeRogueOffline-Android' }}
+          path: PokeRogueOffline.apk
+          retention-days: 30

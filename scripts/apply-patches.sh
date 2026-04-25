@@ -51,8 +51,16 @@ apply_patch "offlineBanner.patch"
 # Patch out logged in as and online count
 apply_patch "update-title-labels.js"
 
+# Fix exporting on devices
 apply_patch "export-fix.js"
 
+
+# Patch to implement PKR 7269
 apply_patch "randomizer.patch"
 
+# Fixes external links
+apply_patch "fix-browser.js"
+
+# Fixes rotating the game
+apply_patch "landscape-canvas-fit.js"
 echo "All patches applied successfully."
