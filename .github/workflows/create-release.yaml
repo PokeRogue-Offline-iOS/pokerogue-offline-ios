@@ -77,6 +77,10 @@ jobs:
           IOS_RUN_ID=$(locate_run "build-ios.yml" "$IOS_AFTER" "iOS")
           ANDROID_RUN_ID=$(locate_run "build-android.yml" "$ANDROID_AFTER" "Android")
 
+          echo "iOS Run ID: ${IOS_RUN_ID}";
+          echo "Android Run ID: ${ANDROID_RUN_ID}";
+
+
           echo "ios_run_id=$IOS_RUN_ID" >> $GITHUB_OUTPUT
           echo "android_run_id=$ANDROID_RUN_ID" >> $GITHUB_OUTPUT
 
