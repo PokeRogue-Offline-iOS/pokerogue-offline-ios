@@ -83,8 +83,23 @@ ${i2}      console.log("Daily seed fetched from live API.");
 ${i2}      generateDaily(fetchedSeed);
 ${i2}    })
 ${i2}    .catch(() => {
-${i2}      console.warn("Could not fetch daily seed from API — using date-based fallback.");
-${i2}      generateDaily(fallbackSeed);
+${i2}      console.warn("Could not fetch daily seed from API — prompting player.");
+${i2}      globalScene.ui.showText("Could not reach the server.\nPlay offline daily instead?", null, () => {
+${i2}        globalScene.ui.setOverlayMode(
+${i2}          UiMode.CONFIRM,
+${i2}          () => {
+${i2}            globalScene.ui.revertMode();
+${i2}            globalScene.ui.showText("", 0);
+${i2}            generateDaily(fallbackSeed);
+${i2}          },
+${i2}          () => {
+${i2}            globalScene.ui.revertMode();
+${i2}            globalScene.ui.showText("", 0);
+${i2}          },
+${i2}          false,
+${i2}          -98,
+${i2}        );
+${i2}      });
 ${i2}    });
 ${i2}}
 ${i}}`;
