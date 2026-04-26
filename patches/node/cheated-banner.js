@@ -47,13 +47,12 @@ const BANNER = `
       border-radius: 0 6px 6px 0;
       padding: 8px 6px;
       font-family: monospace;
-      font-size: 13px;
+      font-size: 25px;
       font-weight: bold;
       color: rgba(255, 255, 255, 0.9);
       letter-spacing: 0.15em;
       writing-mode: vertical-rl;
       text-orientation: mixed;
-      transform: rotate(180deg);
       user-select: none;
     }
   </style>
@@ -70,8 +69,8 @@ const BANNER = `
         if (!canvas) return;
         var r = canvas.getBoundingClientRect();
         var bh = banner.offsetHeight;
-        banner.style.left = r.left + "px";
-        banner.style.top = (r.top + r.height / 2 - bh / 2) + "px";
+        banner.style.left = "0px";
+        banner.style.top = "25%";
       }
 
       // Wait for Phaser to create the canvas, then position
@@ -86,13 +85,13 @@ const BANNER = `
     })();
   </script>`;
 
-const ANCHOR = "</body>";
+const ANCHOR = '<div id="app">';
 if (!src.includes(ANCHOR)) {
   console.error("ERROR: Could not find </body> in index.html.");
   process.exit(1);
 }
 
-src = src.replace(ANCHOR, BANNER + "\n" + ANCHOR);
+src = src.replace(ANCHOR,  ANCHOR + BANNER);
 
 fs.writeFileSync(TARGET, src, "utf8");
 console.log(`Patched cheated banner into ${TARGET}`);
