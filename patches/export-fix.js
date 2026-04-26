@@ -103,9 +103,12 @@ ${i2}  const Share = cap.Plugins?.Share;
 ${i2}  if (!Filesystem) { console.error("Capacitor Filesystem not available."); removeOverlay(); return; }
 
 ${i2}  if (platform === "android") {
+${i2}    const stampC = new Date();
+${i2}    const stamp = stampC.getUTCFullYear() + '_' + stampC.getUTCMonth() + '_' +   stampC.getUTCDay() + '-' + stampC.getUTCHours() + '_' +   stampC.getUTCMinutes() + '_' + stampC.getUTCSeconds();
+${i2}    filename = \`\${dataKey}-\${stamp}.prsv\`;
 ${i2}    Filesystem.requestPermissions();
 ${i2}    Filesystem.writeFile({
-${i2}      path: \`Download/PokeRogueOffline/\${fileName}\`,
+${i2}      path: \`Download/PokeRogueOffline/\`,
 ${i2}      data: base64,
 ${i2}      directory: "EXTERNAL_STORAGE",
 ${i2}      recursive: true,
