@@ -5,6 +5,7 @@ An fully offline wrapper for PokéRogue, built with Capacitor. Play fully offlin
 ## Features
 
 - Fully offline — no internet required after install
+  - Exception: Starting a daily run will *attempt* to connect to this repo, but is not required.
 - Local saves that persist between sessions
 - Import saves from your online account
 - Based on the latest `main` branch of [pagefaultgames / pokerogue](https://github.com/pagefaultgames/pokerogue/)
@@ -14,7 +15,7 @@ An fully offline wrapper for PokéRogue, built with Capacitor. Play fully offlin
 ### New Features
 - Added an **Unlock Everything** option in Manage Data — this instantly unlocks all starters, forms, and progression without needing to import a save manually.
 - Added an **Reset Everything** option in Manage Data — this deletes all current data. **USE WITH CAUTION**.
-
+- This is the **only** offline client that loads the actual server daily seed. Useful when there are special event daily runs.
 - Includes the build number in the banner for support reasons.
 
 ### Changes to How the App is Built
