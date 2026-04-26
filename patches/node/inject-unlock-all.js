@@ -158,8 +158,7 @@ const injection = `    if (isApp) {
                 globalScene.gameData.voucherCounts[2] = (globalScene.gameData.voucherCounts[2] ?? 0) + 99;
                 globalScene.gameData.voucherCounts[3] = (globalScene.gameData.voucherCounts[3] ?? 0) + 99;
                 globalScene.gameData.saveSystem().then(() => {
-                  ui.revertMode();
-                  this.showText("Added 99 of each egg voucher.", null, () => this.showText("", 0), fixedInt(2000));
+                  window.reload();
                 });
               },
               () => {
