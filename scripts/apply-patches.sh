@@ -70,4 +70,6 @@ apply_patch "randomizer.patch"
 # Pause BGM on background
 apply_patch "background-audio-pause.js"
 
+apply_patch "randomizer_locales.js"
+
 echo "All patches applied successfully."
