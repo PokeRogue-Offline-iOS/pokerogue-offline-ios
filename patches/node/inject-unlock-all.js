@@ -158,7 +158,7 @@ const injection = `    if (isApp) {
                 globalScene.gameData.voucherCounts[2] = (globalScene.gameData.voucherCounts[2] ?? 0) + 99;
                 globalScene.gameData.voucherCounts[3] = (globalScene.gameData.voucherCounts[3] ?? 0) + 99;
                 globalScene.gameData.saveSystem().then(() => {
-                  window.reload();
+                  window.location.reload();
                 });
               },
               () => {
