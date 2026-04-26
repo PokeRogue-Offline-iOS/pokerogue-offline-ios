@@ -7,11 +7,13 @@ TARGET_DIR="pokerogue-src"
 
 apply_patch() {
   local file="$1"
-  local full_path="$PATCHES_DIR/$file"
+  local full_path
   echo "Applying: $file"
   if [[ "$file" == *.patch ]]; then
+    full_path="$PATCHES_DIR/patch/$file"
     git -C "$TARGET_DIR" apply "$full_path"
   elif [[ "$file" == *.js ]]; then
+    full_path="$PATCHES_DIR/node/$file"
     node "$full_path"
   else
     echo "Unknown file type: $file"
@@ -23,53 +25,29 @@ apply_patch() {
 apply_submodule_patch() {
   local file="$1"
   local submodule="$2"
-  local full_path="$PATCHES_DIR/$file"
+  local full_path="$PATCHES_DIR/patch/$file"
   echo "Applying: $file to $TARGET_DIR/$submodule"
   git -C "$TARGET_DIR/$submodule" apply "$full_path"
   echo "Applied: $file"
 }
 
-# Add patch files here:
-# apply_patch "01-fix-something.patch"
-
-# Patch to implement 7230
+# Pending upstream PRs (patch/ — remove once merged)
 apply_patch "7230.patch"
+apply_patch "noLearnMove.patch"       # PKR 7077
+apply_patch "iosImport.patch"         # PKR 7222
+apply_patch "noZoom.patch"            # PKR 7223
+apply_patch "randomizer.patch"        # PKR 7269
 
+# Offline client modifications (node/)
 apply_patch "fix-daily-seed.js"
-
-# Fix logo not displaying on android devices
 apply_patch "fix-android-image-paths.js"
-
-# Patch to apply full unlock button
 apply_patch "add-import-data-from-url.js"
 apply_patch "inject-unlock-all.js"
-
-# patch to implement PKR 7077
-apply_patch "noLearnMove.patch"
-
-# Patch to implement PKR 7222
-apply_patch "iosImport.patch"
 apply_patch "android-import-fix.js"
-
-# Patch to implement PKR 7223
-apply_patch "noZoom.patch"
-
-# Patch in version string for offline client
-apply_patch "offlineBanner.patch"
-
-# Patch out logged in as and online count
+apply_patch "offline-banner.js"
 apply_patch "update-title-labels.js"
-
-# Fix exporting on devices
 apply_patch "export-fix.js"
-
-
-# Patch to implement PKR 7269
-apply_patch "randomizer.patch"
-
-# Pause BGM on background
 apply_patch "background-audio-pause.js"
-
 apply_patch "randomizer_locales.js"
 
 echo "All patches applied successfully."
