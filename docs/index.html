@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PokéRogue Offline — iOS</title>
+  <title>PokéRogue Offline — iOS &amp; Android</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="icon" type="image/png" href="favicon.png" />
@@ -24,10 +24,12 @@
       --text:         #e8d5b0;
       --text-dim:     #a89070;
       --border:       rgba(201, 168, 76, 0.25);
+      --android-green: #3ddc84;
+      --android-green-dim: rgba(61,220,132,0.12);
+      --android-green-border: rgba(61,220,132,0.3);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     html { scroll-behavior: smooth; }
 
     body {
@@ -39,7 +41,6 @@
       overflow-x: hidden;
     }
 
-    /* ── NAV ── */
     nav {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -138,7 +139,6 @@
       .nav-hamburger { display: flex; }
     }
 
-    /* ── NOISE OVERLAY ── */
     body::before {
       content: '';
       position: fixed;
@@ -149,11 +149,9 @@
       opacity: 0.5;
     }
 
-    /* ── HERO ── */
     .hero {
       position: relative;
       min-height: 100vh;
-      padding-top: 5rem;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -162,7 +160,6 @@
       padding: 4rem 2rem;
       overflow: hidden;
     }
-
     .hero::before {
       content: '';
       position: absolute;
@@ -173,26 +170,19 @@
         radial-gradient(ellipse 40% 40% at 80% 20%, rgba(100,0,0,0.15) 0%, transparent 60%);
       pointer-events: none;
     }
-
     .hero-emblem {
-      width: 120px;
-      height: 120px;
+      width: 120px; height: 120px;
       border-radius: 24px;
       border: 2px solid var(--gold);
-      box-shadow:
-        0 0 0 6px rgba(201,168,76,0.1),
-        0 0 40px rgba(128,0,0,0.6),
-        0 0 80px rgba(128,0,0,0.3);
+      box-shadow: 0 0 0 6px rgba(201,168,76,0.1), 0 0 40px rgba(128,0,0,0.6), 0 0 80px rgba(128,0,0,0.3);
       margin-bottom: 2.5rem;
       animation: emblem-glow 3s ease-in-out infinite alternate;
       object-fit: cover;
     }
-
     @keyframes emblem-glow {
       from { box-shadow: 0 0 0 6px rgba(201,168,76,0.1), 0 0 40px rgba(128,0,0,0.6), 0 0 80px rgba(128,0,0,0.3); }
       to   { box-shadow: 0 0 0 6px rgba(201,168,76,0.2), 0 0 60px rgba(200,64,64,0.7), 0 0 120px rgba(128,0,0,0.4); }
     }
-
     .hero-eyebrow {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.7rem;
@@ -202,51 +192,52 @@
       margin-bottom: 1rem;
       opacity: 0.8;
     }
-
     .hero-title {
       font-family: 'Cinzel', serif;
       font-size: clamp(2.8rem, 8vw, 6rem);
       font-weight: 900;
       line-height: 1.0;
       color: var(--cream);
-      text-shadow:
-        0 0 60px rgba(200,64,64,0.5),
-        0 2px 4px rgba(0,0,0,0.8);
+      text-shadow: 0 0 60px rgba(200,64,64,0.5), 0 2px 4px rgba(0,0,0,0.8);
       margin-bottom: 0.4rem;
       letter-spacing: 0.02em;
     }
-
-    .hero-title span {
-      color: var(--maroon-glow);
-      text-shadow: 0 0 40px rgba(200,64,64,0.8);
-    }
-
+    .hero-title span { color: var(--maroon-glow); text-shadow: 0 0 40px rgba(200,64,64,0.8); }
     .hero-subtitle {
       font-family: 'Cinzel', serif;
       font-size: clamp(1rem, 3vw, 1.4rem);
       font-weight: 400;
       color: var(--gold-pale);
       letter-spacing: 0.15em;
-      margin-bottom: 2.5rem;
+      margin-bottom: 2rem;
       opacity: 0.85;
     }
-
     .hero-desc {
-      max-width: 540px;
+      max-width: 560px;
       font-size: 1.1rem;
       color: var(--text-dim);
       font-style: italic;
-      margin-bottom: 3rem;
+      margin-bottom: 1.5rem;
       line-height: 1.8;
     }
-
-    .hero-cta {
+    .platform-badges {
       display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
+      gap: 0.75rem;
       justify-content: center;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
     }
-
+    .platform-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      border-radius: 2px;
+    }
+    .platform-badge.ios { background: rgba(201,168,76,0.1); color: var(--gold); border: 1px solid rgba(201,168,76,0.35); }
+    .platform-badge.android { background: var(--android-green-dim); color: var(--android-green); border: 1px solid var(--android-green-border); }
+    .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -259,65 +250,31 @@
       text-decoration: none;
       border-radius: 3px;
       transition: all 0.25s ease;
-      position: relative;
     }
-
     .btn-primary {
       background: var(--maroon);
       color: var(--gold-pale);
       border: 1px solid var(--gold);
       box-shadow: 0 0 20px rgba(128,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
     }
+    .btn-primary:hover { background: var(--maroon-light); box-shadow: 0 0 35px rgba(200,64,64,0.5); transform: translateY(-1px); color: var(--cream); }
+    .btn-secondary { background: transparent; color: var(--gold); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--gold); background: rgba(201,168,76,0.08); transform: translateY(-1px); }
 
-    .btn-primary:hover {
-      background: var(--maroon-light);
-      box-shadow: 0 0 35px rgba(200,64,64,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
-      transform: translateY(-1px);
-      color: var(--cream);
-    }
-
-    .btn-secondary {
-      background: transparent;
-      color: var(--gold);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      border-color: var(--gold);
-      background: rgba(201,168,76,0.08);
-      transform: translateY(-1px);
-    }
-
-    /* ── DIVIDER ── */
     .divider {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
+      display: flex; align-items: center; gap: 1.5rem;
       margin: 0 auto 4rem;
       max-width: 600px;
       padding: 0 2rem;
       opacity: 0.5;
     }
-
     .divider::before, .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
+      content: ''; flex: 1; height: 1px;
       background: linear-gradient(to right, transparent, var(--gold), transparent);
     }
+    .divider-icon { color: var(--gold); font-size: 1.2rem; }
 
-    .divider-icon {
-      color: var(--gold);
-      font-size: 1.2rem;
-    }
-
-    /* ── SECTIONS ── */
-    section {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 0 2rem 6rem;
-    }
-
+    section { max-width: 860px; margin: 0 auto; padding: 0 2rem 6rem; }
     .section-label {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.65rem;
@@ -326,7 +283,6 @@
       color: var(--maroon-glow);
       margin-bottom: 0.75rem;
     }
-
     .section-title {
       font-family: 'Cinzel', serif;
       font-size: clamp(1.6rem, 4vw, 2.4rem);
@@ -335,21 +291,107 @@
       margin-bottom: 1rem;
       line-height: 1.2;
     }
+    .section-intro { color: var(--text-dim); font-style: italic; margin-bottom: 3rem; font-size: 1.05rem; }
 
-    .section-intro {
+    /* FEATURES */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .feature-card {
+      background: linear-gradient(135deg, rgba(74,0,0,0.3) 0%, rgba(26,10,10,0.5) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(to right, transparent, var(--maroon-light), transparent);
+    }
+    .feature-card:hover { border-color: rgba(201,168,76,0.35); box-shadow: 0 4px 20px rgba(128,0,0,0.15); }
+    .feature-card.highlight::before { background: linear-gradient(to right, transparent, var(--gold), transparent); }
+    .feature-card.highlight { border-color: rgba(201,168,76,0.3); }
+    .feature-icon { font-size: 1.5rem; margin-bottom: 0.75rem; display: block; }
+    .feature-title { font-family: 'Cinzel', serif; font-size: 0.95rem; font-weight: 600; color: var(--cream); margin-bottom: 0.4rem; }
+    .feature-desc { font-size: 0.9rem; color: var(--text-dim); line-height: 1.6; }
+    .new-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      background: rgba(201,168,76,0.15);
+      color: var(--gold);
+      border: 1px solid rgba(201,168,76,0.4);
+      border-radius: 2px;
+      padding: 0.15rem 0.45rem;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+    }
+
+    /* PATCHES */
+    .patches-list { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.5rem; }
+    .patch-item {
+      display: flex; align-items: flex-start; gap: 0.85rem;
+      padding: 0.85rem 1rem;
+      background: rgba(26,10,10,0.5);
+      border: 1px solid rgba(201,168,76,0.1);
+      border-radius: 3px;
+      font-size: 0.92rem;
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+    .patch-item:hover { border-color: rgba(201,168,76,0.25); }
+    .patch-pr {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--gold);
+      background: rgba(201,168,76,0.08);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: 2px;
+      padding: 0.15rem 0.5rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .patch-pr a { color: inherit; text-decoration: none; }
+    .patch-pr a:hover { color: var(--cream); }
+
+    /* TABS */
+    .platform-tabs {
+      display: flex; gap: 0;
+      margin-bottom: 2.5rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .platform-tab {
+      flex: 1;
+      padding: 0.85rem 1.5rem;
+      font-family: 'Cinzel', serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(26,10,10,0.6);
       color: var(--text-dim);
-      font-style: italic;
-      margin-bottom: 3rem;
-      font-size: 1.05rem;
+      border: none;
+      transition: all 0.2s;
     }
+    .platform-tab:first-child { border-right: 1px solid var(--border); }
+    .platform-tab.active-ios { background: rgba(128,0,0,0.3); color: var(--gold); }
+    .platform-tab.active-android { background: var(--android-green-dim); color: var(--android-green); }
+    .platform-panel { display: none; }
+    .platform-panel.active { display: block; }
 
-    /* ── INSTALL CARDS ── */
-    .install-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-
+    /* INSTALL CARDS */
+    .install-grid { display: flex; flex-direction: column; gap: 1.5rem; }
     .install-card {
       background: linear-gradient(135deg, rgba(74,0,0,0.4) 0%, rgba(26,10,10,0.6) 100%);
       border: 1px solid var(--border);
@@ -359,48 +401,27 @@
       overflow: hidden;
       transition: border-color 0.25s, box-shadow 0.25s;
     }
-
     .install-card::before {
       content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
       background: linear-gradient(to right, transparent, var(--maroon-light), transparent);
     }
-
-    .install-card:hover {
-      border-color: rgba(201,168,76,0.4);
-      box-shadow: 0 4px 30px rgba(128,0,0,0.2);
+    .install-card:hover { border-color: rgba(201,168,76,0.4); box-shadow: 0 4px 30px rgba(128,0,0,0.2); }
+    .install-card.recommended::before { background: linear-gradient(to right, transparent, var(--gold), transparent); }
+    .install-card.android-card {
+      background: linear-gradient(135deg, rgba(15,50,28,0.4) 0%, rgba(10,26,16,0.6) 100%);
+      border-color: var(--android-green-border);
     }
-
-    .install-card.recommended::before {
-      background: linear-gradient(to right, transparent, var(--gold), transparent);
-    }
+    .install-card.android-card::before { background: linear-gradient(to right, transparent, var(--android-green), transparent); }
+    .install-card.android-card:hover { border-color: rgba(61,220,132,0.5); box-shadow: 0 4px 30px rgba(61,220,132,0.07); }
 
     .card-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
     }
-
-    .card-num {
-      font-family: 'Cinzel', serif;
-      font-size: 0.7rem;
-      color: var(--maroon-glow);
-      letter-spacing: 0.2em;
-    }
-
-    .card-title {
-      font-family: 'Cinzel', serif;
-      font-size: 1.15rem;
-      font-weight: 600;
-      color: var(--cream);
-      margin-top: 0.3rem;
-    }
-
+    .card-num { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--maroon-glow); letter-spacing: 0.2em; }
+    .card-num.android { color: var(--android-green); opacity: 0.7; }
+    .card-title { font-family: 'Cinzel', serif; font-size: 1.15rem; font-weight: 600; color: var(--cream); margin-top: 0.3rem; }
     .badge {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.6rem;
@@ -410,36 +431,27 @@
       border-radius: 2px;
       white-space: nowrap;
     }
+    .badge-recommended { background: rgba(201,168,76,0.15); color: var(--gold); border: 1px solid rgba(201,168,76,0.4); }
+    .badge-simple { background: rgba(128,0,0,0.2); color: var(--maroon-glow); border: 1px solid rgba(128,0,0,0.4); }
+    .badge-android { background: var(--android-green-dim); color: var(--android-green); border: 1px solid var(--android-green-border); }
 
-    .badge-recommended {
-      background: rgba(201,168,76,0.15);
-      color: var(--gold);
-      border: 1px solid rgba(201,168,76,0.4);
-    }
-
-    .badge-simple {
-      background: rgba(128,0,0,0.2);
-      color: var(--maroon-glow);
-      border: 1px solid rgba(128,0,0,0.4);
-    }
-
-    .steps {
-      list-style: none;
-      counter-reset: step;
+    .strongly-recommended-banner {
+      background: linear-gradient(135deg, rgba(201,168,76,0.1) 0%, rgba(128,0,0,0.12) 100%);
+      border: 1px solid rgba(201,168,76,0.3);
+      border-radius: 3px;
+      padding: 0.85rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.92rem;
+      color: var(--gold-pale);
       display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .steps li {
-      counter-increment: step;
-      display: flex;
-      gap: 1rem;
       align-items: flex-start;
-      font-size: 1rem;
-      color: var(--text);
+      gap: 0.6rem;
+      line-height: 1.6;
     }
+    .sr-icon { flex-shrink: 0; margin-top: 0.1rem; }
 
+    .steps { list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.75rem; }
+    .steps li { counter-increment: step; display: flex; gap: 1rem; align-items: flex-start; font-size: 1rem; color: var(--text); }
     .steps li::before {
       content: counter(step);
       font-family: 'JetBrains Mono', monospace;
@@ -449,26 +461,18 @@
       background: rgba(128,0,0,0.2);
       border: 1px solid rgba(200,64,64,0.3);
       border-radius: 2px;
-      min-width: 1.6rem;
-      height: 1.6rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      min-width: 1.6rem; height: 1.6rem;
+      display: flex; align-items: center; justify-content: center;
       margin-top: 0.15rem;
       flex-shrink: 0;
     }
-
-    .steps a {
-      color: var(--gold);
-      text-decoration: none;
-      border-bottom: 1px solid rgba(201,168,76,0.3);
-      transition: border-color 0.2s, color 0.2s;
+    .android-card .steps li::before {
+      color: var(--android-green);
+      background: var(--android-green-dim);
+      border-color: var(--android-green-border);
     }
-
-    .steps a:hover {
-      color: var(--cream);
-      border-color: var(--cream);
-    }
+    .steps a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,168,76,0.3); transition: all 0.2s; }
+    .steps a:hover { color: var(--cream); border-color: var(--cream); }
 
     .card-note {
       margin-top: 1.25rem;
@@ -480,13 +484,9 @@
       font-style: italic;
       border-radius: 0 3px 3px 0;
     }
+    .card-note.android-note { background: rgba(61,220,132,0.04); border-left-color: rgba(61,220,132,0.4); }
 
-    .steps-sub {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid rgba(201,168,76,0.1);
-    }
-
+    .steps-sub { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(201,168,76,0.1); }
     .steps-sub-title {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.65rem;
@@ -496,7 +496,6 @@
       margin-bottom: 0.75rem;
     }
 
-    /* ── ALTSTORE SECTION ── */
     .altstore-box {
       background: linear-gradient(135deg, rgba(74,0,0,0.5) 0%, rgba(26,10,10,0.7) 100%);
       border: 1px solid var(--border);
@@ -505,15 +504,11 @@
       position: relative;
       overflow: hidden;
     }
-
     .altstore-box::before {
       content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
       background: linear-gradient(to right, transparent, var(--gold), transparent);
     }
-
     .repo-url {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.9rem;
@@ -527,59 +522,21 @@
       display: block;
     }
 
-    /* ── AUTHOR ── */
     .author-box {
-      display: flex;
-      align-items: center;
-      gap: 2rem;
+      display: flex; align-items: center; gap: 2rem;
       background: linear-gradient(135deg, rgba(74,0,0,0.3) 0%, rgba(26,10,10,0.5) 100%);
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 2rem 2.5rem;
       flex-wrap: wrap;
     }
-
-    .author-avatar {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      border: 2px solid var(--gold);
-      box-shadow: 0 0 20px rgba(128,0,0,0.4);
-      flex-shrink: 0;
-      object-fit: cover;
-    }
-
-    .author-info {
-      flex: 1;
-      min-width: 200px;
-    }
-
-    .author-name {
-      font-family: 'Cinzel', serif;
-      font-size: 1.3rem;
-      font-weight: 600;
-      color: var(--cream);
-      margin-bottom: 0.25rem;
-    }
-
-    .author-handle {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      color: var(--gold);
-      letter-spacing: 0.1em;
-      margin-bottom: 1rem;
-    }
-
-    .author-links {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
+    .author-avatar { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--gold); box-shadow: 0 0 20px rgba(128,0,0,0.4); flex-shrink: 0; object-fit: cover; }
+    .author-info { flex: 1; min-width: 200px; }
+    .author-name { font-family: 'Cinzel', serif; font-size: 1.3rem; font-weight: 600; color: var(--cream); margin-bottom: 0.25rem; }
+    .author-handle { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--gold); letter-spacing: 0.1em; margin-bottom: 1rem; }
+    .author-links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
     .author-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
+      display: inline-flex; align-items: center; gap: 0.4rem;
       font-size: 0.85rem;
       font-family: 'JetBrains Mono', monospace;
       color: var(--text-dim);
@@ -590,25 +547,10 @@
       transition: all 0.2s;
       letter-spacing: 0.05em;
     }
+    .author-link:hover { color: var(--gold); border-color: rgba(201,168,76,0.5); background: rgba(201,168,76,0.06); }
+    .discord-link { color: var(--maroon-glow); border-color: rgba(200,64,64,0.3); }
+    .discord-link:hover { color: var(--cream); border-color: var(--maroon-glow); background: rgba(200,64,64,0.08); }
 
-    .author-link:hover {
-      color: var(--gold);
-      border-color: rgba(201,168,76,0.5);
-      background: rgba(201,168,76,0.06);
-    }
-
-    .discord-link {
-      color: var(--maroon-glow);
-      border-color: rgba(200,64,64,0.3);
-    }
-
-    .discord-link:hover {
-      color: var(--cream);
-      border-color: var(--maroon-glow);
-      background: rgba(200,64,64,0.08);
-    }
-
-    /* ── DISCLAIMER ── */
     .disclaimer {
       text-align: center;
       padding: 3rem 2rem;
@@ -631,17 +573,8 @@
       border: 1px solid rgba(201,168,76,0.15);
     }
 
-    /* ── SCROLL REVEAL ── */
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: opacity 0.6s ease, transform 0.6s ease;
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
 
     @media (max-width: 600px) {
       .hero { padding: 3rem 1.5rem; }
@@ -649,6 +582,7 @@
       .install-card { padding: 1.5rem; }
       .altstore-box { padding: 1.5rem; }
       .author-box { padding: 1.5rem; gap: 1.25rem; }
+      .features-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -659,6 +593,7 @@
       PokéRogue Offline
     </a>
     <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
       <li><a href="#install">Install</a></li>
       <li><a href="#altstore">AltStore</a></li>
       <li><a href="#save">Save Data</a></li>
@@ -670,149 +605,269 @@
     </button>
   </nav>
   <div class="nav-mobile" id="mobile-menu">
+    <a href="#features" onclick="closeMenu()">Features</a>
     <a href="#install" onclick="closeMenu()">Install</a>
     <a href="#altstore" onclick="closeMenu()">AltStore</a>
     <a href="#save" onclick="closeMenu()">Save Data</a>
     <a href="#contact" onclick="closeMenu()">Contact</a>
-    <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest">↓ Download IPA</a>
+    <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest">↓ Download</a>
   </div>
 
-
-  <!-- ── HERO ── -->
+  <!-- HERO -->
   <div class="hero">
-    <img
-      src="appIcon.webp"
-      alt="Scooom"
-      class="hero-emblem"
-    />
-    <p class="hero-eyebrow">Unofficial iOS Client</p>
+    <img src="appIcon.webp" alt="PokéRogue Offline" class="hero-emblem" />
+    <p class="hero-eyebrow">Unofficial Mobile Client</p>
     <h1 class="hero-title">PokéRogue<br/><span>Offline</span></h1>
     <p class="hero-subtitle">Play Anywhere. No Internet Required.</p>
     <p class="hero-desc">
-      A fully offline iOS wrapper for PokéRogue — the browser-based Pokémon roguelite.
+      A fully offline wrapper for PokéRogue — the browser-based Pokémon roguelite.
       Save locally, import from your online account, and battle on the go.
     </p>
+    <div class="platform-badges">
+      <span class="platform-badge ios">🍎 iOS</span>
+      <span class="platform-badge android">🤖 Android</span>
+    </div>
     <div class="hero-cta">
-      <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" class="btn btn-primary">
-        ↓ Download IPA
-      </a>
-      <a href="https://github.com/PokeRogue-Offline/pokerogue-offline" class="btn btn-secondary">
-        View on GitHub
-      </a>
+      <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" class="btn btn-primary">↓ Download</a>
+      <a href="https://github.com/PokeRogue-Offline/pokerogue-offline" class="btn btn-secondary">View on GitHub</a>
     </div>
   </div>
 
   <div class="divider"><span class="divider-icon">✦</span></div>
 
-  <!-- ── INSTALL ── -->
-  <span id="install"></span>
+  <!-- FEATURES -->
+  <span id="features"></span>
   <section>
     <div class="reveal">
-      <p class="section-label">Getting Started</p>
-      <h2 class="section-title">Installing the App</h2>
-      <p class="section-intro">
-        Since this isn't on the App Store, you'll need to sideload it. Choose the method that works best for you.
-      </p>
+      <p class="section-label">What's Included</p>
+      <h2 class="section-title">Features</h2>
+      <p class="section-intro">Everything from the official game, plus exclusive additions you won't find anywhere else.</p>
     </div>
 
-    <div class="install-grid">
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <span class="feature-icon">📵</span>
+        <p class="feature-title">Fully Offline</p>
+        <p class="feature-desc">No internet required after install. Play anywhere, anytime — airplane mode included.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">💾</span>
+        <p class="feature-title">Local Save Data</p>
+        <p class="feature-desc">Saves persist between sessions, stored entirely on your device.</p>
+      </div>
+      <div class="feature-card highlight reveal">
+        <span class="feature-icon">🔓</span>
+        <p class="feature-title">Unlock Everything <span class="new-tag">New</span></p>
+        <p class="feature-desc">Instantly unlock all starters, forms, and progression via <strong>Manage Data</strong> — no save import needed.</p>
+      </div>
+      <div class="feature-card highlight reveal">
+        <span class="feature-icon">🎟️</span>
+        <p class="feature-title">Add Egg Vouchers <span class="new-tag">New</span></p>
+        <p class="feature-desc">Instantly add 99 of every egg voucher type via <strong>Manage Data</strong> — hatch as many eggs as you want.</p>
+      </div>
+      <div class="feature-card highlight reveal">
+        <span class="feature-icon">🗑️</span>
+        <p class="feature-title">Reset Everything <span class="new-tag">New</span></p>
+        <p class="feature-desc">Wipe all local data with one tap in <strong>Manage Data</strong>. Use with caution.</p>
+      </div>
+      <div class="feature-card highlight reveal">
+        <span class="feature-icon">📅</span>
+        <p class="feature-title">Live Daily Seed <span class="new-tag">New</span></p>
+        <p class="feature-desc">The <em>only</em> offline client that loads the actual server daily seed — including special event daily runs.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">📦</span>
+        <p class="feature-title">Import Online Save</p>
+        <p class="feature-desc">Bring your progress over from pokerogue.net with a simple export/import flow.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">⚡</span>
+        <p class="feature-title">Always Up To Date</p>
+        <p class="feature-desc">Built directly from the official PokéRogue source — automatically stays current with every upstream update.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">#</span>
+        <p class="feature-title">Build Number in Banner</p>
+        <p class="feature-desc">The app version is shown in the banner for easy identification when requesting support.</p>
+      </div>
+    </div>
 
-      <!-- OPTION 1 -->
-      <div class="install-card recommended reveal">
-        <div class="card-header">
-          <div>
-            <p class="card-num">Option 01</p>
-            <h3 class="card-title">LiveContainer + SideStore</h3>
-          </div>
-          <span class="badge badge-recommended">Recommended</span>
+    <div class="reveal" style="margin-top: 2.5rem;">
+      <p class="section-label" style="margin-bottom:0.6rem;">Applied Patches</p>
+      <p style="color:var(--text-dim); font-size:0.95rem; font-style:italic; margin-bottom:1rem;">
+        These upstream fixes are applied on top of the official game. Once accepted by the PokéRogue team, they'll be removed from the patch list automatically.
+      </p>
+      <div class="patches-list">
+        <div class="patch-item">
+          <span class="patch-pr"><a href="https://github.com/pagefaultgames/pokerogue/pull/7077" target="_blank">#7077</a></span>
+          <span>New setting to skip the "are you sure?" prompt when choosing not to learn a move</span>
         </div>
-        <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
-          Unlimited apps with no slot limits. Signs the IPA automatically — no extra tools needed after setup.
-        </p>
-
-        <p class="steps-sub-title">First-time setup</p>
-        <ol class="steps">
-          <li>Install <a href="https://github.com/khcrysalis/iloader" target="_blank">iLoader</a> on your PC or Mac</li>
-          <li>Connect your iPhone via USB and open iLoader</li>
-          <li>Sign in with your Apple ID</li>
-          <li>Select <strong>LiveContainer + SideStore</strong> and install</li>
-          <li>Open LiveContainer and complete setup by importing the certificate from SideStore</li>
-        </ol>
-
-        <div class="steps-sub">
-          <p class="steps-sub-title">Installing PokéRogue Offline</p>
-          <ol class="steps">
-            <li>Download <code>PokeRogueOffline.ipa</code> to your iPhone via Safari or Files</li>
-            <li>Open LiveContainer and tap <strong>+</strong> in the top right</li>
-            <li>Select the IPA file</li>
-            <li>Tap the app icon to launch</li>
-          </ol>
+        <div class="patch-item">
+          <span class="patch-pr"><a href="https://github.com/pagefaultgames/pokerogue/pull/7222" target="_blank">#7222</a></span>
+          <span>Fix for the file import screen on iOS</span>
         </div>
-
-        <div class="card-note">
-          LiveContainer signs the app with your SideStore certificate automatically — no manual signing needed.
+        <div class="patch-item">
+          <span class="patch-pr"><a href="https://github.com/pagefaultgames/pokerogue/pull/7223" target="_blank">#7223</a></span>
+          <span>Fix to prevent accidental screen zoom-in when tapping quickly</span>
+        </div>
+        <div class="patch-item">
+          <span class="patch-pr"><a href="https://github.com/pagefaultgames/pokerogue/pull/7230" target="_blank">#7230</a></span>
+          <span>Remove the no-longer-used Consent Pref menu option</span>
+        </div>
+        <div class="patch-item">
+          <span class="patch-pr"><a href="https://github.com/pagefaultgames/pokerogue/pull/7269" target="_blank">#7269</a></span>
+          <span>Randomizer Challenge Mode — may be replaced by an official implementation from the PokéRogue team</span>
         </div>
       </div>
-
-      <!-- OPTION 2 -->
-      <div class="install-card reveal">
-        <div class="card-header">
-          <div>
-            <p class="card-num">Option 02</p>
-            <h3 class="card-title">SideStore</h3>
-          </div>
-          <span class="badge badge-simple">Up to 3 apps</span>
-        </div>
-        <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
-          Wireless refresh, no PC needed after setup. Limited to 3 sideloaded apps at once.
-        </p>
-        <ol class="steps">
-          <li>Install SideStore via iLoader or AltServer</li>
-          <li>Open SideStore and tap <strong>+</strong> in My Apps</li>
-          <li>Select <code>PokeRogueOffline.ipa</code></li>
-          <li>Apps must be refreshed every 7 days — can be automated with a Shortcuts automation</li>
-        </ol>
-      </div>
-
-      <!-- OPTION 3 -->
-      <div class="install-card reveal">
-        <div class="card-header">
-          <div>
-            <p class="card-num">Option 03</p>
-            <h3 class="card-title">Feather / Sideloadly</h3>
-          </div>
-          <span class="badge badge-simple">Already a user?</span>
-        </div>
-        <p style="color: var(--text-dim); font-size:0.97rem;">
-          If you already use Feather or Sideloadly, just sign and install the IPA as you normally would. No special steps needed.
-        </p>
-      </div>
-
     </div>
   </section>
 
   <div class="divider"><span class="divider-icon">✦</span></div>
 
-  <!-- ── ALTSTORE ── -->
+  <!-- INSTALL -->
+  <span id="install"></span>
+  <section>
+    <div class="reveal">
+      <p class="section-label">Getting Started</p>
+      <h2 class="section-title">Installing the App</h2>
+      <p class="section-intro">Choose your platform below and follow the steps to get PokéRogue Offline on your device.</p>
+    </div>
+
+    <div class="platform-tabs reveal">
+      <button class="platform-tab active-ios" id="tab-ios" onclick="switchTab('ios')">🍎 iOS</button>
+      <button class="platform-tab" id="tab-android" onclick="switchTab('android')">🤖 Android</button>
+    </div>
+
+    <!-- iOS Panel -->
+    <div class="platform-panel active" id="panel-ios">
+      <div class="install-grid">
+
+        <!-- LiveContainer — STRONGLY RECOMMENDED -->
+        <div class="install-card recommended reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num">Option 01</p>
+              <h3 class="card-title">LiveContainer + SideStore</h3>
+            </div>
+            <span class="badge badge-recommended">⭐ Strongly Recommended</span>
+          </div>
+
+          <div class="strongly-recommended-banner">
+            <span class="sr-icon">✦</span>
+            <span>
+              <strong>This is the best way to run PokéRogue Offline on iOS.</strong>
+              LiveContainer lets you run unlimited IPAs inside a container — no slot limits, no manual signing, and no 7-day refresh. If you're starting from scratch, start here.
+            </span>
+          </div>
+
+          <p class="steps-sub-title">First-time setup</p>
+          <ol class="steps">
+            <li>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a> and download iLoader for your PC or Mac</li>
+            <li>Connect your iPhone via USB and open iLoader</li>
+            <li>Sign in with your Apple ID</li>
+            <li>Select <strong>LiveContainer + SideStore</strong> and install</li>
+            <li>Open LiveContainer on your device and complete setup by importing the certificate from SideStore</li>
+          </ol>
+
+          <div class="steps-sub">
+            <p class="steps-sub-title">Installing PokéRogue Offline</p>
+            <ol class="steps">
+              <li>Download <code>PokeRogueOffline.ipa</code> to your iPhone via Safari or Files</li>
+              <li>Open LiveContainer and tap <strong>+</strong> in the top right</li>
+              <li>Select the IPA file</li>
+              <li>Tap the app icon to launch — no signing needed</li>
+            </ol>
+          </div>
+
+          <div class="card-note">
+            LiveContainer signs the app with your SideStore certificate automatically. You never need to manually sign or refresh PokéRogue Offline.
+          </div>
+        </div>
+
+        <!-- SideStore only -->
+        <div class="install-card reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num">Option 02</p>
+              <h3 class="card-title">SideStore</h3>
+            </div>
+            <span class="badge badge-simple">Up to 3 apps</span>
+          </div>
+          <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+            Wireless refresh, no PC needed after setup. Limited to 3 sideloaded apps at once, and apps must be refreshed every 7 days.
+          </p>
+          <ol class="steps">
+            <li>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a>, download iLoader, and use it to install SideStore on your iPhone</li>
+            <li>Open SideStore and tap <strong>+</strong> in My Apps</li>
+            <li>Select <code>PokeRogueOffline.ipa</code></li>
+            <li>Refresh every 7 days — automate this with a Shortcuts automation if desired</li>
+          </ol>
+        </div>
+
+        <!-- Feather / Sideloadly -->
+        <div class="install-card reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num">Option 03</p>
+              <h3 class="card-title">Feather / Sideloadly</h3>
+            </div>
+            <span class="badge badge-simple">Already a user?</span>
+          </div>
+          <p style="color: var(--text-dim); font-size:0.97rem;">
+            If you already use Feather or Sideloadly, just sign and install the IPA as you normally would. No special steps needed.
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Android Panel -->
+    <div class="platform-panel" id="panel-android">
+      <div class="install-grid">
+        <div class="install-card android-card reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num android">Android</p>
+              <h3 class="card-title">Install the APK</h3>
+            </div>
+            <span class="badge badge-android">Direct Install</span>
+          </div>
+          <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+            No sideloading tool needed on Android — just download and install the APK directly from the releases page.
+          </p>
+          <ol class="steps">
+            <li>Go to the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank">latest release</a> and download <code>PokeRogueOffline.apk</code></li>
+            <li>Open the APK file on your device</li>
+            <li>When prompted, go to Settings and enable <strong>Install from Unknown Sources</strong> (or <strong>Install Unknown Apps</strong>) for your browser or Files app</li>
+            <li>Return to the APK and tap <strong>Install</strong></li>
+            <li>Open PokéRogue Offline and start playing</li>
+          </ol>
+          <div class="card-note android-note">
+            The APK is debug-signed. Your device may show a warning during install — this is expected and safe to proceed through.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <div class="divider"><span class="divider-icon">✦</span></div>
+
+  <!-- ALTSTORE -->
   <span id="altstore"></span>
   <section>
     <div class="reveal">
       <p class="section-label">AltStore Compatible</p>
       <h2 class="section-title">Add to AltStore</h2>
-      <p class="section-intro">
-        Get notified of updates automatically by adding the source repo to AltStore or SideStore.
-      </p>
+      <p class="section-intro">Get notified of updates automatically by adding the source repo to AltStore or SideStore.</p>
     </div>
 
     <div class="altstore-box reveal">
-      <p style="margin-bottom:0.5rem; color: var(--text);">
-        Add the following URL as a source in AltStore or SideStore:
-      </p>
+      <p style="margin-bottom:0.5rem; color: var(--text);">Add the following URL as a source in AltStore or SideStore:</p>
       <code class="repo-url">https://pokerogue-offline.github.io/pokerogue-offline/repo.json</code>
       <p style="color: var(--text-dim); font-size:0.95rem; font-style:italic;">
         Note: AltStore support is newly added and hasn't been fully tested yet. If you run into any issues, please report them in the Discord channel below.
       </p>
-
       <div style="margin-top:1.75rem;">
         <p class="steps-sub-title">How to add a source in AltStore</p>
         <ol class="steps">
@@ -827,15 +882,13 @@
 
   <div class="divider"><span class="divider-icon">✦</span></div>
 
-  <!-- ── IMPORT SAVE ── -->
+  <!-- SAVE DATA -->
   <span id="save"></span>
   <section>
     <div class="reveal">
       <p class="section-label">Save Data</p>
       <h2 class="section-title">Import Your Online Save</h2>
-      <p class="section-intro">
-        Already have progress on pokerogue.net? Bring it into the app.
-      </p>
+      <p class="section-intro">Already have progress on pokerogue.net? Bring it into the app — or use Unlock Everything to start fresh.</p>
     </div>
     <div class="install-card reveal">
       <ol class="steps">
@@ -843,59 +896,42 @@
         <li>Navigate to <strong>Menu → Manage Data → Export Data</strong></li>
         <li>Open PokéRogue Offline on your device</li>
         <li>Navigate to <strong>Menu → Manage Data → Import Data</strong></li>
-        <li>Select the exported file</li>
+        <li>Select the exported file — your save will load immediately</li>
       </ol>
+      <div class="card-note">
+        Alternatively, open <strong>Manage Data</strong> and tap <strong>Unlock Everything</strong> to instantly unlock all starters and forms without importing a save.
+      </div>
     </div>
   </section>
 
   <div class="divider"><span class="divider-icon">✦</span></div>
 
-  <!-- ── AUTHOR ── -->
+  <!-- CONTACT -->
   <span id="contact"></span>
   <section>
     <div class="reveal">
       <p class="section-label">Made by</p>
-      <h2 class="section-title">Contact & Support</h2>
-      <p class="section-intro">
-        Questions, bugs, or feedback? Find me on the PokéRogue Discord.
-      </p>
+      <h2 class="section-title">Contact &amp; Support</h2>
+      <p class="section-intro">Questions, bugs, or feedback? Find me on the PokéRogue Discord.</p>
     </div>
 
     <div class="author-box reveal">
-      <img
-        src="scooom.png"
-        alt="Scooom avatar"
-        class="author-avatar"
-      />
+      <img src="scooom.png" alt="Scooom avatar" class="author-avatar" />
       <div class="author-info">
         <p class="author-name">Scooom</p>
         <p class="author-handle">Discord: scooom</p>
         <div class="author-links">
-          <a
-            href="https://discord.com/channels/1125469663833370665/1237830192102244352"
-            target="_blank"
-            class="author-link discord-link"
-          >
-            ♯ offline-and-modding
-          </a>
-          <a
-            href="https://github.com/Scoooom"
-            target="_blank"
-            class="author-link"
-          >
-            ↗ GitHub
-          </a>
+          <a href="https://discord.com/channels/1125469663833370665/1237830192102244352" target="_blank" class="author-link discord-link">♯ offline-and-modding</a>
+          <a href="https://github.com/Scoooom" target="_blank" class="author-link">↗ GitHub</a>
         </div>
         <p style="margin-top:1rem; font-size:0.88rem; color:var(--text-dim); font-style:italic;">
           To access <strong>#offline-and-modding</strong>, grab the <strong>Dev</strong> role from
-          <a href="https://discord.com/channels/1125469663833370665/1194825607738052621" target="_blank" style="color:var(--gold); text-decoration:none; border-bottom:1px solid rgba(201,168,76,0.3);">#select-roles</a>
-          first.
+          <a href="https://discord.com/channels/1125469663833370665/1194825607738052621" target="_blank" style="color:var(--gold); text-decoration:none; border-bottom:1px solid rgba(201,168,76,0.3);">#select-roles</a> first.
         </p>
       </div>
     </div>
   </section>
 
-  <!-- ── DISCLAIMER ── -->
   <div class="disclaimer reveal">
     PokéRogue Offline is an unofficial fan project and is not affiliated with or endorsed by the PokéRogue team.
     PokéRogue is developed by <a href="https://github.com/pagefaultgames" target="_blank" style="color:var(--gold-pale); text-decoration:none;">PageFaultGames</a>.
@@ -903,25 +939,40 @@
   </div>
 
   <script>
-
-    // Nav scroll effect
     const nav = document.getElementById('top-nav');
-    window.addEventListener('scroll', () => {
-      nav.classList.toggle('scrolled', window.scrollY > 20);
-    });
+    window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', window.scrollY > 20); });
 
-    // Hamburger
     const hamburger = document.getElementById('hamburger');
     const mobileMenu = document.getElementById('mobile-menu');
     hamburger.addEventListener('click', () => {
       hamburger.classList.toggle('open');
       mobileMenu.classList.toggle('open');
     });
-
     function closeMenu() {
       hamburger.classList.remove('open');
       mobileMenu.classList.remove('open');
     }
+
+    function switchTab(platform) {
+      const tabIos = document.getElementById('tab-ios');
+      const tabAndroid = document.getElementById('tab-android');
+      const panelIos = document.getElementById('panel-ios');
+      const panelAndroid = document.getElementById('panel-android');
+      if (platform === 'ios') {
+        tabIos.className = 'platform-tab active-ios';
+        tabAndroid.className = 'platform-tab';
+        panelIos.classList.add('active');
+        panelAndroid.classList.remove('active');
+      } else {
+        tabAndroid.className = 'platform-tab active-android';
+        tabIos.className = 'platform-tab';
+        panelAndroid.classList.add('active');
+        panelIos.classList.remove('active');
+        document.querySelectorAll('#panel-android .reveal').forEach(el => el.classList.add('visible'));
+      }
+    }
+
+    if (window.location.hash === '#android') switchTab('android');
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((e, i) => {
@@ -931,9 +982,7 @@
         }
       });
     }, { threshold: 0.1 });
-
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
   </script>
-
 </body>
 </html>
