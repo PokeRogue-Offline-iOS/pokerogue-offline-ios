@@ -11,7 +11,7 @@ if (!content.includes(anchor)) {
 }
 const injection = `  "randomize": {
     "name": "Randomizer Mode",
-    "desc": "Randomizes the game in the following ways:\\n - All Pokemon get random abilities.\\n - Passive Abilities are not effected.\\n - All Pokemon get random types.\\n - Mono Type Pokemon have a 33% chance to get a random secondary type.\\nBoss Pokemon do not have their abilities randomized.",
+    "desc": "Randomizes the following:\\n- All Pokemon abilities.\\n - All Pokemon types; Mono Type Pokemon have may have a secondary type.\\nBoss abilites in tact.",
     "value": {
       "0": "Off",
       "1": "On"
