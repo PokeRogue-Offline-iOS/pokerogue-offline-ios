@@ -143,6 +143,9 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string prsv" ios/App/App/Info.plist
 
+      - name: Install ImageMagick
+        run: brew install imagemagick
+
       - name: Copy app icon (dev — gray tint + Dev label)
         run: |
           ICON_SRC="docs/appIcon.png"
