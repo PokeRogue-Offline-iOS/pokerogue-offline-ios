@@ -461,6 +461,7 @@
       <li><a href="index.html#altstore">AltStore</a></li>
       <li><a href="index.html#save">Save Data</a></li>
       <li><a href="index.html#contact">Contact</a></li>
+      <li><a href="ios-sidestore-livecontainer.html" style="color:var(--gold);">iOS Guide</a></li>
     </ul>
     <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" class="nav-download">↓ Download</a>
     <button class="nav-hamburger" id="hamburger" aria-label="Menu">
@@ -473,6 +474,7 @@
     <a href="index.html#altstore" onclick="closeMenu()">AltStore</a>
     <a href="index.html#save" onclick="closeMenu()">Save Data</a>
     <a href="index.html#contact" onclick="closeMenu()">Contact</a>
+    <a href="ios-sidestore-livecontainer.html" onclick="closeMenu()" style="color:var(--gold);">iOS Guide</a>
     <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest">↓ Download</a>
   </div>
 
@@ -577,11 +579,13 @@
           <div class="steps">
           <div class="step-row"><span class="step-n">1</span><span>Install the <code>usbmuxd</code> package via your package manager (it may already be installed).</span></div>
           <div class="step-row"><span class="step-n">2</span><span>Download and install iLoader for your distribution:
-              <ul style="list-style:none; margin-top:0.5rem; padding-left:1rem; display:flex; flex-direction:column; gap:0.3rem;">
-                <li><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-amd64.deb" target="_blank">DEB</a> — Debian / Ubuntu</span></div>
-          <div class="step-row"><span class="step-n">3</span><span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-x86_64.rpm" target="_blank">RPM</a> — Fedora / openSUSE</span></div>
-          <div class="step-row"><span class="step-n">4</span><span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-amd64.AppImage" target="_blank">AppImage</a> — all other distros</span></div>
-          <div class="step-row"><span class="step-n">5</span><span><a href="https://aur.archlinux.org/packages/iloader-bin" target="_blank">AUR: <code>iloader-bin</code></a> — Arch Linux</span></div>
+            <div style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.3rem; padding-left:0.25rem;">
+              <span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-amd64.deb" target="_blank">DEB</a> — Debian / Ubuntu</span>
+              <span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-x86_64.rpm" target="_blank">RPM</a> — Fedora / openSUSE</span>
+              <span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-amd64.AppImage" target="_blank">AppImage</a> — all other distros</span>
+              <span><a href="https://aur.archlinux.org/packages/iloader-bin" target="_blank">AUR: <code>iloader-bin</code></a> — Arch Linux</span>
+            </div>
+          </span></div>
           </div>
         </div>
 
@@ -631,6 +635,10 @@
           <div class="steps">
           <div class="step-row"><span class="step-n">1</span><span>Open <strong>Settings → General → VPN &amp; Device Management</strong>.</span></div>
           <div class="step-row"><span class="step-n">2</span><span>Tap your Apple ID under "Developer App" and tap <strong>Trust</strong>.</span></div>
+          </div>
+          <div class="callout warning" style="margin-top:1rem;">
+            <span class="callout-icon">⚠️</span>
+            <span>Make sure the Apple ID shown under "Developer App" <strong>matches the account you used in iLoader</strong>. If you see a different account, do not trust it — go back and reinstall using the correct Apple ID.</span>
           </div>
         </div>
 
