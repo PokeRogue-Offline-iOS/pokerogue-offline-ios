@@ -96,7 +96,10 @@ ${h2}              this.initDailyRun();
 ${h2}            },
 ${h2}            () => {
 ${h2}              // No: restart title screen cleanly
+${h2}              globalScene.ui.revertMode();
+${h2}              globalScene.ui.clearText();
 ${h2}              globalScene.phaseManager.toTitleScreen();
+${h2}              globalScene.ui.setMode(UiMode.TITLE);
 ${h2}            },
 ${h2}            false,
 ${h2}            -98,
