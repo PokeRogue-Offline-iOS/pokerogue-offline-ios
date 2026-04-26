@@ -1,0 +1,195 @@
+name: Build PokeRogueOffline IPA (Dev)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Clone PokeRogue fork
+        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download full unlocks save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
+            -o pokerogue-src/full_unlocks.prsv
+
+      - name: Download 0% save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/refs/heads/beta/test/utils/saves/data_new.prsv \
+            -o pokerogue-src/data_new.prsv
+
+      - name: Apply patches
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh
+
+      - name: Inject build number into banner
+        run: |
+          sed -i '' 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+
+      - name: Install PokeRogue dependencies
+        working-directory: pokerogue-src
+        run: pnpm install
+
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build --mode app
+
+      - name: Apply post-build patches
+        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh
+
+      - name: Copy save file to dist
+        run: cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Install Capacitor
+        working-directory: pokerogue-src
+        run: |
+          pnpm add @capacitor/core @capacitor/cli @capacitor/ios @capacitor/filesystem @capacitor/share @capacitor/status-bar
+
+      - name: Configure Capacitor
+        working-directory: pokerogue-src
+        run: |
+          cat > capacitor.config.json << 'CAPEOF'
+          {
+            "appId": "xyz.scooom.pkrdev",
+            "appName": "PokéRogue Offline Dev",
+            "webDir": "dist",
+            "ios": {
+              "contentInset": "never",
+              "scrollEnabled": false,
+              "backgroundColor": "#000000",
+              "allowsLinkPreview": false,
+              "webContentsDebuggingEnabled": true,
+              "allowsBackForwardNavigationGestures": false
+            },
+            "plugins": {
+              "StatusBar": {
+                "overlaysWebView": false,
+                "style": "DARK",
+                "backgroundColor": "#000000"
+              }
+            }
+          }
+          CAPEOF
+          cat capacitor.config.json;
+
+      - name: Add iOS platform
+        working-directory: pokerogue-src
+        run: npx cap add ios
+
+      - name: Sync Capacitor
+        working-directory: pokerogue-src
+        run: npx cap sync ios
+
+      - name: Set app version
+        working-directory: pokerogue-src
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}" ios/App/App/Info.plist
+
+      - name: Configure iOS app settings
+        working-directory: pokerogue-src
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :UIStatusBarHidden bool true" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool false" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIRequiresFullScreen bool true" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType public.app-category.games" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.games" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIHomeIndicatorAutoHidden bool true" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSDocumentsFolderUsageDescription string 'Required to save your exported game data file.'" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIFileSharingEnabled bool true" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :LSSupportsOpeningDocumentsInPlace bool true" ios/App/App/Info.plist || true
+
+      - name: Register .prsv UTI so iOS preserves the file extension
+        working-directory: pokerogue-src
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes array" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0 dict" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeName string PokéRogue Save Data" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes array" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes:0 string xyz.scooom.pkr.prsv" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSHandlerRank string Owner" ios/App/App/Info.plist
+
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations array" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0 dict" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeIdentifier string xyz.scooom.pkr.prsv" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeDescription string PokéRogue Save Data" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo array" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:0 string public.data" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification dict" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string prsv" ios/App/App/Info.plist
+
+      - name: Copy app icon
+        run: |
+          cp docs/appIcon.png pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+
+      - name: Build Xcode project (unsigned)
+        run: |
+          xcodebuild \
+            -project pokerogue-src/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            CODE_SIGNING_ALLOWED=NO \
+            CONFIGURATION_BUILD_DIR=$PWD/build
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r "build/App.app" Payload/
+          zip -r PokeRogueOffline.ipa Payload
+          rm -rf Payload
+
+      - name: Get IPA size
+        id: ipa_size
+        run: echo "size=$(wc -c < PokeRogueOffline.ipa)" >> $GITHUB_OUTPUT
+
+#      - name: Update AltStore source
+#        env:
+#          APP_VERSION: ${{ steps.pokerogue_version.outputs.version }}
+#          BUILD_NUMBER: ${{ github.run_number }}
+#          IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
+#        run: node scripts/update-altstore-source.js
+#
+#      - name: Commit updated repo.json
+#        run: |
+#          git config user.name "github-actions[bot]"
+#          git config user.email "github-actions[bot]@users.noreply.github.com"
+#          git add docs/repo.json
+#          git commit -m "Update AltStore source for v${{ steps.pokerogue_version.outputs.version }}"
+#          git push
+
+      # Artifact name is scoped to the release workflow's run ID when triggered
+      # from the release workflow, so it can be unambiguously downloaded later.
+      # Falls back to a standalone name when run independently.
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PokeRogueOffline-iOS-dev
+          path: PokeRogueOffline.ipa
+          retention-days: 30
