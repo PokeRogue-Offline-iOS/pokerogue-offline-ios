@@ -49,6 +49,7 @@ apply_patch "noLearnMove.patch"
 
 # Patch to implement PKR 7222
 apply_patch "iosImport.patch"
+apply_patch "android-import-fix.js"
 
 # Patch to implement PKR 7223
 apply_patch "noZoom.patch"
