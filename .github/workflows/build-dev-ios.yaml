@@ -18,6 +18,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install ImageMagick1
+        run: brew install imagemagick
+
+      - name: list fonts
+        run: |
+          ICON_SRC="docs/appIcon.png"
+          ICON_DST="pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          magick -list font
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -150,6 +158,7 @@ jobs:
         run: |
           ICON_SRC="docs/appIcon.png"
           ICON_DST="pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          magick -list font
           magick "$ICON_SRC" \
             \( -clone 0 -size 1024x1024 xc:"rgba(128,128,128,0.10)" \) \
             -composite \
