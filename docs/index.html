@@ -760,12 +760,17 @@
             </span>
           </div>
 
+          <div style="display:flex; align-items:flex-start; gap:0.6rem; background:rgba(200,64,64,0.1); border:1px solid rgba(200,64,64,0.35); border-radius:3px; padding:0.85rem 1.1rem; margin-bottom:1.25rem; font-size:0.9rem; color:var(--cream); line-height:1.6;">
+            <span style="flex-shrink:0; margin-top:0.05rem;">⚠️</span>
+            <span><strong>iOS 26.4 users:</strong> SideStore's stable release has a known bug on iOS 26.4. When setting up, choose the <strong>Nightly</strong> build instead. You can also get it manually from the <a href="https://nightly.sidestore.io/" target="_blank" style="color:var(--gold); border-bottom:1px solid rgba(201,168,76,0.3);">SideStore Nightly page</a>.</span>
+          </div>
+
           <p class="steps-sub-title">First-time setup</p>
           <ol class="steps">
             <li>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a> and download iLoader for your PC or Mac</li>
             <li>Connect your iPhone via USB and open iLoader</li>
             <li>Sign in with your Apple ID</li>
-            <li>Select <strong>LiveContainer + SideStore</strong> and install</li>
+            <li>Select <strong>LiveContainer + SideStore</strong> and install — choose <strong>Nightly</strong> if on iOS 26.4</li>
             <li>Open LiveContainer on your device and complete setup by importing the certificate from SideStore</li>
           </ol>
 
@@ -796,8 +801,12 @@
           <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
             Wireless refresh, no PC needed after setup. Limited to 3 sideloaded apps at once, and apps must be refreshed every 7 days.
           </p>
+          <div style="display:flex; align-items:flex-start; gap:0.6rem; background:rgba(200,64,64,0.1); border:1px solid rgba(200,64,64,0.35); border-radius:3px; padding:0.85rem 1.1rem; margin-bottom:1.25rem; font-size:0.9rem; color:var(--cream); line-height:1.6;">
+            <span style="flex-shrink:0; margin-top:0.05rem;">⚠️</span>
+            <span><strong>iOS 26.4 users:</strong> The stable release of SideStore has a known bug on iOS 26.4. You must install the <strong>Nightly</strong> build instead. Get it from the <a href="https://nightly.sidestore.io/" target="_blank" style="color:var(--gold); border-bottom:1px solid rgba(201,168,76,0.3);">SideStore Nightly page</a>.</span>
+          </div>
           <ol class="steps">
-            <li>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a>, download iLoader, and use it to install SideStore on your iPhone</li>
+            <li>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a>, download iLoader, and use it to install SideStore (Nightly if on iOS 26.4) on your iPhone</li>
             <li>Open SideStore and tap <strong>+</strong> in My Apps</li>
             <li>Select <code>PokeRogueOffline.ipa</code></li>
             <li>Refresh every 7 days — automate this with a Shortcuts automation if desired</li>
