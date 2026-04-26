@@ -162,12 +162,12 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r "build/App.app" Payload/
-          zip -r PokeRogueOffline.ipa Payload
+          zip -r PokeRogueOffline-dev.ipa Payload
           rm -rf Payload
 
       - name: Get IPA size
         id: ipa_size
-        run: echo "size=$(wc -c < PokeRogueOffline.ipa)" >> $GITHUB_OUTPUT
+        run: echo "size=$(wc -c < PokeRogueOffline-dev.ipa)" >> $GITHUB_OUTPUT
 
 #      - name: Update AltStore source
 #        env:
@@ -191,5 +191,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PokeRogueOffline-iOS-dev
-          path: PokeRogueOffline.ipa
+          path: PokeRogueOffline-dev.ipa
           retention-days: 30
