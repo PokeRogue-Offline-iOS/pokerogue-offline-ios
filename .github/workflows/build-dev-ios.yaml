@@ -150,11 +150,11 @@ jobs:
         run: |
           ICON_SRC="docs/appIcon.png"
           ICON_DST="pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
-          convert "$ICON_SRC" \
+          magick "$ICON_SRC" \
             \( -clone 0 -size 1024x1024 xc:"rgba(128,128,128,0.10)" \) \
             -composite \
             \( -size 1024x1024 xc:none \
-               -font DejaVu-Sans-Bold -pointsize 160 \
+               -font Helvetica-Bold -pointsize 160 \
                -fill "rgba(0,0,0,0.4)" \
                -stroke "rgba(0,0,0,0.4)" -strokewidth 8 \
                -gravity Center -annotate 0 "Dev" \
