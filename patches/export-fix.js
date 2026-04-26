@@ -59,7 +59,7 @@ const REPLACEMENT = `${i}${encryptLine}
 ${i}const cap = (window as any).Capacitor;
 ${i}if (cap?.isNativePlatform?.()) {
 ${i2}const stampC = new Date();
-${i2}const stamp = stampC.getUTCFullYear() + '_' + (stampC.getUTCMonth() + 1) + '_' +   stampC.getUTCDate() + '-' + stampC.getUTCHours() + '_' +   stampC.getUTCMin>
+${i2}const stamp = stampC.getUTCFullYear() + '_' + (stampC.getUTCMonth() + 1) + '_' +   stampC.getUTCDate() + '-' + stampC.getUTCHours() + '_' +   stampC.getUTCMinutes() + '_' + stampC.getUTCSeconds();
 ${i2}const filename = \`\${dataKey}-\${stamp}.prsv\`;
 ${i2}const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
 ${i2}const platform = cap.getPlatform?.() ?? "ios";
