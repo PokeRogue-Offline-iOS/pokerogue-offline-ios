@@ -124,6 +124,7 @@ const injection = `    if (isApp) {
             ui.setOverlayMode(
               UiMode.CONFIRM,
               () => {
+                localStorage.setItem("hasCheated", "1");
                 globalScene.gameData.importDataFromUrl("/full_unlocks.prsv");
                 ui.revertMode();
                 this.showText("", 0);
@@ -151,6 +152,7 @@ const injection = `    if (isApp) {
             ui.setOverlayMode(
               UiMode.CONFIRM,
               () => {
+                localStorage.setItem("hasCheated", "1");
                 globalScene.gameData.voucherCounts[0] = (globalScene.gameData.voucherCounts[0] ?? 0) + 99;
                 globalScene.gameData.voucherCounts[1] = (globalScene.gameData.voucherCounts[1] ?? 0) + 99;
                 globalScene.gameData.voucherCounts[2] = (globalScene.gameData.voucherCounts[2] ?? 0) + 99;
