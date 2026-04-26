@@ -86,10 +86,7 @@ ${h2}        globalScene.ui.showText("Could not reach the server. Play offline d
 ${h2}          globalScene.ui.setOverlayMode(
 ${h2}            UiMode.CONFIRM,
 ${h2}            () => {
-${h2}              // Yes: store fallback and proceed
-${h2}              const fallback = btoa(new Date().toISOString().slice(0, 10));
-${h2}              localStorage.setItem("daily_seed_date", todayUtc);
-${h2}              localStorage.setItem("daily_seed", fallback);
+${h2}              // Yes: proceed
 ${h2}              globalScene.ui.revertMode();
 ${h2}              globalScene.ui.clearText();
 ${h2}              this.initDailyRun();
@@ -98,8 +95,8 @@ ${h2}            () => {
 ${h2}              // No: restart title screen cleanly
 ${h2}              globalScene.ui.revertMode();
 ${h2}              globalScene.ui.clearText();
-${h2}              globalScene.phaseManager.toTitleScreen();
-${h2}              globalScene.ui.setMode(UiMode.TITLE);
+${h2}              phaseManager.toTitleScreen();
+${h2}              phaseManager.getCurrentPhase().end();
 ${h2}            },
 ${h2}            false,
 ${h2}            -98,
