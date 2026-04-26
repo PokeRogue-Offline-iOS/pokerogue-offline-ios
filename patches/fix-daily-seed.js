@@ -82,7 +82,6 @@ ${h2}        globalScene.ui.clearText();
 ${h2}        this.initDailyRun();
 ${h2}      })
 ${h2}      .catch(err => {
-${h2}        alert("Daily seed fetch failed: " + err);
 ${h2}        globalScene.ui.showText("Could not reach the server. Play offline daily instead?", null, () => {
 ${h2}          globalScene.ui.setOverlayMode(
 ${h2}            UiMode.CONFIRM,
