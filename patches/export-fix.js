@@ -60,7 +60,7 @@ ${i}const cap = (window as any).Capacitor;
 ${i}if (cap?.isNativePlatform?.()) {
 ${i2}const stampC = new Date();
 ${i2}const stamp = stampC.getUTCFullYear() + '_' + (stampC.getUTCMonth() + 1) + '_' +   stampC.getUTCDate() + '-' + stampC.getUTCHours() + '_' +   stampC.getUTCMinutes() + '_' + stampC.getUTCSeconds();
-${i2}const filename = \`\${dataKey}-\${stamp}.prsv\`;
+${i2}const fileName = \`\${dataKey}-\${stamp}.prsv\`;
 ${i2}const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
 ${i2}const platform = cap.getPlatform?.() ?? "ios";
 
@@ -107,7 +107,7 @@ ${i2}  if (!Filesystem) { console.error("Capacitor Filesystem not available."); 
 ${i2}  if (platform === "android") {
 ${i2}    Filesystem.requestPermissions();
 ${i2}    Filesystem.writeFile({
-${i2}      path: \`Download/PokeRogueOffline/\${filename}\`,
+${i2}      path: \`Download/PokeRogueOffline/\${fileName}\`,
 ${i2}      data: base64,
 ${i2}      directory: "EXTERNAL_STORAGE",
 ${i2}      recursive: true,
