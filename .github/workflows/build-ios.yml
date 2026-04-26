@@ -150,7 +150,7 @@ jobs:
 
       - name: Copy app icon
         run: |
-          cp appIcon.png pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+          cp docs/appIcon.png pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
 
       - name: Build Xcode project (unsigned)
         run: |
