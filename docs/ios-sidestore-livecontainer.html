@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iOS Install Guide — SideStore & LiveContainer | PokéRogue Offline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --maroon:       #800000;
+      --maroon-deep:  #4a0000;
+      --maroon-mid:   #600000;
+      --maroon-light: #a83232;
+      --maroon-glow:  #c84040;
+      --gold:         #c9a84c;
+      --gold-pale:    #e8d5a0;
+      --cream:        #f5ede0;
+      --parchment:    #ede0cc;
+      --ash:          #1a0a0a;
+      --smoke:        #2a1010;
+      --text:         #e8d5b0;
+      --text-dim:     #a89070;
+      --border:       rgba(201, 168, 76, 0.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--ash);
+      color: var(--text);
+      font-family: 'Crimson Pro', Georgia, serif;
+      font-size: 18px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2.5rem;
+      height: 56px;
+      background: rgba(16, 4, 4, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(201, 168, 76, 0.12);
+      transition: border-color 0.3s;
+    }
+    nav.scrolled { border-bottom-color: rgba(201, 168, 76, 0.25); }
+    .nav-logo {
+      font-family: "Cinzel", serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--cream);
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .nav-logo img { width: 26px; height: 26px; border-radius: 6px; border: 1px solid rgba(201,168,76,0.3); }
+    .nav-links { display: flex; align-items: center; gap: 0.25rem; list-style: none; }
+    .nav-links a {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 0.4rem 0.85rem;
+      border-radius: 2px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-links a:hover { color: var(--gold); background: rgba(201,168,76,0.07); }
+    .nav-download {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      text-decoration: none;
+      padding: 0.4rem 1rem;
+      border: 1px solid rgba(201,168,76,0.4);
+      border-radius: 2px;
+      transition: all 0.2s;
+    }
+    .nav-download:hover { background: rgba(201,168,76,0.1); border-color: var(--gold); color: var(--cream); }
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 0.25rem;
+      background: none;
+      border: none;
+    }
+    .nav-hamburger span { display: block; width: 22px; height: 1.5px; background: var(--gold); transition: all 0.25s; }
+    .nav-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+    .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+    .nav-mobile {
+      display: none;
+      position: fixed;
+      top: 56px; left: 0; right: 0;
+      background: rgba(16,4,4,0.97);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(201,168,76,0.2);
+      padding: 1.5rem 2.5rem;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 499;
+    }
+    .nav-mobile.open { display: flex; }
+    .nav-mobile a {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(201,168,76,0.08);
+      transition: color 0.2s;
+    }
+    .nav-mobile a:hover { color: var(--gold); }
+    .nav-mobile a:last-child { border-bottom: none; color: var(--gold); }
+    @media (max-width: 700px) {
+      .nav-links, .nav-download { display: none; }
+      .nav-hamburger { display: flex; }
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.5;
+    }
+
+    /* Page header */
+    .page-header {
+      padding: 9rem 2rem 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 60% at 50% 30%, rgba(128,0,0,0.3) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .page-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+    .page-title {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: 900;
+      line-height: 1.05;
+      color: var(--cream);
+      text-shadow: 0 0 60px rgba(200,64,64,0.4), 0 2px 4px rgba(0,0,0,0.8);
+      margin-bottom: 0.75rem;
+    }
+    .page-title span { color: var(--maroon-glow); }
+    .page-subtitle {
+      font-family: 'Crimson Pro', serif;
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      font-style: italic;
+      max-width: 560px;
+      margin: 0 auto 2rem;
+      line-height: 1.8;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+      margin-top: 0.5rem;
+    }
+    .back-link:hover { color: var(--gold); }
+
+    .divider {
+      display: flex; align-items: center; gap: 1.5rem;
+      margin: 0 auto 4rem;
+      max-width: 600px;
+      padding: 0 2rem;
+      opacity: 0.5;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+    }
+    .divider-icon { color: var(--gold); font-size: 1.2rem; }
+
+    /* Main content */
+    .guide-body {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 2rem 6rem;
+    }
+
+    /* Requirements box */
+    .req-box {
+      background: rgba(201,168,76,0.06);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2rem 2.25rem;
+      margin-bottom: 3rem;
+    }
+    .req-box h3 {
+      font-family: 'Cinzel', serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+    }
+    .req-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .req-list li {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      font-size: 0.97rem;
+      color: var(--text);
+    }
+    .req-list li::before {
+      content: '✦';
+      color: var(--gold);
+      font-size: 0.6rem;
+      margin-top: 0.45rem;
+      flex-shrink: 0;
+    }
+    .req-list a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,168,76,0.3); transition: border-color 0.2s, color 0.2s; }
+    .req-list a:hover { color: var(--cream); border-color: var(--gold); }
+
+    /* Steps */
+    .guide-step {
+      margin-bottom: 3.5rem;
+    }
+    .step-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      background: rgba(201,168,76,0.1);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: 2px;
+      padding: 0.3rem 0.7rem;
+      white-space: nowrap;
+      margin-top: 0.35rem;
+    }
+    .step-title {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(1.2rem, 3vw, 1.6rem);
+      font-weight: 700;
+      color: var(--cream);
+      line-height: 1.2;
+    }
+    .step-body {
+      font-size: 1rem;
+      color: var(--text);
+      line-height: 1.8;
+    }
+    .step-body p { margin-bottom: 1rem; }
+    .step-body a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,168,76,0.3); transition: color 0.2s, border-color 0.2s; }
+    .step-body a:hover { color: var(--cream); border-color: var(--gold); }
+
+    /* Sub-sections within a step */
+    .sub-section {
+      margin-top: 1.75rem;
+    }
+    .sub-section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--gold-pale);
+      letter-spacing: 0.08em;
+      margin-bottom: 0.85rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(201,168,76,0.15);
+    }
+
+    /* OS tabs */
+    .os-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .os-tab {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      border-radius: 2px;
+      border: 1px solid rgba(201,168,76,0.25);
+      color: var(--text-dim);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .os-tab.active, .os-tab:hover { color: var(--gold); border-color: rgba(201,168,76,0.6); background: rgba(201,168,76,0.07); }
+    .os-panel { display: none; }
+    .os-panel.active { display: block; }
+
+    /* Numbered steps list */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin: 0.75rem 0;
+    }
+    .steps .step-row {
+      display: grid;
+      grid-template-columns: 1.6rem 1fr;
+      gap: 0.85rem;
+      font-size: 0.97rem;
+      line-height: 1.7;
+      align-items: start;
+    }
+    .steps .step-n {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--gold);
+      background: rgba(201,168,76,0.1);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 2px;
+      width: 1.6rem;
+      height: 1.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 0.15rem;
+    }
+
+    /* Callout boxes */
+    .callout {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      border-radius: 3px;
+      padding: 0.9rem 1.1rem;
+      margin: 1.25rem 0;
+      font-size: 0.93rem;
+      line-height: 1.65;
+    }
+    .callout-icon { flex-shrink: 0; font-size: 1rem; margin-top: 0.05rem; }
+    .callout.warning {
+      background: rgba(200,64,64,0.1);
+      border: 1px solid rgba(200,64,64,0.35);
+      color: var(--cream);
+    }
+    .callout.info {
+      background: rgba(201,168,76,0.07);
+      border: 1px solid rgba(201,168,76,0.25);
+      color: var(--text);
+    }
+    .callout.tip {
+      background: rgba(61,180,100,0.08);
+      border: 1px solid rgba(61,180,100,0.25);
+      color: var(--text);
+    }
+    .callout a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,168,76,0.3); }
+    .callout a:hover { color: var(--cream); border-color: var(--gold); }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.83em;
+      color: var(--gold-pale);
+      background: rgba(0,0,0,0.25);
+      padding: 0.15em 0.4em;
+      border-radius: 2px;
+      border: 1px solid rgba(201,168,76,0.15);
+    }
+
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* Pro tip banner */
+    .pro-tip {
+      background: rgba(201,168,76,0.09);
+      border: 1px solid rgba(201,168,76,0.3);
+      border-left: 3px solid var(--gold);
+      border-radius: 3px;
+      padding: 1.1rem 1.4rem;
+      margin: 1.5rem 0;
+      font-size: 0.97rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+    .pro-tip strong { color: var(--gold); }
+    .pro-tip a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,168,76,0.3); }
+    .pro-tip a:hover { color: var(--cream); border-color: var(--gold); }
+
+    /* Disclaimer */
+    .disclaimer {
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      font-style: italic;
+      padding: 0 2rem 3rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .disclaimer a { color: var(--gold-pale); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .guide-body { padding: 0 1.5rem 4rem; }
+      .req-box { padding: 1.5rem; }
+      .step-header { gap: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav id="top-nav">
+    <a href="index.html" class="nav-logo">
+      <img src="https://pokerogue-offline.github.io/pokerogue-offline/appIcon.webp" alt="PokéRogue Offline" />
+      PokéRogue Offline
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html#features">Features</a></li>
+      <li><a href="index.html#install">Install</a></li>
+      <li><a href="index.html#altstore">AltStore</a></li>
+      <li><a href="index.html#save">Save Data</a></li>
+      <li><a href="index.html#contact">Contact</a></li>
+    </ul>
+    <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" class="nav-download">↓ Download</a>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <div class="nav-mobile" id="mobile-menu">
+    <a href="index.html#features" onclick="closeMenu()">Features</a>
+    <a href="index.html#install" onclick="closeMenu()">Install</a>
+    <a href="index.html#altstore" onclick="closeMenu()">AltStore</a>
+    <a href="index.html#save" onclick="closeMenu()">Save Data</a>
+    <a href="index.html#contact" onclick="closeMenu()">Contact</a>
+    <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest">↓ Download</a>
+  </div>
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <p class="page-eyebrow">iOS Installation Guide</p>
+    <h1 class="page-title">SideStore &amp; <span>LiveContainer</span></h1>
+    <p class="page-subtitle">
+      Unlimited sideloading on iOS — no jailbreak, no 3-app limit, no computer needed after first setup.
+    </p>
+    <a href="index.html#install" class="back-link">← Back to Install Options</a>
+  </div>
+
+  <div class="divider"><span class="divider-icon">✦</span></div>
+
+  <div class="guide-body">
+
+    <!-- REQUIREMENTS -->
+    <div class="reveal">
+      <div class="req-box">
+        <h3>Requirements</h3>
+        <ul class="req-list">
+          <li><strong>Device:</strong> iPhone or iPad running iOS / iPadOS 15.0 or higher, <strong>with a passcode set.</strong> <a href="https://support.apple.com/en-us/119586" target="_blank">How to set a passcode →</a></li>
+          <li><strong>Computer:</strong> macOS, Windows, or Linux — needed only for the first install.</li>
+          <li><strong>Apple ID:</strong> A standard (free) Apple ID. No developer account required.</li>
+          <li><strong>Wi-Fi:</strong> Your computer and iPhone must be on the same network.</li>
+          <li><strong>App Store app:</strong> Download <a href="https://apps.apple.com/app/localdevvpn/id6755608044" target="_blank">LocalDevVPN</a> from the App Store before you begin.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="guide-step reveal">
+      <div class="step-header">
+        <span class="step-num">Step 01</span>
+        <h2 class="step-title">Device Preparation — LocalDevVPN</h2>
+      </div>
+      <div class="step-body">
+        <p>
+          SideStore needs a special loopback VPN tunnel running on the device to re-sign apps wirelessly.
+          The SideStore team built <strong>LocalDevVPN</strong> specifically for this purpose.
+        </p>
+
+        <div class="callout warning">
+          <span class="callout-icon">⚠️</span>
+          <span><strong>A passcode is required.</strong> iOS will refuse to install a VPN profile on a device without a passcode. Make sure yours is set before continuing.</span>
+        </div>
+
+        <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Download <a href="https://apps.apple.com/app/localdevvpn/id6755608044" target="_blank">LocalDevVPN</a> from the App Store.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Open the app and tap <strong>Connect</strong>. When prompted to "Allow VPN Configurations," tap <strong>Allow</strong> and enter your passcode.</span></div>
+          </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <span>You must have LocalDevVPN <strong>connected</strong> every time you want to install, update, or refresh apps in SideStore. It doesn't affect your internet connection — it only opens a local tunnel to the signing server.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="guide-step reveal">
+      <div class="step-header">
+        <span class="step-num">Step 02</span>
+        <h2 class="step-title">Install iLoader on Your Computer</h2>
+      </div>
+      <div class="step-body">
+        <p>
+          <a href="https://iloader.app/" target="_blank">iLoader</a> is a cross-platform sideloader used to install SideStore (and LiveContainer) onto your device from a computer. Download the version for your OS below.
+        </p>
+
+        <!-- OS Tabs -->
+        <div class="os-tabs" id="os-tabs">
+          <button class="os-tab active" onclick="switchOS('macos')">macOS</button>
+          <button class="os-tab" onclick="switchOS('windows')">Windows</button>
+          <button class="os-tab" onclick="switchOS('linux')">Linux</button>
+        </div>
+
+        <div class="os-panel active" id="os-macos">
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-darwin-universal.dmg" target="_blank">Download iLoader for macOS (.dmg)</a> and open the installer to install it.</span></div>
+          </div>
+        </div>
+
+        <div class="os-panel" id="os-windows">
+          <div class="callout warning">
+            <span class="callout-icon">⚠️</span>
+            <span><strong>32-bit Windows and Windows 10 on ARM are not supported.</strong> To check: press <code>Windows + R</code>, type <code>control /name microsoft.system</code>, and look for "System type." If it says "32-bit Operating System," iLoader won't run.</span>
+          </div>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Install iTunes from the <a href="https://apps.microsoft.com/store/detail/9PB2MZ1ZMB1S" target="_blank">Microsoft Store</a> or <a href="https://www.apple.com/itunes/download/win64" target="_blank">directly from Apple</a>.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Download iLoader as an <a href="https://github.com/nab138/iloader/releases/latest/download/iloader-windows-x64.msi" target="_blank">MSI installer</a> (recommended) or <a href="https://github.com/nab138/iloader/releases/latest/download/iloader-windows-x64.exe" target="_blank">EXE</a>.</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Run the installer.</span></div>
+          </div>
+        </div>
+
+        <div class="os-panel" id="os-linux">
+          <div class="callout warning">
+            <span class="callout-icon">⚠️</span>
+            <span><strong>Only 64-bit distributions are supported.</strong> Run <code>uname -m</code> in a terminal to check — expected output: <code>x86_64</code>.</span>
+          </div>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Install the <code>usbmuxd</code> package via your package manager (it may already be installed).</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Download and install iLoader for your distribution:
+              <ul style="list-style:none; margin-top:0.5rem; padding-left:1rem; display:flex; flex-direction:column; gap:0.3rem;">
+                <li><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-amd64.deb" target="_blank">DEB</a> — Debian / Ubuntu</span></div>
+          <div class="step-row"><span class="step-n">3</span><span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-x86_64.rpm" target="_blank">RPM</a> — Fedora / openSUSE</span></div>
+          <div class="step-row"><span class="step-n">4</span><span><a href="https://github.com/nab138/iloader/releases/latest/download/iloader-linux-amd64.AppImage" target="_blank">AppImage</a> — all other distros</span></div>
+          <div class="step-row"><span class="step-n">5</span><span><a href="https://aur.archlinux.org/packages/iloader-bin" target="_blank">AUR: <code>iloader-bin</code></a> — Arch Linux</span></div>
+          </div>
+        </div>
+
+        <!-- Installing SideStore via iLoader -->
+        <div class="sub-section">
+          <p class="sub-section-title">Installing SideStore with iLoader</p>
+
+          <div class="callout warning">
+            <span class="callout-icon">⚠️</span>
+            <span><strong>iOS 26.4 users:</strong> SideStore's stable release has a known bug on iOS 26.4. When selecting an app to install, choose the <strong>Nightly</strong> build. You can also get it manually from the <a href="https://nightly.sidestore.io/" target="_blank">SideStore Nightly page</a>.</span>
+          </div>
+
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Connect your iPhone to the computer via USB. Tap <strong>Trust</strong> on the "Trust This Computer" prompt that appears on your device.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Launch iLoader and sign in with your Apple ID.</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Select your iPhone from the device list.</span></div>
+          </div>
+
+          <div class="pro-tip">
+            <strong>💡 Strongly Recommended: Install the Bundle</strong><br/>
+            On the installation screen, choose <strong>LiveContainer + SideStore (Nightly)</strong> — the rightmost option — rather than SideStore alone.
+            <br/><br/>
+            This installs both SideStore and LiveContainer under a single app slot, saving one of your 3 free slots. LiveContainer then lets you run unlimited additional apps (like PokéRogue Offline) <em>inside</em> that single slot, with no signing required and no 7-day refresh needed for those inner apps.
+          </div>
+
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>On the installation screen, select <strong>LiveContainer + SideStore (Nightly)</strong> and tap install.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Wait for the installation to complete, then disconnect the USB cable.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="guide-step reveal">
+      <div class="step-header">
+        <span class="step-num">Step 03</span>
+        <h2 class="step-title">Device-Side Activation</h2>
+      </div>
+      <div class="step-body">
+        <p>
+          LiveContainer is now on your home screen, but it needs a few on-device steps to become fully operational. Work through these in order.
+        </p>
+
+        <div class="sub-section">
+          <p class="sub-section-title">1 — Trust the Certificate</p>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Open <strong>Settings → General → VPN &amp; Device Management</strong>.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Tap your Apple ID under "Developer App" and tap <strong>Trust</strong>.</span></div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <p class="sub-section-title">2 — Enable Developer Mode</p>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Go to <strong>Settings → Privacy &amp; Security</strong> and scroll to the bottom.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Toggle on <strong>Developer Mode</strong>. Your device will restart.</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>After rebooting, tap <strong>Turn On</strong> in the warning dialog and enter your passcode.</span></div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <p class="sub-section-title">3 — Start the VPN Tunnel</p>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Open <strong>LocalDevVPN</strong> and tap <strong>Connect</strong>. You'll see a "VPN" indicator appear in your status bar when it's active.</span></div>
+          </div>
+          <div class="callout info">
+            <span class="callout-icon">ℹ️</span>
+            <span>This VPN only connects to your own device (localhost) — your internet connection is not affected, and no data is sent externally.</span>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <p class="sub-section-title">4 — Sign in to SideStore</p>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Open the <strong>SideStore</strong> button from within LiveContainer's top-left corner on the Apps page (or launch SideStore directly if it appears as a standalone icon).</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Sign in with the <strong>same Apple ID</strong> you used in iLoader.</span></div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <p class="sub-section-title">5 — Refresh Certificate from SideStore</p>
+          <p>This step is required to generate a valid signing certificate on the device.</p>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>In SideStore, go to the <strong>My Apps</strong> tab.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Tap the <strong>7 DAYS</strong> button next to LiveContainer to trigger a certificate refresh. If prompted to revoke an existing certificate and create a new one, tap <strong>Yes</strong> or <strong>Refresh Now</strong>.</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Wait for SideStore to finish refreshing, then <strong>quit SideStore</strong> from the app switcher.</span></div>
+          </div>
+          <div class="callout info">
+            <span class="callout-icon">ℹ️</span>
+            <span>LocalDevVPN must remain connected during this step. If the refresh fails, make sure the VPN is active and try again.</span>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <p class="sub-section-title">6 — Import Certificate into LiveContainer &amp; Verify JIT-Less Mode</p>
+          <p>Now link the certificate you just generated into LiveContainer so it can sign and run apps without using any additional app slots.</p>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Re-open <strong>LiveContainer</strong> (close it from the app switcher first, then relaunch it).</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Go to <strong>Settings</strong> within LiveContainer.</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Tap <strong>Import Certificate from SideStore</strong>, then tap <strong>OK</strong>. If the button changes to "Remove Certificate," the import succeeded.</span></div>
+          <div class="step-row"><span class="step-n">4</span><span>Tap <strong>JIT-Less Mode Diagnose</strong>, then tap <strong>Test JIT-Less Mode</strong>. The test should pass — you'll see all indicators turn green.</span></div>
+          </div>
+
+          <div class="callout tip">
+            <span class="callout-icon">✅</span>
+            <span>A passing JIT-Less Mode Diagnose means LiveContainer can sign and launch apps using your SideStore certificate automatically. You should see "App Group Accessible: Yes" and a valid "Certificate Last Update Date." If anything is red, ensure both LiveContainer and SideStore were installed using the same Apple ID, then repeat the refresh and import steps above.</span>
+          </div>
+
+          <div class="callout info">
+            <span class="callout-icon">ℹ️</span>
+            <span><strong>About pairing files:</strong> If you update or reset your device, your pairing file may expire. You'll need to reconnect to a computer and re-run iLoader to generate a new one.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="divider"><span class="divider-icon">✦</span></div>
+
+    <!-- INSTALL POKEROGUE -->
+    <div class="guide-step reveal">
+      <div class="step-header">
+        <span class="step-num">Done</span>
+        <h2 class="step-title">Install PokéRogue Offline</h2>
+      </div>
+      <div class="step-body">
+        <p>
+          With LiveContainer fully set up, installing PokéRogue Offline is simple — and it won't count against your 3-app slot limit.
+        </p>
+        <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Download <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank"><code>PokeRogueOffline.ipa</code></a> to your iPhone via Safari or the Files app.</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Open <strong>LiveContainer</strong> and tap <strong>+</strong> in the top right.</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Select the <code>PokeRogueOffline.ipa</code> file.</span></div>
+          <div class="step-row"><span class="step-n">4</span><span>Tap the app icon inside LiveContainer to launch — no signing step needed.</span></div>
+          </div>
+
+        <div class="callout tip">
+          <span class="callout-icon">✦</span>
+          <span><strong>Ongoing maintenance:</strong> Every 7 days, open LocalDevVPN, connect, then open SideStore and tap <strong>Refresh All</strong>. This refreshes the LiveContainer certificate — any apps running inside it (including PokéRogue Offline) are renewed automatically.</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /guide-body -->
+
+  <div class="disclaimer reveal">
+    This guide is adapted from <a href="https://fr0stb1rd.gitlab.io/posts/ios-26-unlimited-sideload-sidestore-livecontainer/" target="_blank"><em>Unlimited Sideload Infrastructure on iOS 26.2.1: SideStore and LiveContainer (Nightly)</em></a>
+    by <a href="https://twitter.com/fr0stb1rd" target="_blank">fr0stb1rd</a>, licensed under
+    <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC BY 4.0</a>.
+    Changes were made: rewritten for PokéRogue Offline, restructured into dedicated sections, and expanded Step 3 with SideStore certificate refresh and JIT-Less Mode Diagnose instructions.
+  </div>
+
+  <div class="disclaimer reveal" style="margin-top:0.5rem;">
+    PokéRogue Offline is an unofficial fan project and is not affiliated with or endorsed by the PokéRogue team.
+    PokéRogue is developed by <a href="https://github.com/pagefaultgames" target="_blank">PageFaultGames</a>.
+    This app is intended for personal use only.
+  </div>
+
+  <script>
+    const nav = document.getElementById('top-nav');
+    window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', window.scrollY > 20); });
+
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+    hamburger.addEventListener('click', () => {
+      hamburger.classList.toggle('open');
+      mobileMenu.classList.toggle('open');
+    });
+    function closeMenu() {
+      hamburger.classList.remove('open');
+      mobileMenu.classList.remove('open');
+    }
+
+    function switchOS(os) {
+      document.querySelectorAll('.os-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.os-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('os-' + os).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          setTimeout(() => e.target.classList.add('visible'), i * 80);
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

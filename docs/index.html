@@ -450,10 +450,9 @@
     }
     .sr-icon { flex-shrink: 0; margin-top: 0.1rem; }
 
-    .steps { list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.75rem; }
-    .steps li { counter-increment: step; display: flex; gap: 1rem; align-items: flex-start; font-size: 1rem; color: var(--text); }
-    .steps li::before {
-      content: counter(step);
+    .steps { display: flex; flex-direction: column; gap: 0.75rem; }
+    .steps .step-row { display: grid; grid-template-columns: 1.6rem 1fr; gap: 1rem; font-size: 1rem; color: var(--text); align-items: start; }
+    .steps .step-n {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.65rem;
       font-weight: 700;
@@ -461,12 +460,11 @@
       background: rgba(128,0,0,0.2);
       border: 1px solid rgba(200,64,64,0.3);
       border-radius: 2px;
-      min-width: 1.6rem; height: 1.6rem;
+      width: 1.6rem; height: 1.6rem;
       display: flex; align-items: center; justify-content: center;
       margin-top: 0.15rem;
-      flex-shrink: 0;
     }
-    .android-card .steps li::before {
+    .android-card .steps .step-n {
       color: var(--android-green);
       background: var(--android-green-dim);
       border-color: var(--android-green-border);
@@ -765,28 +763,10 @@
             <span><strong>iOS 26.4 users:</strong> SideStore's stable release has a known bug on iOS 26.4. When setting up, choose the <strong>Nightly</strong> build instead. You can also get it manually from the <a href="https://nightly.sidestore.io/" target="_blank" style="color:var(--gold); border-bottom:1px solid rgba(201,168,76,0.3);">SideStore Nightly page</a>.</span>
           </div>
 
-          <p class="steps-sub-title">First-time setup</p>
-          <ol class="steps">
-            <li>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a> and download iLoader for your PC or Mac</li>
-            <li>Connect your iPhone via USB and open iLoader</li>
-            <li>Sign in with your Apple ID</li>
-            <li>Select <strong>LiveContainer + SideStore</strong> and install — choose <strong>Nightly</strong> if on iOS 26.4</li>
-            <li>Open LiveContainer on your device and complete setup by importing the certificate from SideStore</li>
-          </ol>
-
-          <div class="steps-sub">
-            <p class="steps-sub-title">Installing PokéRogue Offline</p>
-            <ol class="steps">
-              <li>Download <code>PokeRogueOffline.ipa</code> to your iPhone via Safari or Files</li>
-              <li>Open LiveContainer and tap <strong>+</strong> in the top right</li>
-              <li>Select the IPA file</li>
-              <li>Tap the app icon to launch — no signing needed</li>
-            </ol>
-          </div>
-
-          <div class="card-note">
-            LiveContainer signs the app with your SideStore certificate automatically. You never need to manually sign or refresh PokéRogue Offline.
-          </div>
+          <p style="color: var(--text-dim); font-size:0.97rem; margin-bottom:1.5rem;">
+            Requires a one-time computer setup with iLoader, then everything runs wirelessly from the device. Full instructions on the dedicated guide page.
+          </p>
+          <a href="ios-sidestore-livecontainer.html" style="display:inline-flex; align-items:center; gap:0.5rem; font-family:'JetBrains Mono',monospace; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); text-decoration:none; padding:0.5rem 1.1rem; border:1px solid rgba(201,168,76,0.4); border-radius:2px; transition:all 0.2s;" onmouseover="this.style.background='rgba(201,168,76,0.1)';this.style.borderColor='var(--gold)';this.style.color='var(--cream)'" onmouseout="this.style.background='';this.style.borderColor='rgba(201,168,76,0.4)';this.style.color='var(--gold)'">→ Full Setup Guide</a>
         </div>
 
         <!-- SideStore only -->
@@ -805,12 +785,12 @@
             <span style="flex-shrink:0; margin-top:0.05rem;">⚠️</span>
             <span><strong>iOS 26.4 users:</strong> The stable release of SideStore has a known bug on iOS 26.4. You must install the <strong>Nightly</strong> build instead. Get it from the <a href="https://nightly.sidestore.io/" target="_blank" style="color:var(--gold); border-bottom:1px solid rgba(201,168,76,0.3);">SideStore Nightly page</a>.</span>
           </div>
-          <ol class="steps">
-            <li>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a>, download iLoader, and use it to install SideStore (Nightly if on iOS 26.4) on your iPhone</li>
-            <li>Open SideStore and tap <strong>+</strong> in My Apps</li>
-            <li>Select <code>PokeRogueOffline.ipa</code></li>
-            <li>Refresh every 7 days — automate this with a Shortcuts automation if desired</li>
-          </ol>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Go to <a href="https://iloader.app/" target="_blank">iloader.app</a>, download iLoader, and use it to install SideStore (Nightly if on iOS 26.4) on your iPhone</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Open SideStore and tap <strong>+</strong> in My Apps</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Select <code>PokeRogueOffline.ipa</code></span></div>
+          <div class="step-row"><span class="step-n">4</span><span>Refresh every 7 days — automate this with a Shortcuts automation if desired</span></div>
+          </div>
         </div>
 
         <!-- Feather / Sideloadly -->
@@ -844,13 +824,13 @@
           <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
             No sideloading tool needed on Android — just download and install the APK directly from the releases page.
           </p>
-          <ol class="steps">
-            <li>Go to the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank">latest release</a> and download <code>PokeRogueOffline.apk</code></li>
-            <li>Open the APK file on your device</li>
-            <li>When prompted, go to Settings and enable <strong>Install from Unknown Sources</strong> (or <strong>Install Unknown Apps</strong>) for your browser or Files app</li>
-            <li>Return to the APK and tap <strong>Install</strong></li>
-            <li>Open PokéRogue Offline and start playing</li>
-          </ol>
+          <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Go to the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank">latest release</a> and download <code>PokeRogueOffline.apk</code></span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Open the APK file on your device</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>When prompted, go to Settings and enable <strong>Install from Unknown Sources</strong> (or <strong>Install Unknown Apps</strong>) for your browser or Files app</span></div>
+          <div class="step-row"><span class="step-n">4</span><span>Return to the APK and tap <strong>Install</strong></span></div>
+          <div class="step-row"><span class="step-n">5</span><span>Open PokéRogue Offline and start playing</span></div>
+          </div>
           <div class="card-note android-note">
             The APK is debug-signed. Your device may show a warning during install — this is expected and safe to proceed through.
           </div>
@@ -879,12 +859,12 @@
       </p>
       <div style="margin-top:1.75rem;">
         <p class="steps-sub-title">How to add a source in AltStore</p>
-        <ol class="steps">
-          <li>Open AltStore and go to the <strong>Browse</strong> tab</li>
-          <li>Tap <strong>Sources</strong> in the top right corner</li>
-          <li>Tap <strong>+</strong> and paste the URL above</li>
-          <li>PokéRogue Offline will appear in Browse — tap to install</li>
-        </ol>
+        <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Open AltStore and go to the <strong>Browse</strong> tab</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Tap <strong>Sources</strong> in the top right corner</span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Tap <strong>+</strong> and paste the URL above</span></div>
+          <div class="step-row"><span class="step-n">4</span><span>PokéRogue Offline will appear in Browse — tap to install</span></div>
+          </div>
       </div>
     </div>
   </section>
@@ -900,13 +880,13 @@
       <p class="section-intro">Already have progress on pokerogue.net? Bring it into the app — or use Unlock Everything to start fresh.</p>
     </div>
     <div class="install-card reveal">
-      <ol class="steps">
-        <li>Go to <a href="https://pokerogue.net" target="_blank">pokerogue.net</a> in a browser and log in</li>
-        <li>Navigate to <strong>Menu → Manage Data → Export Data</strong></li>
-        <li>Open PokéRogue Offline on your device</li>
-        <li>Navigate to <strong>Menu → Manage Data → Import Data</strong></li>
-        <li>Select the exported file — your save will load immediately</li>
-      </ol>
+      <div class="steps">
+          <div class="step-row"><span class="step-n">1</span><span>Go to <a href="https://pokerogue.net" target="_blank">pokerogue.net</a> in a browser and log in</span></div>
+          <div class="step-row"><span class="step-n">2</span><span>Navigate to <strong>Menu → Manage Data → Export Data</strong></span></div>
+          <div class="step-row"><span class="step-n">3</span><span>Open PokéRogue Offline on your device</span></div>
+          <div class="step-row"><span class="step-n">4</span><span>Navigate to <strong>Menu → Manage Data → Import Data</strong></span></div>
+          <div class="step-row"><span class="step-n">5</span><span>Select the exported file — your save will load immediately</span></div>
+          </div>
       <div class="card-note">
         Alternatively, open <strong>Manage Data</strong> and tap <strong>Unlock Everything</strong> to instantly unlock all starters and forms without importing a save.
       </div>
