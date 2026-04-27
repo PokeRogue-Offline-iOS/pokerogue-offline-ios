@@ -65,10 +65,6 @@ const BANNER = `
       banner.style.display = "block";
 
       function position() {
-        var canvas = document.querySelector("#app canvas");
-        if (!canvas) return;
-        var r = canvas.getBoundingClientRect();
-        var bh = banner.offsetHeight;
         banner.style.left = "0px";
         banner.style.top = "25%";
       }

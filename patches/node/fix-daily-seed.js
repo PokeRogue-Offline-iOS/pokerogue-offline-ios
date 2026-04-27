@@ -27,6 +27,8 @@
 const fs = require("fs");
 const path = require("path");
 
+const DAILY_SEED_URL = "https://pokerogue-offline.github.io/pokerogue-offline/daily-seed.txt";
+
 const TARGET = path.join("pokerogue-src", "src", "phases", "title-phase.ts");
 
 if (!fs.existsSync(TARGET)) {
@@ -69,7 +71,7 @@ ${h2}  } else {
 ${h2}    globalScene.ui.revertMode();
 ${h2}    globalScene.ui.setMode(UiMode.MESSAGE);
 ${h2}    globalScene.ui.showText("Fetching daily seed...", null, null, null, true);
-${h2}    fetch("https://pokerogue-offline.github.io/pokerogue-offline/daily-seed.txt")
+${h2}    fetch(\`\${DAILY_SEED_URL}\`)
 ${h2}      .then(r => {
 ${h2}        if (!r.ok) throw new Error(\`HTTP \${r.status}\`);
 ${h2}        return r.text();
