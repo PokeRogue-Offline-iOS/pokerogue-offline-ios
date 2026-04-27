@@ -6,7 +6,7 @@ let content = fs.readFileSync(filePath, 'utf8');
 const anchor = `  "noneSelected": "None Selected",`;
 
 if (!content.includes(anchor)) {
-  console.warn('locales anchor not found — skipping');
+  console.error('locales anchor not found — skipping');
   process.exit(1);
 }
 const injection = `  "randomize": {
