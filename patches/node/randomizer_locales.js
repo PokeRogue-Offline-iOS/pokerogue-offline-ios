@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const fs = require('fs');
 
 const filePath = 'pokerogue-src/locales/en/challenges.json';

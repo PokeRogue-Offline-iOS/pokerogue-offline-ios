@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const fs = require('fs');
 
 const filePath = 'pokerogue-src/src/ui/handlers/menu-ui-handler.ts';
