@@ -40,6 +40,7 @@ const CHANGE_PASSWORD_REPLACEMENT = `    manageDataOptions.push(
 
 if (!content.includes(CHANGE_PASSWORD_ORIGINAL)) {
   console.error('Anchor for Change Password removal not found — skipping that removal');
+  process.exit(1);
 } else {
   content = content.replace(CHANGE_PASSWORD_ORIGINAL, CHANGE_PASSWORD_REPLACEMENT);
   console.log('Removed Change Password menu item');
@@ -101,6 +102,7 @@ const ADMIN_ORIGINAL = `    if (bypassLogin || loggedInUser?.hasAdminRole) {
 
 if (!content.includes(ADMIN_ORIGINAL)) {
   console.error('Anchor for Admin removal not found — skipping that removal');
+  process.exit(1);
 } else {
   content = content.replace(ADMIN_ORIGINAL, '');
   console.log('Removed Admin community menu item');
