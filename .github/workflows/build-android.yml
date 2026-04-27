@@ -2,11 +2,6 @@ name: Build PokeRogueOffline APK
 
 on:
   workflow_dispatch:
-    inputs:
-      release_run_id:
-        description: 'Run ID of the calling release workflow (used to name the artifact for pickup)'
-        required: false
-        default: ''
 
 permissions:
   contents: write
@@ -174,12 +169,9 @@ jobs:
           SIGNED="PokeRogueOffline.apk"
           cp -v $UNSIGNED $SIGNED
 
-      # Artifact name is scoped to the release workflow's run ID when triggered
-      # from the release workflow, so it can be unambiguously downloaded later.
-      # Falls back to a standalone name when run independently.
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.release_run_id != '' && format('release-{0}-android', inputs.release_run_id) || 'PokeRogueOffline-Android' }}
+          name: PokeRogueOffline-Android
           path: PokeRogueOffline.apk
           retention-days: 30
