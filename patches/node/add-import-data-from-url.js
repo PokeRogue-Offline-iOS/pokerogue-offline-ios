@@ -35,8 +35,8 @@ const injection = `
 const anchor = `  migrateStarterAbilities(systemData: SystemSaveData, initialStarterData?: StarterData): void {`;
 
 if (!content.includes(anchor)) {
-  console.warn('Anchor not found in game-data.ts — skipping injection');
-  process.exit(0);
+  console.error('Anchor not found in game-data.ts — skipping injection');
+  process.exit(1);
 }
 
 content = content.replace(anchor, injection + '\n  ' + anchor);
