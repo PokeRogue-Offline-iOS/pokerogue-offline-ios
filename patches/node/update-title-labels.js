@@ -2,12 +2,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = path.join('pokerogue-src','src','ui','handlers','title-ui-handler.ts');
-if (!fs.existsSync(filePath)) {
-  console.error(`ERROR: Could not find target file: ${filePath}`);
+const TARGET = path.join('pokerogue-src','src','ui','handlers','title-ui-handler.ts');
+if (!fs.existsSync(TARGET)) {
+  console.error(`ERROR: Could not find target file: ${TARGET}`);
   process.exit(1);
 }
-let content = fs.readFileSync(filePath, 'utf8');
+let content = fs.readFileSync(TARGET, 'utf8');
 
 const anchor = `    this.titleContainer.add([`;
 
@@ -30,5 +30,5 @@ content = content.replace(anchor2, anchor2 + '\n  ' + injection2);
 
 
 
-fs.writeFileSync(filePath, content);
+fs.writeFileSync(TARGET, content);
 console.log('Online labels removed successfully');

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
 
-const filePath = 'pokerogue-src/locales/en/challenges.json';
-if (!fs.existsSync(filePath)) {
-  console.error(`ERROR: Could not find target file: ${filePath}`);
+const TARGET = path.join('pokerogue-src','locales','en','challenges.json');
+if (!fs.existsSync(TARGET)) {
+  console.error(`ERROR: Could not find target file: ${TARGET}`);
   process.exit(1);
 }
-let content = fs.readFileSync(filePath, 'utf8');
+let content = fs.readFileSync(TARGET, 'utf8');
 
 const anchor = `  "noneSelected": "None Selected",`;
 
@@ -26,5 +27,5 @@ content = content.replace(anchor, anchor + "\n" + injection);
 
 
 
-fs.writeFileSync(filePath, content);
+fs.writeFileSync(TARGET, content);
 console.log('Randomizer Locales successfully');

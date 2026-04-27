@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
 
-const filePath = 'pokerogue-src/src/system/game-data.ts';
-if (!fs.existsSync(filePath)) {
-  console.error(`ERROR: Could not find target file: ${filePath}`);
+const TARGET = path.join('pokerogue-src', 'src', 'system', 'game-data.ts');
+
+if (!fs.existsSync(TARGET)) {
+  console.error(`ERROR: Could not find target file: ${TARGET}`);
   process.exit(1);
 }
-let content = fs.readFileSync(filePath, 'utf8');
+
+let content = fs.readFileSync(TARGET, 'utf8');
 
 const injection = `
   /**
@@ -45,5 +48,5 @@ if (!content.includes(anchor)) {
 }
 
 content = content.replace(anchor, injection + '\n  ' + anchor);
-fs.writeFileSync(filePath, content);
+fs.writeFileSync(TARGET, content);
 console.log('importDataFromUrl injected successfully');
