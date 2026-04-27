@@ -2,6 +2,10 @@
 const fs = require('fs');
 
 const filePath = 'pokerogue-src/src/system/game-data.ts';
+if (!fs.existsSync(filePath)) {
+  console.error(`ERROR: Could not find target file: ${filePath}`);
+  process.exit(1);
+}
 let content = fs.readFileSync(filePath, 'utf8');
 
 const injection = `

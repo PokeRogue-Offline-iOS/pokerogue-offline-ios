@@ -2,6 +2,10 @@
 const fs = require('fs');
 
 const filePath = 'pokerogue-src/locales/en/challenges.json';
+if (!fs.existsSync(filePath)) {
+  console.error(`ERROR: Could not find target file: ${filePath}`);
+  process.exit(1);
+}
 let content = fs.readFileSync(filePath, 'utf8');
 
 const anchor = `  "noneSelected": "None Selected",`;
