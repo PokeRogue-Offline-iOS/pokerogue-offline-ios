@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 const TARGET = path.join('pokerogue-src', 'src', 'system', 'game-data.ts');
 
@@ -9,7 +9,7 @@ if (!fs.existsSync(TARGET)) {
   process.exit(1);
 }
 
-let content = fs.readFileSync(TARGET, 'utf8');
+let content = fs.readFileSync(TARGET, "utf8");
 
 if (content.includes('importDataFromUrl')) {
   console.log('importDataFromUrl already present, skipping.');

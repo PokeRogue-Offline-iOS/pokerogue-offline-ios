@@ -29,7 +29,7 @@
  *   therefore the canvas) within the full viewport width. Black bars appear
  *   naturally on both sides. Controls sit in those bars. Portrait unchanged.
  *
- * Targets: pokevoid-src/dist/index.html
+ * Targets: pokerogue-src/dist/index.html
  */
 
 const fs = require("fs");

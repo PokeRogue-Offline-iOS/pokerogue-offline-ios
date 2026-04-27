@@ -16,7 +16,6 @@ if (!version || !buildNumber) {
 }
 
 const sourcePath = path.join(__dirname, '../docs/repo.json');
-console.log('load json');
 const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
 
 if (!Array.isArray(source.apps) || source.apps.length === 0) {

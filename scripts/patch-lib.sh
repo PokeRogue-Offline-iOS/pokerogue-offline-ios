@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # patch-lib.sh — shared helpers sourced by apply-patches.sh and apply-post-build-patches.sh
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"

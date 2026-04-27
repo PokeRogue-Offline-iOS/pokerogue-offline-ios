@@ -2,12 +2,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const TARGET = path.join('pokerogue-src','locales','en','challenges.json');
+const TARGET = path.join('pokerogue-src', 'locales', 'en', 'challenges.json');
 if (!fs.existsSync(TARGET)) {
   console.error(`ERROR: Could not find target file: ${TARGET}`);
   process.exit(1);
 }
-let content = fs.readFileSync(TARGET, 'utf8');
+let content = fs.readFileSync(TARGET, "utf8");
 
 if (content.includes('"randomize"')) {
   console.log('Randomizer locale already present, skipping.');
