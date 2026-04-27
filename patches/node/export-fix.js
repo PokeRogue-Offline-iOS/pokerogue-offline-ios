@@ -58,8 +58,7 @@ const REPLACEMENT = `${i}${encryptLine}
 
 ${i}const cap = (window as any).Capacitor;
 ${i}if (cap?.isNativePlatform?.()) {
-${i2}const stampC = new Date();
-${i2}const stamp = stampC.getUTCFullYear().toString().padStart(2,'0') + '_' + (stampC.getUTCMonth() + 1).toString().padStart(2,'0') + '_' +   stampC.getUTCDate().toString().padStart(2,'0') + '-' + stampC.getUTCHours().toString().padStart(2,'0') + '_' +   stampC.getUTCMinutes().toString().padStart(2,'0') + '_' + stampC.getUTCSeconds().toString().padStart(2,'0');
+${i2}const stamp = new Date().toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '_');
 ${i2}const fileName = \`\${dataKey}-\${stamp}.prsv\`;
 ${i2}const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
 ${i2}const platform = cap.getPlatform?.() ?? "ios";

@@ -18,6 +18,15 @@ if (!version || !buildNumber) {
 const sourcePath = path.join(__dirname, '../docs/repo.json');
 console.log('load json');
 const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+
+if (!Array.isArray(source.apps) || source.apps.length === 0) {
+  console.error('ERROR: repo.json is missing a valid apps array.');
+  process.exit(1);
+}
+if (!Array.isArray(source.apps[0].versions)) {
+  console.error('ERROR: repo.json apps[0] is missing a versions array.');
+  process.exit(1);
+}
 const newVersion = {
   version: version2,
   buildVersion: buildNumber,
