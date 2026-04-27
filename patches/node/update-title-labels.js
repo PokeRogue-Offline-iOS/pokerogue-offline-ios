@@ -9,6 +9,11 @@ if (!fs.existsSync(TARGET)) {
 }
 let content = fs.readFileSync(TARGET, 'utf8');
 
+if (content.includes('playerCountLabel.setText(``)')) {
+  console.log('update-title-labels already applied, skipping.');
+  process.exit(0);
+}
+
 const anchor = `    this.titleContainer.add([`;
 
 if (!content.includes(anchor)) {
