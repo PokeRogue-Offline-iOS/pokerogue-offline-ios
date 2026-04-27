@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const fs = require('fs');
 
 const filePath = 'pokerogue-src/src/system/game-data.ts';
