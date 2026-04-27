@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
 
-const filePath = 'pokerogue-src/src/ui/handlers/title-ui-handler.ts';
+const filePath = path.join('pokerogue-src','src','ui','handlers','title-ui-handler.ts');
 if (!fs.existsSync(filePath)) {
   console.error(`ERROR: Could not find target file: ${filePath}`);
   process.exit(1);
