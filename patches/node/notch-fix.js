@@ -23,6 +23,11 @@ if (!fs.existsSync(TARGET)) {
 
 let src = fs.readFileSync(TARGET, "utf8");
 
+if (src.includes("viewport-fit=cover")) {
+  console.log("Notch fix already present, skipping.");
+  process.exit(0);
+}
+
 // Match any existing <meta name="viewport" ...> tag regardless of its current content.
 const VIEWPORT_RE = /<meta\s+name="viewport"[^>]*>/i;
 

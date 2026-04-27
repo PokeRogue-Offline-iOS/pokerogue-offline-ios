@@ -83,7 +83,7 @@ const BANNER = `
 
 const ANCHOR = '<div id="app">';
 if (!src.includes(ANCHOR)) {
-  console.error("ERROR: Could not find </body> in index.html.");
+  console.error("ERROR: Could not find <div id=\"app\"> in index.html.");
   process.exit(1);
 }
 

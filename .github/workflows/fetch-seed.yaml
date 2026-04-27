@@ -2,6 +2,8 @@ name: Fetch Daily Seed
 
 on:
   workflow_dispatch:
+    # Scheduled daily runs are triggered externally via a VPS cron job.
+    # Do not add a schedule: trigger here.
 
 permissions:
   contents: write

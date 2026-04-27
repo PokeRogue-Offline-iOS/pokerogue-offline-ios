@@ -171,20 +171,6 @@ jobs:
         id: ipa_size
         run: echo "size=$(wc -c < PokeRogueOffline-dev.ipa)" >> $GITHUB_OUTPUT
 
-#      - name: Update AltStore source
-#        env:
-#          APP_VERSION: ${{ steps.pokerogue_version.outputs.version }}
-#          BUILD_NUMBER: ${{ github.run_number }}
-#          IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
-#        run: node scripts/update-altstore-source.js
-#
-#      - name: Commit updated repo.json
-#        run: |
-#          git config user.name "github-actions[bot]"
-#          git config user.email "github-actions[bot]@users.noreply.github.com"
-#          git add docs/repo.json
-#          git commit -m "Update AltStore source for v${{ steps.pokerogue_version.outputs.version }}"
-#          git push
 
       # Artifact name is scoped to the release workflow's run ID when triggered
       # from the release workflow, so it can be unambiguously downloaded later.

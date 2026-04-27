@@ -2,13 +2,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const TARGET = path.join('pokerogue-src','src','ui','handlers','menu-ui-handler.ts')
-;
+const TARGET = path.join('pokerogue-src', 'src', 'ui', 'handlers', 'menu-ui-handler.ts');
 if (!fs.existsSync(TARGET)) {
   console.error(`ERROR: Could not find target file: ${TARGET}`);
   process.exit(1);
 }
-let content = fs.readFileSync(TARGET, 'utf8');
+let content = fs.readFileSync(TARGET, "utf8");
 
 if (content.includes('Unlock Everything')) {
   console.log('inject-unlock-all already applied, skipping.');

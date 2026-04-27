@@ -87,7 +87,7 @@ jobs:
               "scrollEnabled": false,
               "backgroundColor": "#000000",
               "allowsLinkPreview": false,
-              "webContentsDebuggingEnabled": true,
+              "webContentsDebuggingEnabled": false,
               "allowsBackForwardNavigationGestures": false
             },
             "plugins": {
