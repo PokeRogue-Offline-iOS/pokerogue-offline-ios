@@ -2,11 +2,6 @@ name: Build PokeRogueOffline IPA
 
 on:
   workflow_dispatch:
-    inputs:
-      release_run_id:
-        description: 'Run ID of the calling release workflow (used to name the artifact for pickup)'
-        required: false
-        default: ''
 
 permissions:
   contents: write
@@ -189,12 +184,14 @@ jobs:
 #          git commit -m "Update AltStore source for v${{ steps.pokerogue_version.outputs.version }}"
 #          git push
 
-      # Artifact name is scoped to the release workflow's run ID when triggered
-      # from the release workflow, so it can be unambiguously downloaded later.
-      # Falls back to a standalone name when run independently.
-      - name: Upload IPA artifact
+      - name: Upload version artifact
+        run: echo -n "${{ steps.pokerogue_version.outputs.version }}" > version.txt
+
+      - name: Upload IPA and version artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.release_run_id != '' && format('release-{0}-ios', inputs.release_run_id) || 'PokeRogueOffline-iOS' }}
-          path: PokeRogueOffline.ipa
+          name: PokeRogueOffline-iOS
+          path: |
+            PokeRogueOffline.ipa
+            version.txt
           retention-days: 30

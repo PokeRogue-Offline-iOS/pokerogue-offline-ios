@@ -176,12 +176,14 @@ jobs:
           mv apk-out/PokeRogueOffline.apk ./PokeRogueOffline.apk
 
       # -----------------------------------------------------------------------
-      # Derive the version string from the IPA's embedded Info.plist.
+      # Read the version string from version.txt bundled in the iOS artifact.
+      # This guarantees the tag matches what's actually in the binaries, rather
+      # than fetching live from upstream which could have changed since the build ran.
       # -----------------------------------------------------------------------
-      - name: Extract version from IPA
+      - name: Read version
         id: version
         run: |
-          VERSION=$(curl -s https://raw.githubusercontent.com/pagefaultgames/pokerogue/refs/heads/main/package.json | jq -r '.version')
+          VERSION=$(cat ipa-out/version.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Found Version: ${VERSION}"
 
