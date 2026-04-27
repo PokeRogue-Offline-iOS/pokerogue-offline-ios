@@ -22,15 +22,6 @@ apply_patch() {
   echo "Applied: $file"
 }
 
-apply_submodule_patch() {
-  local file="$1"
-  local submodule="$2"
-  local full_path="$PATCHES_DIR/patch/$file"
-  echo "Applying: $file to $TARGET_DIR/$submodule"
-  git -C "$TARGET_DIR/$submodule" apply "$full_path"
-  echo "Applied: $file"
-}
-
 # Pending upstream PRs (patch/ — remove once merged)
 apply_patch "7230.patch"
 apply_patch "noLearnMove.patch"       # PKR 7077
