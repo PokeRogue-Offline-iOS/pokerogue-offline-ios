@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
 
-const filePath = 'pokerogue-src/src/ui/handlers/menu-ui-handler.ts';
-if (!fs.existsSync(filePath)) {
-  console.error(`ERROR: Could not find target file: ${filePath}`);
+const TARGET = path.join('pokerogue-src','src','ui','handlers','menu-ui-handler.ts')
+;
+if (!fs.existsSync(TARGET)) {
+  console.error(`ERROR: Could not find target file: ${TARGET}`);
   process.exit(1);
 }
-let content = fs.readFileSync(filePath, 'utf8');
+let content = fs.readFileSync(TARGET, 'utf8');
 
 // ── 1. Remove "Change Password" from Manage Data ─────────────────────────────
 
@@ -221,5 +223,5 @@ if (!content.includes(anchor)) {
 content = content.replace(anchor, injection + anchor);
 console.log('Injected app-only menu options');
 
-fs.writeFileSync(filePath, content);
+fs.writeFileSync(TARGET, content);
 console.log('inject-unlock-all: all changes applied successfully');
