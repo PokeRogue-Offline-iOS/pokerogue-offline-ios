@@ -11,6 +11,11 @@ if (!fs.existsSync(TARGET)) {
 
 let content = fs.readFileSync(TARGET, 'utf8');
 
+if (content.includes('importDataFromUrl')) {
+  console.log('importDataFromUrl already present, skipping.');
+  process.exit(0);
+}
+
 const injection = `
   /**
    * Fetches a .prsv file from a URL and imports it as system save data.

@@ -9,6 +9,11 @@ if (!fs.existsSync(TARGET)) {
 }
 let content = fs.readFileSync(TARGET, 'utf8');
 
+if (content.includes('"randomize"')) {
+  console.log('Randomizer locale already present, skipping.');
+  process.exit(0);
+}
+
 const anchor = `  "noneSelected": "None Selected",`;
 
 if (!content.includes(anchor)) {

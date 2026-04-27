@@ -10,6 +10,11 @@ if (!fs.existsSync(TARGET)) {
 }
 let content = fs.readFileSync(TARGET, 'utf8');
 
+if (content.includes('Unlock Everything')) {
+  console.log('inject-unlock-all already applied, skipping.');
+  process.exit(0);
+}
+
 // ── 1. Remove "Change Password" from Manage Data ─────────────────────────────
 
 const CHANGE_PASSWORD_ORIGINAL = `    manageDataOptions.push(
