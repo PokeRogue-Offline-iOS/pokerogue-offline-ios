@@ -15,7 +15,7 @@
  *   Intent.ACTION_VIEW / openURL to launch the system browser automatically.
  *   No extra plugins needed — this is built into Capacitor's core bridge.
  *
- * Targets: pokevoid-src/dist/index.html
+ * Targets: pokerogue-src/dist/index.html
  */
 
 const fs = require("fs");
