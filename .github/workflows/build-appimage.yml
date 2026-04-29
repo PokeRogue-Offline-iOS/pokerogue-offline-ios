@@ -88,8 +88,8 @@ jobs:
         id: appimage_path
         run: |
           FILE=$(find -type f -name "*.AppImage");
-          OUTPUT=$(./pokerogue-src/dist/PokeRogueOffline.AppImage
-          mv $FILE $OUTPUT
+          OUTPUT=./pokerogue-src/PokeRogueOffline.AppImage
+          mv $FILE $OUTPUT || true # Don't error if the file is the same
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload AppImage artifact
