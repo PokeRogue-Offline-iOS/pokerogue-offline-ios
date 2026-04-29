@@ -146,7 +146,7 @@ jobs:
       - name: Set version in build.gradle
         working-directory: pokerogue-src/android/app
         run: |
-          VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          VERSION="${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}"
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3)
