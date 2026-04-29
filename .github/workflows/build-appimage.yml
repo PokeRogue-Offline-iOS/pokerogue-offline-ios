@@ -49,6 +49,7 @@ jobs:
         run: pnpm build --app
 
       - name: Install Electron Builder
+        working-directory: pokerogue-src
         run: pnpm add -D electron-builder
 
       - name: Generate AppImage
