@@ -9,6 +9,13 @@
  * Changes isIOS() checks to isNative() (Capacitor.isNativePlatform()) so the
  * overlay appears on both platforms.
  *
+ * Also fixes a timing issue where the overlay was removed synchronously at the
+ * top of the `change` handler, before reader.onload fires. On Android, the
+ * touch event from the finger lifting after picker dismissal lands on the game
+ * canvas in that window and triggers revertMode(), dismissing the confirm
+ * dialog immediately. The overlay is kept alive until the confirm dialog is
+ * shown, so it absorbs any stray touches in the interim.
+ *
  * Targets: pokerogue-src/src/system/game-data.ts
  */
 
@@ -92,9 +99,6 @@ src = src.replace(APPEND_OVERLAY_OLD, APPEND_OVERLAY_NEW);
 
 // Remove the trailing appendChild(saveFile) left by iosImport.patch — it is
 // now redundant for the native path and harmful (triggers the duplicate event).
-// The non-native else branch still hides saveFile but never appends it, which
-// is fine because the non-native path uses saveFile.click() directly and the
-// browser handles it without the element being in the DOM.
 const TRAILING_APPEND_OLD = `\n\n    // Append the file input to body for iOS compatibility\n    document.body.appendChild(saveFile);`;
 
 if (!src.includes(TRAILING_APPEND_OLD)) {
@@ -102,6 +106,55 @@ if (!src.includes(TRAILING_APPEND_OLD)) {
   process.exit(1);
 }
 src = src.replace(TRAILING_APPEND_OLD, "");
+
+// Move overlay/button cleanup out of the top of the change handler and into
+// the showText callback, so the overlay stays in place until the confirm dialog
+// is actually on screen. On Android, dismissing the file picker fires a touch
+// event that reaches the game canvas in the gap between change firing (overlay
+// removed) and reader.onload resolving (confirm shown). That stray touch calls
+// revertMode() and pops the confirm dialog before the user ever sees it.
+const CLEANUP_OLD = `    saveFile.addEventListener("change", e => {
+      // Remove iOS UI elements if they exist
+      const overlay = document.getElementById("iosUploadOverlay");
+      const button = document.getElementById("iosUploadButton");
+      if (overlay) {
+        overlay.remove();
+      }
+      if (button) {
+        button.remove();
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = (_ => {
+        return e => {
+          const dataName = i18next.t(\`gameData:\${toCamelCase(GameDataType[dataType])}\`);`;
+
+const CLEANUP_NEW = `    saveFile.addEventListener("change", e => {
+      const reader = new FileReader();
+
+      reader.onload = (_ => {
+        return e => {
+          // android-import-overlay: remove overlay here, not at the top of the
+          // change handler. Keeping the overlay alive until the confirm dialog
+          // is shown prevents stray touches (from the picker dismissal) from
+          // reaching the game canvas and calling revertMode().
+          const overlay = document.getElementById("iosUploadOverlay");
+          const button = document.getElementById("iosUploadButton");
+          if (overlay) {
+            overlay.remove();
+          }
+          if (button) {
+            button.remove();
+          }
+
+          const dataName = i18next.t(\`gameData:\${toCamelCase(GameDataType[dataType])}\`);`;
+
+if (!src.includes(CLEANUP_OLD)) {
+  console.error("ERROR: Could not find change handler cleanup block in game-data.ts.");
+  process.exit(1);
+}
+src = src.replace(CLEANUP_OLD, CLEANUP_NEW);
 
 fs.writeFileSync(TARGET, src, "utf8");
 console.log(`Patched import overlay in ${TARGET}`);
