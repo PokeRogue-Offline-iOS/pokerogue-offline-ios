@@ -52,7 +52,6 @@ jobs:
       - name: Apply Linux-specific patches
         run: |
           node ${{ github.workspace }}/patches/linux/node/electron-save-bridge.js
-          node ${{ github.workspace }}/patches/linux/node/electron-banner.js
 
       - name: Inject build number into banner
         run: |
