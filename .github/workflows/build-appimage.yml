@@ -86,7 +86,9 @@ jobs:
 
       - name: Rename and save AppImage
         run: |
-          OUTPUT=$(find -type f -name "*.AppImage");
+          FILE=$(find -type f -name "*.AppImage");
+          OUTPUT=$(./pokerogue-src/dist/PokeRogueOffline.AppImage
+          mv $FILE $OUTPUT
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload AppImage artifact
