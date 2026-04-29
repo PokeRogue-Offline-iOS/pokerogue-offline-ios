@@ -42,7 +42,7 @@ jobs:
             -o pokerogue-src/data_new.prsv
 
       - name: Apply patches
-        run: bash ${{ github.workspace }}/scripts/apply-patches.sh
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh mobile
 
       - name: Inject build number into banner
         run: |
@@ -59,7 +59,7 @@ jobs:
         run: pnpm build --mode app
 
       - name: Apply post-build patches
-        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh
+        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh mobile
 
       - name: Copy save file to dist
         run: cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
