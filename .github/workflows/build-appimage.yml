@@ -86,6 +86,7 @@ jobs:
 
       - name: Rename and save AppImage
         run: |
+          find -type f -name "*.AppImage"
           OUTPUT=dist/PokeRogueOffline-${{ steps.pokerogue_version.outputs.version }}.AppImage
           mv pokerogue-src/dist/*.AppImage $OUTPUT
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
