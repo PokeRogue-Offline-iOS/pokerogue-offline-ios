@@ -85,6 +85,7 @@ jobs:
         run: pnpm electron-builder --linux AppImage
 
       - name: Rename and save AppImage
+        id: appimage_path
         run: |
           FILE=$(find -type f -name "*.AppImage");
           OUTPUT=$(./pokerogue-src/dist/PokeRogueOffline.AppImage
@@ -95,5 +96,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PokeRogueOffline-AppImage
-          path: ${{ steps.pokerogue_version.outputs.AppImage }}
+          path: ${{ steps.appimage_path.outputs.AppImage }}
           retention-days: 30
