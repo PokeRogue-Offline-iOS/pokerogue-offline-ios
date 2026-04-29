@@ -18,7 +18,6 @@ jobs:
       # -----------------------------------------------------------------------
       # Record a timestamp just before triggering each build, then locate the
       # resulting run ID by finding the first run created after that moment.
-      # This avoids any dependency on workflow inputs being queryable via API.
       # -----------------------------------------------------------------------
       - name: Trigger iOS build
         id: trigger_ios
@@ -38,18 +37,27 @@ jobs:
           gh workflow run build-android.yml --ref "${{ github.ref_name }}"
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
+      - name: Trigger Linux build
+        id: trigger_linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run build-linux.yml --ref "${{ github.ref_name }}"
+          echo "triggered_after=$TS" >> $GITHUB_OUTPUT
+
       # -----------------------------------------------------------------------
-      # Locate the run IDs by polling for runs created after the trigger
-      # timestamps. Retry for up to 2 minutes to allow GitHub to register them.
-      # Run ID is written to a temp file to avoid capturing log lines in $().
+      # Locate all three run IDs by polling for runs created after the trigger
+      # timestamps. Retry for up to 2 minutes.
       # -----------------------------------------------------------------------
       - name: Locate run IDs
         id: runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          IOS_AFTER: ${{ steps.trigger_ios.outputs.triggered_after }}
+          IOS_AFTER:     ${{ steps.trigger_ios.outputs.triggered_after }}
           ANDROID_AFTER: ${{ steps.trigger_android.outputs.triggered_after }}
+          LINUX_AFTER:   ${{ steps.trigger_linux.outputs.triggered_after }}
         run: |
           set -e
 
@@ -76,26 +84,25 @@ jobs:
             return 1
           }
 
-          locate_run "build-ios.yml" "$IOS_AFTER" "iOS" /tmp/ios_run_id
+          locate_run "build-ios.yml"     "$IOS_AFTER"     "iOS"     /tmp/ios_run_id
           locate_run "build-android.yml" "$ANDROID_AFTER" "Android" /tmp/android_run_id
+          locate_run "build-linux.yml"   "$LINUX_AFTER"   "Linux"   /tmp/linux_run_id
 
-          IOS_RUN_ID=$(cat /tmp/ios_run_id)
-          ANDROID_RUN_ID=$(cat /tmp/android_run_id)
-
-          echo "ios_run_id=$IOS_RUN_ID" >> $GITHUB_OUTPUT
-          echo "android_run_id=$ANDROID_RUN_ID" >> $GITHUB_OUTPUT
+          echo "ios_run_id=$(cat /tmp/ios_run_id)"         >> $GITHUB_OUTPUT
+          echo "android_run_id=$(cat /tmp/android_run_id)" >> $GITHUB_OUTPUT
+          echo "linux_run_id=$(cat /tmp/linux_run_id)"     >> $GITHUB_OUTPUT
 
       # -----------------------------------------------------------------------
-      # Poll until both runs reach a terminal state.
-      # Timeout after 90 minutes (iOS builds on macos-latest can be slow).
-      # If one build fails, the other is cancelled immediately.
+      # Poll until all three builds reach a terminal state.
+      # Timeout after 90 minutes. If one fails, the others are cancelled.
       # -----------------------------------------------------------------------
       - name: Wait for builds to complete
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          IOS_RUN_ID: ${{ steps.runs.outputs.ios_run_id }}
+          IOS_RUN_ID:     ${{ steps.runs.outputs.ios_run_id }}
           ANDROID_RUN_ID: ${{ steps.runs.outputs.android_run_id }}
+          LINUX_RUN_ID:   ${{ steps.runs.outputs.linux_run_id }}
         run: |
           set -e
 
@@ -114,34 +121,49 @@ jobs:
           }
 
           while true; do
-            IOS_STATUS=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID" --jq '.status')
-            IOS_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID" --jq '.conclusion')
-            ANDROID_STATUS=$(gh api "repos/$REPO/actions/runs/$ANDROID_RUN_ID" --jq '.status')
-            ANDROID_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$ANDROID_RUN_ID" --jq '.conclusion')
+            IOS_STATUS=$(gh api     "repos/$REPO/actions/runs/$IOS_RUN_ID"     --jq '.status')
+            IOS_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID"     --jq '.conclusion')
+            AND_STATUS=$(gh api     "repos/$REPO/actions/runs/$ANDROID_RUN_ID" --jq '.status')
+            AND_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$ANDROID_RUN_ID" --jq '.conclusion')
+            LNX_STATUS=$(gh api     "repos/$REPO/actions/runs/$LINUX_RUN_ID"   --jq '.status')
+            LNX_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$LINUX_RUN_ID"   --jq '.conclusion')
 
-            echo "iOS: $IOS_STATUS / $IOS_CONCLUSION  |  Android: $ANDROID_STATUS / $ANDROID_CONCLUSION  (${ELAPSED}s elapsed)"
+            echo "iOS: $IOS_STATUS/$IOS_CONCLUSION | Android: $AND_STATUS/$AND_CONCLUSION | Linux: $LNX_STATUS/$LNX_CONCLUSION (${ELAPSED}s)"
 
-            # If one has failed, cancel the other and exit immediately
-            if [ "$IOS_STATUS" = "completed" ] && [ "$IOS_CONCLUSION" != "success" ]; then
-              cancel_run "$ANDROID_RUN_ID" "Android" "$ANDROID_STATUS"
-              echo "ERROR: iOS build ended with: $IOS_CONCLUSION"
-              exit 1
-            fi
-            if [ "$ANDROID_STATUS" = "completed" ] && [ "$ANDROID_CONCLUSION" != "success" ]; then
-              cancel_run "$IOS_RUN_ID" "iOS" "$IOS_STATUS"
-              echo "ERROR: Android build ended with: $ANDROID_CONCLUSION"
-              exit 1
-            fi
+            fail_if() {
+              local label="$1" status="$2" conclusion="$3"
+              local r1="$4" l1="$5" s1="$6"
+              local r2="$7" l2="$8" s2="$9"
+              if [ "$status" = "completed" ] && [ "$conclusion" != "success" ]; then
+                cancel_run "$r1" "$l1" "$s1"
+                cancel_run "$r2" "$l2" "$s2"
+                echo "ERROR: $label build ended with: $conclusion"
+                exit 1
+              fi
+            }
 
-            if [ "$IOS_STATUS" = "completed" ] && [ "$ANDROID_STATUS" = "completed" ]; then
-              echo "Both builds succeeded."
+            fail_if "iOS"     "$IOS_STATUS" "$IOS_CONCLUSION" \
+                    "$ANDROID_RUN_ID" "Android" "$AND_STATUS" \
+                    "$LINUX_RUN_ID"   "Linux"   "$LNX_STATUS"
+
+            fail_if "Android" "$AND_STATUS" "$AND_CONCLUSION" \
+                    "$IOS_RUN_ID"     "iOS"     "$IOS_STATUS" \
+                    "$LINUX_RUN_ID"   "Linux"   "$LNX_STATUS"
+
+            fail_if "Linux"   "$LNX_STATUS" "$LNX_CONCLUSION" \
+                    "$IOS_RUN_ID"     "iOS"     "$IOS_STATUS" \
+                    "$ANDROID_RUN_ID" "Android" "$AND_STATUS"
+
+            if [ "$IOS_STATUS" = "completed" ] && [ "$AND_STATUS" = "completed" ] && [ "$LNX_STATUS" = "completed" ]; then
+              echo "All three builds succeeded."
               break
             fi
 
             ELAPSED=$((ELAPSED + POLL))
             if [ $ELAPSED -ge $TIMEOUT ]; then
-              cancel_run "$IOS_RUN_ID" "iOS" "$IOS_STATUS"
-              cancel_run "$ANDROID_RUN_ID" "Android" "$ANDROID_STATUS"
+              cancel_run "$IOS_RUN_ID"     "iOS"     "$IOS_STATUS"
+              cancel_run "$ANDROID_RUN_ID" "Android" "$AND_STATUS"
+              cancel_run "$LINUX_RUN_ID"   "Linux"   "$LNX_STATUS"
               echo "ERROR: Timed out waiting for builds to complete."
               exit 1
             fi
@@ -149,7 +171,7 @@ jobs:
           done
 
       # -----------------------------------------------------------------------
-      # Download both artifacts into the workspace.
+      # Download all three artifacts.
       # -----------------------------------------------------------------------
       - name: Download IPA artifact
         env:
@@ -175,10 +197,20 @@ jobs:
           unzip apk.zip -d apk-out
           mv apk-out/PokeRogueOffline.apk ./PokeRogueOffline.apk
 
+      - name: Download AppImage artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          LINUX_RUN_ID: ${{ steps.runs.outputs.linux_run_id }}
+        run: |
+          ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$LINUX_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "PokeRogueOffline-Linux") | .id')
+          gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" > appimage.zip
+          unzip appimage.zip -d appimage-out
+          mv appimage-out/PokeRogueOffline.AppImage ./PokeRogueOffline.AppImage
+
       # -----------------------------------------------------------------------
       # Read the version string from version.txt bundled in the iOS artifact.
-      # This guarantees the tag matches what's actually in the binaries, rather
-      # than fetching live from upstream which could have changed since the build ran.
       # -----------------------------------------------------------------------
       - name: Read version
         id: version
@@ -199,10 +231,19 @@ jobs:
             ## PokeRogueOffline v${{ steps.version.outputs.version }}
 
             - **PokeRogueOffline.ipa** — iOS (sideload via SideStore / LiveContainer / Feather)
-            - **PokeRogueOffline.apk** — Android (sideload by enabling "Install unknown apps")
+            - **PokeRogueOffline.apk** — Android (enable "Install unknown apps")
+            - **PokeRogueOffline.AppImage** — Linux x64 (chmod +x, then run directly)
+
+            ### Linux quick start
+            ```bash
+            chmod +x PokeRogueOffline.AppImage
+            ./PokeRogueOffline.AppImage
+            ```
+            Saves are stored in `~/.config/PokeRogueOffline/saves/`.
           files: |
             PokeRogueOffline.ipa
             PokeRogueOffline.apk
+            PokeRogueOffline.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -226,8 +267,7 @@ jobs:
           git push
 
   # -----------------------------------------------------------------------
-  # Runs only if the release job is cancelled. Finds any in-progress or
-  # queued runs of the build workflows and cancels them.
+  # Runs only if the release job is cancelled.
   # -----------------------------------------------------------------------
   cancel-builds:
     runs-on: ubuntu-latest
@@ -257,5 +297,6 @@ jobs:
             done
           }
 
-          cancel_active_runs "build-ios.yml" "iOS"
+          cancel_active_runs "build-ios.yml"    "iOS"
           cancel_active_runs "build-android.yml" "Android"
+          cancel_active_runs "build-linux.yml"   "Linux"
