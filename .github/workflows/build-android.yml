@@ -91,10 +91,9 @@ jobs:
             },
             "plugins": {
               "StatusBar": {
-                "overlaysWebView": true,
+                "overlaysWebView": false,
                 "style": "DARK",
-                "backgroundColor": "#00000000",
-                "hide": true
+                "backgroundColor": "#000000",
               }
             }
           }
@@ -107,23 +106,6 @@ jobs:
       - name: Sync Capacitor
         working-directory: pokerogue-src
         run: npx cap sync android
-
-      - name: Configure fullscreen / immersive mode
-        working-directory: pokerogue-src
-        run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          STYLES="android/app/src/main/res/values/styles.xml"
-
-          # Render into notch/punch-hole areas on both orientations,
-          # matching the iOS notch-fix patch behaviour.
-          grep -q "layoutInDisplayCutoutMode" "$MANIFEST" || \
-            sed -i 's|android:theme="@style/AppTheme"|android:theme="@style/AppTheme"\n            android:windowLayoutInDisplayCutoutMode="shortEdges"|' "$MANIFEST"
-
-          # Set fullscreen in the native theme so the status bar is hidden
-          # before Capacitor's JS bridge loads, preventing a flash on cold start.
-          if ! grep -q "windowFullscreen" "$STYLES"; then
-            sed -i 's|</style>|    <item name="android:windowFullscreen">true</item>\n        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>\n    </style>|' "$STYLES"
-          fi
 
       - name: Fix Android permissions
         working-directory: pokerogue-src
