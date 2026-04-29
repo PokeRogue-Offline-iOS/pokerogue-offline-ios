@@ -49,12 +49,12 @@ jobs:
       - name: Ensure package.json has required metadata
         working-directory: pokerogue-src
         run: |
-          node -e "
+          node << 'EOF'
           const pkg = require('./package.json');
           if (!pkg.description) pkg.description = 'PokeRogue Offline';
-          if (!pkg.author) pkg.author = 'Scooom and PageFaultGames';
+          if (!pkg.author) pkg.author = 'PokeRogue Contributors';
           require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
-          "
+          EOF
 
         - name: Build PokeRogue
           working-directory: pokerogue-src
