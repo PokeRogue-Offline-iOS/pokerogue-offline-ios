@@ -69,6 +69,40 @@ if (!src.includes(CLICK_OLD)) {
 }
 src = src.replace(CLICK_OLD, CLICK_NEW);
 
+// Move appendChild(saveFile) inside the native block, before the overlay/button
+// are appended. This ensures saveFile is in the DOM before the user can tap the
+// button and open the picker. If it were appended after file selection (as
+// iosImport.patch leaves it at the bottom of the function), Android WebView
+// re-fires the `change` event when the already-filled input is inserted into
+// the DOM — causing a duplicate read that corrupts the UI mode stack and
+// triggers window.location.reload() before the confirm dialog can appear.
+const APPEND_OVERLAY_OLD = `      document.body.appendChild(overlay);
+      document.body.appendChild(uploadButton);`;
+const APPEND_OVERLAY_NEW = `      document.body.appendChild(overlay);
+      document.body.appendChild(uploadButton);
+      // android-import-overlay: saveFile must be in the DOM before the picker
+      // opens so that Android WebView does not re-fire change on insertion.
+      document.body.appendChild(saveFile);`;
+
+if (!src.includes(APPEND_OVERLAY_OLD)) {
+  console.error("ERROR: Could not find overlay/button appendChild block in game-data.ts.");
+  process.exit(1);
+}
+src = src.replace(APPEND_OVERLAY_OLD, APPEND_OVERLAY_NEW);
+
+// Remove the trailing appendChild(saveFile) left by iosImport.patch — it is
+// now redundant for the native path and harmful (triggers the duplicate event).
+// The non-native else branch still hides saveFile but never appends it, which
+// is fine because the non-native path uses saveFile.click() directly and the
+// browser handles it without the element being in the DOM.
+const TRAILING_APPEND_OLD = `\n\n    // Append the file input to body for iOS compatibility\n    document.body.appendChild(saveFile);`;
+
+if (!src.includes(TRAILING_APPEND_OLD)) {
+  console.error("ERROR: Could not find trailing appendChild(saveFile) in game-data.ts.");
+  process.exit(1);
+}
+src = src.replace(TRAILING_APPEND_OLD, "");
+
 fs.writeFileSync(TARGET, src, "utf8");
 console.log(`Patched import overlay in ${TARGET}`);
 console.log("Android import overlay applied successfully.");
