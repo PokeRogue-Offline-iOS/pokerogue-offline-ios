@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Patch: android-import-fix.js
+ * Patch: android-import-overlay.js
  *
  * Extends the iOS import overlay to also show on Android.
  * iosImport.patch only shows the overlay when isIOS() is true; Android falls
@@ -8,13 +8,6 @@
  *
  * Changes isIOS() checks to isNative() (Capacitor.isNativePlatform()) so the
  * overlay appears on both platforms.
- *
- * Also fixes an Android-specific bug: when the file picker closes, the WebView
- * fires a click event on the overlay (which is still covering the screen).
- * iosImport.patch's overlay.onclick removes saveFile, which kills the input
- * before the change event can fire — so nothing happens after file selection.
- * The fix replaces overlay.onclick so it no longer removes saveFile; saveFile
- * cleans itself up inside the change listener instead.
  *
  * Targets: pokerogue-src/src/system/game-data.ts
  */
@@ -75,64 +68,6 @@ if (!src.includes(CLICK_OLD)) {
   process.exit(1);
 }
 src = src.replace(CLICK_OLD, CLICK_NEW);
-
-// Move appendChild(saveFile) inside the native block so saveFile is in the DOM
-// before the picker opens. If appended after selection, Android WebView re-fires
-// the change event on insertion, causing a duplicate read and skipping the
-// confirm dialog.
-const APPEND_OVERLAY_OLD = `      document.body.appendChild(overlay);
-      document.body.appendChild(uploadButton);`;
-const APPEND_OVERLAY_NEW = `      document.body.appendChild(overlay);
-      document.body.appendChild(uploadButton);
-      // android-import-overlay: saveFile must be in the DOM before the picker
-      // opens so that Android WebView does not re-fire change on insertion.
-      document.body.appendChild(saveFile);`;
-
-if (!src.includes(APPEND_OVERLAY_OLD)) {
-  console.error("ERROR: Could not find overlay/button appendChild block in game-data.ts.");
-  process.exit(1);
-}
-src = src.replace(APPEND_OVERLAY_OLD, APPEND_OVERLAY_NEW);
-
-// Remove the trailing appendChild(saveFile) left by iosImport.patch — now
-// redundant since saveFile is appended inside the native block above.
-const TRAILING_APPEND_OLD = `\n\n    // Append the file input to body for iOS compatibility\n    document.body.appendChild(saveFile);`;
-
-if (!src.includes(TRAILING_APPEND_OLD)) {
-  console.error("ERROR: Could not find trailing appendChild(saveFile) in game-data.ts.");
-  process.exit(1);
-}
-src = src.replace(TRAILING_APPEND_OLD, "");
-
-// Replace overlay.onclick so it no longer removes saveFile.
-// iosImport.patch's handler removes saveFile on overlay click, which is fine
-// for iOS (the overlay click only fires on cancel). On Android however, the
-// WebView fires a click on the overlay when the file picker closes — before the
-// change event fires — destroying saveFile and silently swallowing the
-// selection. Removing saveFile.remove() from this handler fixes that; saveFile
-// is cleaned up inside the change listener instead.
-const OVERLAY_ONCLICK_OLD = `      // Handle overlay click to cancel
-      overlay.onclick = () => {
-        overlay.remove();
-        uploadButton.remove();
-        saveFile.remove();
-      };`;
-const OVERLAY_ONCLICK_NEW = `      // Handle overlay click to cancel
-      overlay.onclick = () => {
-        overlay.remove();
-        uploadButton.remove();
-        // android-import-overlay: do not remove saveFile here. On Android the
-        // WebView fires a click on the overlay when the file picker closes,
-        // before the change event fires. Removing saveFile at that point would
-        // silently swallow the selection. saveFile removes itself in the change
-        // listener once the import is complete.
-      };`;
-
-if (!src.includes(OVERLAY_ONCLICK_OLD)) {
-  console.error("ERROR: Could not find overlay.onclick handler in game-data.ts.");
-  process.exit(1);
-}
-src = src.replace(OVERLAY_ONCLICK_OLD, OVERLAY_ONCLICK_NEW);
 
 fs.writeFileSync(TARGET, src, "utf8");
 console.log(`Patched import overlay in ${TARGET}`);
