@@ -56,17 +56,17 @@ jobs:
           require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           EOF
 
-        - name: Build PokeRogue
-          working-directory: pokerogue-src
-          env:
-            VITE_BYPASS_LOGIN: '1'
-          run: pnpm build --app
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build --app
 
-        - name: Generate AppImage
-          working-directory: pokerogue-src
-          env:
-            CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          run: pnpm electron-builder --linux AppImage
+      - name: Generate AppImage
+        working-directory: pokerogue-src
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: pnpm electron-builder --linux AppImage
 
       - name: Rename and save AppImage
         run: |
