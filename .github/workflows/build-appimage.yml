@@ -53,6 +53,21 @@ jobs:
           const pkg = require('./package.json');
           if (!pkg.description) pkg.description = 'PokeRogue Offline';
           if (!pkg.author) pkg.author = 'PokeRogue Contributors';
+          pkg.build = {
+            "appId": "com.scooom.pkr",
+            "productName": "PokeRogue Offline",
+            "linux": {
+              "target": ["AppImage"],
+              "category": "Game"
+            },
+            "files": [
+              "dist/**/*",
+              "node_modules/**/*"
+            ],
+            "extraMetadata": {
+              "main": "dist/index.html"
+            }
+          };
           require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           EOF
 
