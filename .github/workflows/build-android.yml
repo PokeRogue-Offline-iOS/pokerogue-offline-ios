@@ -91,9 +91,10 @@ jobs:
             },
             "plugins": {
               "StatusBar": {
-                "overlaysWebView": false,
+                "overlaysWebView": true,
                 "style": "DARK",
-                "backgroundColor": "#000000"
+                "backgroundColor": "#00000000",
+                "hide": true
               }
             }
           }
@@ -106,6 +107,23 @@ jobs:
       - name: Sync Capacitor
         working-directory: pokerogue-src
         run: npx cap sync android
+
+      - name: Configure fullscreen / immersive mode
+        working-directory: pokerogue-src
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          STYLES="android/app/src/main/res/values/styles.xml"
+
+          # Render into notch/punch-hole areas on both orientations,
+          # matching the iOS notch-fix patch behaviour.
+          grep -q "layoutInDisplayCutoutMode" "$MANIFEST" || \
+            sed -i 's|android:theme="@style/AppTheme"|android:theme="@style/AppTheme"\n            android:windowLayoutInDisplayCutoutMode="shortEdges"|' "$MANIFEST"
+
+          # Set fullscreen in the native theme so the status bar is hidden
+          # before Capacitor's JS bridge loads, preventing a flash on cold start.
+          if ! grep -q "windowFullscreen" "$STYLES"; then
+            sed -i 's|</style>|    <item name="android:windowFullscreen">true</item>\n        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>\n    </style>|' "$STYLES"
+          fi
 
       - name: Fix Android permissions
         working-directory: pokerogue-src
@@ -146,14 +164,24 @@ jobs:
       - name: Set version in build.gradle
         working-directory: pokerogue-src/android/app
         run: |
-          VERSION="${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}"
+          VERSION="${{ steps.pokerogue_version.outputs.version }}"
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3)
-          VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          RUN=${{ github.run_number }}
+
+          # VERSION_CODE: each component gets a fixed-width slot so codes are
+          # always monotonically increasing within a game version.
+          #   MAJOR * 10_000_000  (supports 0-9)
+          #   MINOR *    100_000  (supports 0-99)
+          #   PATCH *      1_000  (supports 0-99)
+          #   RUN                 (supports 0-999, rolls over cleanly at 1000)
+          # Max realistic value ~100_000_000 — well under Android's 2_100_000_000 limit.
+          VERSION_CODE=$(( MAJOR * 10000000 + MINOR * 100000 + PATCH * 1000 + RUN ))
+          VERSION_NAME="${VERSION}.${{ github.run_number }}"
 
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" build.gradle
-          sed -i "s/versionName .*/versionName \"$VERSION\"/" build.gradle
+          sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" build.gradle
 
       - name: Make gradlew executable
         working-directory: pokerogue-src/android
