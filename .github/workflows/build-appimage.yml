@@ -1,0 +1,72 @@
+name: Build PokeRogueOffline AppImage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Clone PokeRogue fork
+        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Apply patches
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh appimage
+
+      - name: Inject build number into the banner
+        run: |
+          sed -i 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+
+      - name: Install PokeRogue dependencies
+        working-directory: pokerogue-src
+        run: pnpm install
+
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build --app
+
+      - name: Install Electron Builder
+        run: pnpm add -D electron-builder
+
+      - name: Generate AppImage
+        working-directory: pokerogue-src
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          pnpm electron-builder --linux AppImage
+
+      - name: Rename and save AppImage
+        run: |
+          OUTPUT=dist/PokeRogueOffline-${{ steps.pokerogue_version.outputs.version }}.AppImage
+          mv pokerogue-src/dist/*.AppImage $OUTPUT
+          echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PokeRogueOffline-AppImage
+          path: ${{ steps.pokerogue_version.outputs.AppImage }}
+          retention-days: 30
