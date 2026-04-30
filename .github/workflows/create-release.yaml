@@ -47,6 +47,16 @@ jobs:
           gh workflow run build-appimage.yml --ref "${{ github.ref_name }}"
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
+      - name: Trigger Windows build
+        id: trigger_windows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run build-exe.yml --ref "${{ github.ref_name }}"
+          echo "triggered_after=$TS" >> $GITHUB_OUTPUT
+
+
       # -----------------------------------------------------------------------
       # Locate the run IDs by polling for runs created after the trigger
       # timestamps. Retry for up to 2 minutes to allow GitHub to register them.
@@ -60,6 +70,7 @@ jobs:
           IOS_AFTER: ${{ steps.trigger_ios.outputs.triggered_after }}
           ANDROID_AFTER: ${{ steps.trigger_android.outputs.triggered_after }}
           APPIMAGE_AFTER: ${{ steps.trigger_appimage.outputs.triggered_after }}
+          WINDOWS_AFTER: ${{ steps.trigger_windows.outputs.triggered_after }}
         run: |
           set -e
 
@@ -88,18 +99,24 @@ jobs:
 
           locate_run "build-ios.yml" "$IOS_AFTER" "iOS" /tmp/ios_run_id
           locate_run "build-android.yml" "$ANDROID_AFTER" "Android" /tmp/android_run_id
-          locate_run "build-appimage.yml" "$APPIMAGE_AFTER" "Android" /tmp/appimage_run_id
+          locate_run "build-appimage.yml" "$APPIMAGE_AFTER" "AppImage" /tmp/appimage_run_id
+          locate_run "build-exe.yml" "$WINDOWS_AFTER" "Windows" /tmp/windows_run_id
+
 
           IOS_RUN_ID=$(cat /tmp/ios_run_id)
           ANDROID_RUN_ID=$(cat /tmp/android_run_id)
           APPIMAGE_RUN_ID=$(cat /tmp/appimage_run_id)
+          WINDOWS_RUN_ID=$(cat /tmp/windows_run_id)
+
 
           echo "ios_run_id=$IOS_RUN_ID" >> $GITHUB_OUTPUT
           echo "android_run_id=$ANDROID_RUN_ID" >> $GITHUB_OUTPUT
           echo "appimage_run_id=$APPIMAGE_RUN_ID" >> $GITHUB_OUTPUT
+          echo "windows_run_id=$WINDOWS_RUN_ID" >> $GITHUB_OUTPUT
+
 
       # -----------------------------------------------------------------------
-      # Poll until both runs reach a terminal state.
+      # Poll until all runs reach a terminal state.
       # Timeout after 90 minutes (iOS builds on macos-latest can be slow).
       # If one build fails, the other is cancelled immediately.
       # -----------------------------------------------------------------------
@@ -110,6 +127,8 @@ jobs:
           IOS_RUN_ID: ${{ steps.runs.outputs.ios_run_id }}
           ANDROID_RUN_ID: ${{ steps.runs.outputs.android_run_id }}
           APPIMAGE_RUN_ID: ${{ steps.runs.outputs.appimage_run_id }}
+          WINDOWS_RUN_ID: ${{ steps.runs.outputs.windows_run_id }}
+
         run: |
           set -e
 
@@ -135,11 +154,15 @@ jobs:
             APPIMAGE_STATUS=$(gh api "repos/$REPO/actions/runs/$APPIMAGE_RUN_ID" --jq '.status')
             APPIMAGE_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$APPIMAGE_RUN_ID" --jq '.conclusion')
 
-            echo -e "iOS: $IOS_STATUS / $IOS_CONCLUSION\nAndroid: $ANDROID_STATUS / $ANDROID_CONCLUSION\nAppImage: $APPIMAGE_STATUS / $APPIMAGE_CONCLUSION\n(${ELAPSED}s elapsed)"
+            WINDOWS_STATUS=$(gh api "repos/$REPO/actions/runs/$WINDOWS_RUN_ID" --jq '.status')
+            WINDOWS_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$WINDOWS_RUN_ID" --jq '.conclusion')
 
-            # If one has failed, cancel the other and exit immediately
+            echo -e "iOS: $IOS_STATUS / $IOS_CONCLUSION\nAndroid: $ANDROID_STATUS / $ANDROID_CONCLUSION\nAppImage: $APPIMAGE_STATUS / $APPIMAGE_CONCLUSION\nWindows: $WINDOWS_STATUS / $WINDOWS_CONCLUSION\n(${ELAPSED}s elapsed)"
+
+            # If one has failed, cancel the others and exit immediately
             if [ "$IOS_STATUS" = "completed" ] && [ "$IOS_CONCLUSION" != "success" ]; then
               cancel_run "$ANDROID_RUN_ID" "Android" "$ANDROID_STATUS"
+              cancel_run "$WINDOWS_RUN_ID" "Windows" "$WINDOWS_STATUS"
               cancel_run "$APPIMAGE_RUN_ID" "AppImage" "$APPIMAGE_STATUS"
               echo "ERROR: iOS build ended with: $IOS_CONCLUSION"
               exit 1
@@ -147,18 +170,28 @@ jobs:
             if [ "$ANDROID_STATUS" = "completed" ] && [ "$ANDROID_CONCLUSION" != "success" ]; then
               cancel_run "$IOS_RUN_ID" "iOS" "$IOS_STATUS"
               cancel_run "$APPIMAGE_RUN_ID" "AppImage" "$APPIMAGE_STATUS"
+              cancel_run "$WINDOWS_RUN_ID" "Windows" "$WINDOWS_STATUS"
               echo "ERROR: Android build ended with: $ANDROID_CONCLUSION"
               exit 1
             fi
             
-            if [ "$APPIMAGE_STATUS" = "completed" ] && [ "$ANDROID_CONCLUSION" != "success" ]; then
+            if [ "$APPIMAGE_STATUS" = "completed" ] && [ "$APPIMAGE_CONCLUSION" != "success" ]; then
               cancel_run "$IOS_RUN_ID" "iOS" "$IOS_STATUS"
-              cancel_run "$ANDROID_RUN_ID" "Android" "$ANDROID_STATUS"
+              cancel_run "$ANDROID_RUN_ID" "Android" "$APPIMAGE_STATUS"
+              cancel_run "$WINDOWS_RUN_ID" "Windows" "$WINDOWS_STATUS"
               echo "ERROR: AppImage build ended with: $APPIMAGE_CONCLUSION"
               exit 1
             fi
 
-            if [ "$IOS_STATUS" = "completed" ] && [ "$ANDROID_STATUS" = "completed" ] && [ "$APPIMAGE_STATUS" = "completed" ]; then
+            if [ "$WINDOWS_STATUS" = "completed" ] && [ "$WINDOWS_CONCLUSION" != "success" ]; then
+              cancel_run "$IOS_RUN_ID" "iOS" "$IOS_STATUS"
+              cancel_run "$ANDROID_RUN_ID" "Android" "$ANDROID_STATUS"
+              cancel_run "$APPIMAGE_RUN_ID" "AppImage" "$APPIMAGE_STATUS"
+              echo "ERROR: Windows build ended with: $WINDOWS_CONCLUSION"
+              exit 1
+            fi
+
+            if [ "$IOS_STATUS" = "completed" ] && [ "$ANDROID_STATUS" = "completed" ] && [ "$APPIMAGE_STATUS" = "completed" ] && [ "$WINDOWS_STATUS" = "completed" ]; then
               echo "All builds succeeded."
               break
             fi
@@ -168,6 +201,7 @@ jobs:
               cancel_run "$IOS_RUN_ID" "iOS" "$IOS_STATUS"
               cancel_run "$ANDROID_RUN_ID" "Android" "$ANDROID_STATUS"
               cancel_run "$APPIMAGE_RUN_ID" "AppImage" "$APPIMAGE_STATUS"
+              cancel_run "$WINDOWS_RUN_ID" "Windows" "$WINDOWS_STATUS"
               echo "ERROR: Timed out waiting for builds to complete."
               exit 1
             fi
@@ -175,7 +209,7 @@ jobs:
           done
 
       # -----------------------------------------------------------------------
-      # Download both artifacts into the workspace.
+      # Download all artifacts into the workspace.
       # -----------------------------------------------------------------------
       - name: Download IPA artifact
         env:
@@ -212,6 +246,19 @@ jobs:
           gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" > appimage.zip
           unzip appimage.zip -d appimage-out
           mv appimage-out/PokeRogueOffline.AppImage ./PokeRogueOffline.AppImage
+          
+      - name: Download Windows EXE artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          WINDOWS_RUN_ID: ${{ steps.runs.outputs.windows_run_id }}
+        run: |
+          ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$WINDOWS_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "PokeRogueOffline-Windows") | .id')
+          gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" > windows.zip
+          unzip windows.zip -d windows-out
+          mv windows-out/PokeRogueOffline.exe ./PokeRogueOffline.exe
+
 
       # -----------------------------------------------------------------------
       # Read the version string from version.txt bundled in the iOS artifact.
@@ -238,12 +285,15 @@ jobs:
 
             - **PokeRogueOffline.ipa** — iOS (sideload via SideStore / LiveContainer / Feather)
             - **PokeRogueOffline.apk** — Android (sideload by enabling "Install unknown apps")
-            - **PokeRogueOffline.AppImage** — AppImage
+            - **PokeRogueOffline.AppImage** — Linux AppImage
+            - **PokeRogueOffline.exe** — Windows Portable EXE
 
           files: |
             PokeRogueOffline.ipa
             PokeRogueOffline.apk
             PokeRogueOffline.AppImage
+            PokeRogueOffline.exe
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -300,3 +350,6 @@ jobs:
 
           cancel_active_runs "build-ios.yml" "iOS"
           cancel_active_runs "build-android.yml" "Android"
+          cancel_active_runs "build-appimage.yml" "AppImage"
+          cancel_active_runs "build-exe.yml" "Windows"
+
