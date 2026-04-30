@@ -132,7 +132,7 @@ jobs:
         id: exe_path
         shell: bash
         run: |
-          FILE=$(find -type f -name "*.exe");
+          FILE=$(find -type f -name "PokeRogue*Offline*.exe" | head -n1);
           echo $FILE;
           OUTPUT="./PokeRogueOffline.exe";
           echo $OUTPUT;
