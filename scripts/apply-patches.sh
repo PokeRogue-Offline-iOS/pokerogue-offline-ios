@@ -12,7 +12,6 @@ PLATFORM="${1:-all}"
 source "$(dirname "$0")/patch-lib.sh"
 
 # ── All platforms ─────────────────────────────────────────────────────────────
-ls -alR
 
 # Pending upstream PRs (remove once merged upstream)
 apply_patch "7230.patch"         all   # PKR 7230
