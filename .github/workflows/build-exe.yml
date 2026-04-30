@@ -99,6 +99,12 @@ jobs:
             "win": {
               "target": ["portable"]
             },
+            "win": {
+              "target": ["portable"],
+              "verifyUpdateCodeSignature": false,
+              "signingHashAlgorithms": []
+              "signAndEditExecutable": false
+            },
             "files": [
               "dist/**/*",
               "main.cjs",
