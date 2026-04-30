@@ -111,6 +111,10 @@ jobs:
         working-directory: pokerogue-src
         run: node ${{ github.workspace }}/patches/android/node/fullscreen-immersive.js
 
+      - name: Patch AndroidManifest to prevent keyboard resize
+        working-directory: pokerogue-src
+        run: node ${{ github.workspace }}/patches/android/node/keyboard-resize-fix.js
+
       - name: Fix Android permissions
         working-directory: pokerogue-src
         run: |
