@@ -106,7 +106,7 @@ jobs:
         working-directory: pokerogue-src
         env:
           VITE_BYPASS_LOGIN: '1'
-        run: pnpm build --app
+        run: pnpm build --mode app
 
       - name: Generate AppImage
         working-directory: pokerogue-src
