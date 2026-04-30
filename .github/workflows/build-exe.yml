@@ -34,7 +34,8 @@ jobs:
 
       - name: Apply patches
         shell: bash
-        run: bash ${{ github.workspace }}/scripts/apply-patches.sh exe
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/apply-patches.sh exe
 
       - name: Inject build number into the banner
         shell: bash
