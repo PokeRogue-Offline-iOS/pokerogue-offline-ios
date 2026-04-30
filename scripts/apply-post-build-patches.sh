@@ -17,6 +17,7 @@ if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
   apply_patch "notch-fix.js"           mobile
   apply_patch "fix-browser.js"         mobile
   apply_patch "landscape-canvas-fit.js" mobile
+  apply_patch "keyboard-resize-css-fix.js"  mobile
 
 fi
 

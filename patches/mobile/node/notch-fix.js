@@ -5,6 +5,12 @@
  * variables are non-zero on notched devices, preventing content from rendering
  * under the status bar / notch.
  *
+ * Also adds interactive-widget=resizes-visual (Chrome 108+) so that when the
+ * Android soft keyboard opens, only the visual viewport shrinks — the layout
+ * viewport (and therefore the Phaser canvas) is left untouched. This is a
+ * second layer of defence alongside the windowSoftInputMode="adjustNothing"
+ * manifest patch; together they cover all Chrome/WebView versions.
+ *
  * Must run AFTER the PokeRogue build step (dist/index.html must exist).
  *
  * Targets: pokerogue-src/dist/index.html
@@ -31,7 +37,11 @@ if (src.includes("viewport-fit=cover")) {
 // Match any existing <meta name="viewport" ...> tag regardless of its current content.
 const VIEWPORT_RE = /<meta\s+name="viewport"[^>]*>/i;
 
-const REPLACEMENT = '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">';
+// interactive-widget=resizes-visual (Chrome 108+ / Android WebView 108+):
+//   When the soft keyboard opens, only the *visual* viewport shrinks —
+//   the layout viewport (and therefore the Phaser canvas) is untouched.
+//   This is a CSS-level complement to windowSoftInputMode="adjustNothing".
+const REPLACEMENT = '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual">';
 
 if (!VIEWPORT_RE.test(src)) {
   console.error("ERROR: Could not find a <meta name=\"viewport\"> tag in index.html.");
