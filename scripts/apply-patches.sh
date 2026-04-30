@@ -25,6 +25,7 @@ apply_patch "cheated-banner.js"       all
 apply_patch "offline-banner.js"       all
 apply_patch "update-title-labels.js"  all
 apply_patch "randomizer_locales.js"   all
+apply_patch "seeded-classic-run.js"   all
 
 # ── Mobile (iOS + Android) ────────────────────────────────────────────────────
 if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
