@@ -21,6 +21,9 @@ jobs:
 
       - name: Install pnpm
         run: npm install -g pnpm
+        
+      - name: Configure Git line endings
+        run: git config --global core.autocrlf false
 
       - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
