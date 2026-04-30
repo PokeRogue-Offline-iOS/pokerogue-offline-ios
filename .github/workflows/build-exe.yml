@@ -1,0 +1,133 @@
+name: Build PokeRogueOffline Windows EXE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Clone PokeRogue fork
+        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        shell: pwsh
+        run: |
+          $version = (Get-Content ./pokerogue-src/package.json | ConvertFrom-Json).version
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Apply patches
+        shell: bash
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh exe
+
+      - name: Inject build number into the banner
+        shell: bash
+        run: |
+          sed -i 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+
+      - name: Install PokeRogue dependencies
+        working-directory: pokerogue-src
+        run: pnpm install
+
+      - name: Install Electron dependencies
+        working-directory: pokerogue-src
+        run: pnpm add -D electron electron-builder
+
+      - name: Create Electron main process file
+        working-directory: pokerogue-src
+        run: |
+          cat > main.cjs << 'EOF'
+          const { app, BrowserWindow } = require('electron');
+          const path = require('path');
+
+          let mainWindow;
+
+          function createWindow() {
+            mainWindow = new BrowserWindow({
+              width: 1280,
+              height: 720,
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+              }
+            });
+
+            mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+            if (process.env.DEBUG) {
+              mainWindow.webContents.openDevTools();
+            }
+          }
+
+          app.on('ready', createWindow);
+          app.on('window-all-closed', () => {
+            if (process.platform !== 'darwin') app.quit();
+          });
+          EOF
+
+      - name: Configure electron-builder for web app
+        working-directory: pokerogue-src
+        run: |
+          node << 'EOF'
+          const pkg = require('./package.json');
+          if (!pkg.description) pkg.description = 'PokeRogue Offline';
+          if (!pkg.author) pkg.author = 'Scooom';
+          pkg.main = 'main.cjs';
+          pkg.build = {
+            "appId": "com.scooom.pkr",
+            "productName": "PokeRogue Offline",
+            "win": {
+              "target": ["portable"]
+            },
+            "files": [
+              "dist/**/*",
+              "main.cjs",
+              "node_modules/**/*"
+            ]
+          };
+          require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
+          EOF
+
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build:app
+
+      - name: Generate Windows EXE
+        working-directory: pokerogue-src
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm electron-builder --win portable
+
+      - name: Rename and save EXE
+        id: exe_path
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path ./dist -Filter "*.exe" | Select-Object -First 1
+          $output = "./PokeRogueOffline.exe"
+          Move-Item -LiteralPath $file.FullName -Destination $output -Force
+          Write-Output "exe=$output" >> $env:GITHUB_OUTPUT
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PokeRogueOffline-Windows
+          path: ${{ steps.exe_path.outputs.exe }}
+          retention-days: 30
