@@ -36,7 +36,7 @@ if (!fs.existsSync(TARGET)) {
 
 let src = fs.readFileSync(TARGET, "utf8");
 
-if (src.includes("keyboard-resize-fix")) {
+if (src.includes("adjustNothing")) {
   console.log("Keyboard resize fix already present, skipping.");
   process.exit(0);
 }
@@ -68,7 +68,7 @@ if (src.includes("windowSoftInputMode")) {
   // Inject the attribute right after android:name=".MainActivity"
   src = src.replace(
     ACTIVITY_ANCHOR,
-    `${ACTIVITY_ANCHOR}\n            android:windowSoftInputMode="adjustNothing" <!-- keyboard-resize-fix: keyboard overlays game without resizing layout -->`
+    `${ACTIVITY_ANCHOR}\n            android:windowSoftInputMode="adjustNothing"
   );
   console.log("Injected windowSoftInputMode=\"adjustNothing\" into <activity>.");
 }
