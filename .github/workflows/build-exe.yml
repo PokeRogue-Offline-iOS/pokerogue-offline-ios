@@ -130,12 +130,14 @@ jobs:
 
       - name: Rename and save EXE
         id: exe_path
-        shell: pwsh
+        shell: bash
         run: |
-          $file = Get-ChildItem -Path ./dist -Filter "*.exe" | Select-Object -First 1
-          $output = "./PokeRogueOffline.exe"
-          Move-Item -LiteralPath $file.FullName -Destination $output -Force
-          Write-Output "exe=$output" >> $env:GITHUB_OUTPUT
+          FILE=$(find -type f -name "*.exe");
+          echo $FILE;
+          OUTPUT="./PokeRogueOffline.exe";
+          echo $OUTPUT;
+          mv "$FILE" "$OUTPUT";
+          echo "exe=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
