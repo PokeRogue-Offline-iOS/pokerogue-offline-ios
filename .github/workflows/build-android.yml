@@ -91,7 +91,7 @@ jobs:
             },
             "plugins": {
               "StatusBar": {
-                "overlaysWebView": false,
+                "overlaysWebView": true,
                 "style": "DARK",
                 "backgroundColor": "#000000"
               }
@@ -106,6 +106,10 @@ jobs:
       - name: Sync Capacitor
         working-directory: pokerogue-src
         run: npx cap sync android
+
+      - name: Patch MainActivity for fullscreen immersive mode
+        working-directory: pokerogue-src
+        run: node ${{ github.workspace }}/patches/android/node/fullscreen-immersive.js
 
       - name: Fix Android permissions
         working-directory: pokerogue-src
