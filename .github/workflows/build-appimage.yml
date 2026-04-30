@@ -49,7 +49,7 @@ jobs:
       - name: Create Electron main process file
         working-directory: pokerogue-src
         run: |
-          cat > main.js << 'EOF'
+          cat > main.cjs << 'EOF'
           const { app, BrowserWindow } = require('electron');
           const path = require('path');
 
@@ -85,7 +85,7 @@ jobs:
           const pkg = require('./package.json');
           if (!pkg.description) pkg.description = 'PokeRogue Offline';
           if (!pkg.author) pkg.author = 'Scooom';
-          pkg.main = 'main.js';
+          pkg.main = 'main.cjs';
           pkg.build = {
             "appId": "com.scooom.pkr",
             "productName": "PokeRogue Offline",
@@ -95,7 +95,7 @@ jobs:
             },
             "files": [
               "dist/**/*",
-              "main.js",
+              "main.cjs",
               "node_modules/**/*"
             ]
           };
