@@ -45,14 +45,47 @@ jobs:
       - name: Install Electron dependencies
         working-directory: pokerogue-src
         run: pnpm add -D electron electron-builder
+        
+      - name: Create Electron main process file
+        working-directory: pokerogue-src
+        run: |
+          cat > main.js << 'EOF'
+          const { app, BrowserWindow } = require('electron');
+          const path = require('path');
 
-      - name: Ensure package.json has required metadata
+          let mainWindow;
+
+          function createWindow() {
+            mainWindow = new BrowserWindow({
+              width: 1280,
+              height: 720,
+              webPreferences: {
+                preload: path.join(__dirname, 'preload.js'),
+                nodeIntegration: false,
+                contextIsolation: true
+              }
+            });
+
+            mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+            if (process.env.DEBUG) {
+              mainWindow.webContents.openDevTools();
+            }
+          }
+
+          app.on('ready', createWindow);
+          app.on('window-all-closed', () => {
+            if (process.platform !== 'darwin') app.quit();
+          });
+          EOF
+
+      - name: Configure electron-builder for web app
         working-directory: pokerogue-src
         run: |
           node << 'EOF'
           const pkg = require('./package.json');
           if (!pkg.description) pkg.description = 'PokeRogue Offline';
-          if (!pkg.author) pkg.author = 'PokeRogue Contributors';
+          if (!pkg.author) pkg.author = 'Scooom';
+          pkg.main = 'main.js';
           pkg.build = {
             "appId": "com.scooom.pkr",
             "productName": "PokeRogue Offline",
@@ -62,11 +95,9 @@ jobs:
             },
             "files": [
               "dist/**/*",
+              "main.js",
               "node_modules/**/*"
-            ],
-            "extraMetadata": {
-              "main": "dist/index.html"
-            }
+            ]
           };
           require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           EOF
@@ -88,7 +119,9 @@ jobs:
         id: appimage_path
         run: |
           FILE=$(find -type f -name "*.AppImage");
-          echo "AppImage=$FILE" >> $GITHUB_OUTPUT
+          OUTPUT="$(dirname $FILE)/PokeRogueOffline.AppImage";
+          mv $FILE $OUTPUT;
+          echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
