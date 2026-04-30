@@ -36,16 +36,15 @@ if (!fs.existsSync(TARGET)) {
 
 let src = fs.readFileSync(TARGET, "utf8");
 
-if (src.includes("adjustNothing")) {
+// Guard: check for the attribute value we inject, not an XML comment.
+// XML comments cannot appear inside an element's attribute list — they are
+// only valid between elements — so we never write one there.
+if (src.includes('android:windowSoftInputMode="adjustNothing"')) {
   console.log("Keyboard resize fix already present, skipping.");
   process.exit(0);
 }
 
 // ── Apply ─────────────────────────────────────────────────────────────────────
-
-// Capacitor generates an <activity> tag with android:name=".MainActivity".
-// We inject the windowSoftInputMode attribute onto that element.
-// The comment acts as both a guard marker and documentation in the manifest.
 
 const ACTIVITY_ANCHOR = 'android:name=".MainActivity"';
 
@@ -55,22 +54,23 @@ if (!src.includes(ACTIVITY_ANCHOR)) {
   process.exit(1);
 }
 
-// Check if windowSoftInputMode is already set by Capacitor (it normally isn't,
-// but be safe and don't duplicate the attribute).
 if (src.includes("windowSoftInputMode")) {
-  // Replace whatever value is there with adjustNothing
+  // Already set to something else — replace the value in place.
   src = src.replace(
     /android:windowSoftInputMode="[^"]*"/,
-    'android:windowSoftInputMode="adjustNothing" <!-- keyboard-resize-fix -->'
+    'android:windowSoftInputMode="adjustNothing"'
   );
-  console.log("Replaced existing windowSoftInputMode with adjustNothing.");
+  console.log("Replaced existing windowSoftInputMode value with adjustNothing.");
 } else {
-  // Inject the attribute right after android:name=".MainActivity"
+  // Inject the attribute on a new line directly after android:name=".MainActivity".
+  // No inline XML comment — comments are only valid between elements, not inside
+  // an element's opening tag, and the XML parser will reject the manifest if one
+  // is placed there.
   src = src.replace(
     ACTIVITY_ANCHOR,
-    `${ACTIVITY_ANCHOR}\n            android:windowSoftInputMode="adjustNothing"
+    `${ACTIVITY_ANCHOR}\n            android:windowSoftInputMode="adjustNothing"`
   );
-  console.log("Injected windowSoftInputMode=\"adjustNothing\" into <activity>.");
+  console.log('Injected android:windowSoftInputMode="adjustNothing" into <activity>.');
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
