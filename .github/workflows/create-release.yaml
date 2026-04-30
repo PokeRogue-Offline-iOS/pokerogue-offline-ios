@@ -157,7 +157,7 @@ jobs:
             WINDOWS_STATUS=$(gh api "repos/$REPO/actions/runs/$WINDOWS_RUN_ID" --jq '.status')
             WINDOWS_CONCLUSION=$(gh api "repos/$REPO/actions/runs/$WINDOWS_RUN_ID" --jq '.conclusion')
 
-            echo -e "iOS: $IOS_STATUS / $IOS_CONCLUSION\nAndroid: $ANDROID_STATUS / $ANDROID_CONCLUSION\nAppImage: $APPIMAGE_STATUS / $APPIMAGE_CONCLUSION\nWindows: $WINDOWS_STATUS / $WINDOWS_CONCLUSION\n(${ELAPSED}s elapsed)"
+            echo -e "iOS: $IOS_STATUS / $IOS_CONCLUSION | Android: $ANDROID_STATUS / $ANDROID_CONCLUSION | AppImage: $APPIMAGE_STATUS / $APPIMAGE_CONCLUSION | Windows: $WINDOWS_STATUS / $WINDOWS_CONCLUSION | (${ELAPSED}s elapsed)"
 
             # If one has failed, cancel the others and exit immediately
             if [ "$IOS_STATUS" = "completed" ] && [ "$IOS_CONCLUSION" != "success" ]; then
