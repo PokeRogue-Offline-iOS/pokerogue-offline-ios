@@ -26,7 +26,7 @@ if (!fs.existsSync(TARGET)) {
   process.exit(1);
 }
 
-let src = fs.readFileSync(TARGET, "utf8");
+let src = fs.readFileSync(TARGET, "utf8").replace(/\r\n/g, "\n");
 
 if (src.includes("cheated-banner")) {
   console.log("Cheated banner already present, skipping.");

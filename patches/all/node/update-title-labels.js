@@ -7,7 +7,7 @@ if (!fs.existsSync(TARGET)) {
   console.error(`ERROR: Could not find target file: ${TARGET}`);
   process.exit(1);
 }
-let content = fs.readFileSync(TARGET, "utf8");
+let content = fs.readFileSync(TARGET, "utf8").replace(/\r\n/g, "\n");
 
 if (content.includes('playerCountLabel.setText(``)')) {
   console.log('update-title-labels already applied, skipping.');
