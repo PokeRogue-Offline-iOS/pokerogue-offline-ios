@@ -122,7 +122,7 @@ jobs:
           echo $FILE;
           OUTPUT="./PokeRogueOffline.AppImage";
           echo $OUTPUT;
-          mv $FILE $OUTPUT;
+          mv "$FILE" "$OUTPUT";
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload AppImage artifact
