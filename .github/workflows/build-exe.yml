@@ -21,13 +21,6 @@ jobs:
 
       - name: Install pnpm
         run: npm install -g pnpm
-        
-
-      - name: Apply patches
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: bash scripts/apply-patches.sh exe
-
 
       - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
@@ -38,6 +31,10 @@ jobs:
         run: |
           $version = (Get-Content ./pokerogue-src/package.json | ConvertFrom-Json).version
           Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Apply patches
+        shell: bash
+        run: bash scripts/apply-patches.sh exe
 
       - name: Inject build number into the banner
         shell: bash
