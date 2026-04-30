@@ -38,7 +38,7 @@ if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
   apply_patch "android-import-fix.js"        mobile
   apply_patch "export-fix.js"                mobile
   apply_patch "background-audio-pause.js"    mobile
-
+  apply_patch "fix-capacitor-input-focus.js" mobile
 fi
 
 # ── Android only ──────────────────────────────────────────────────────────────
