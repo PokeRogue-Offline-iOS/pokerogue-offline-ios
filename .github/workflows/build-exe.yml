@@ -102,7 +102,7 @@ jobs:
             "win": {
               "target": ["portable"],
               "verifyUpdateCodeSignature": false,
-              "signingHashAlgorithms": []
+              "signingHashAlgorithms": [],
               "signAndEditExecutable": false
             },
             "files": [
