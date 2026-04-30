@@ -119,7 +119,9 @@ jobs:
         id: appimage_path
         run: |
           FILE=$(find -type f -name "*.AppImage");
+          echo $FILE;
           OUTPUT="$(dirname $FILE)/PokeRogueOffline.AppImage";
+          echo $OUTPUT;
           mv $FILE $OUTPUT;
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
