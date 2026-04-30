@@ -18,6 +18,8 @@ apply_patch() {
 
   if [[ "$file" == *.patch ]]; then
     full_path="$PATCHES_DIR/$category/patch/$file"
+    # Resolve to an absolute path that survives git's -C directory change on Windows
+    full_path="$(cd "$(dirname "$full_path")" && pwd)/$(basename "$full_path")"
     git -C "$TARGET_DIR" apply "$full_path"
   elif [[ "$file" == *.js ]]; then
     full_path="$PATCHES_DIR/$category/node/$file"
