@@ -138,7 +138,7 @@ const injection = `    if (isApp) {
               UiMode.CONFIRM,
               () => {
                 localStorage.setItem("hasCheated", "1");
-                globalScene.gameData.importDataFromUrl("/full_unlocks.prsv");
+                globalScene.gameData.importDataFromUrl("full_unlocks.prsv");
                 ui.revertMode();
                 this.showText("", 0);
               },
