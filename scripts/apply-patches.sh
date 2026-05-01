@@ -25,7 +25,7 @@ apply_patch "cheated-banner.js"       all
 apply_patch "offline-banner.js"       all
 apply_patch "update-title-labels.js"  all
 apply_patch "randomizer_locales.js"   all
-apply_patch "seeded-classic-run.js"   all
+# apply_patch "seeded-classic-run.js"   all #Disable seeded classic
 
 # ── Mobile (iOS + Android) ────────────────────────────────────────────────────
 if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
@@ -38,7 +38,7 @@ if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
   apply_patch "android-import-fix.js"        mobile
   apply_patch "export-fix.js"                mobile
   apply_patch "background-audio-pause.js"    mobile
-  apply_patch "fix-capacitor-input-focus.js" mobile
+#  apply_patch "fix-capacitor-input-focus.js" mobile
 fi
 
 # ── Android only ──────────────────────────────────────────────────────────────
