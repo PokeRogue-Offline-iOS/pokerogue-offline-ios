@@ -102,7 +102,6 @@ jobs:
               "dist/**/*",
               "main.cjs",
               "node_modules/**/*",
-              "full_unlocks.prsv"
             ]
           };
           require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
@@ -113,6 +112,10 @@ jobs:
         env:
           VITE_BYPASS_LOGIN: '1'
         run: pnpm build --mode app
+
+      - name: Copy full_unlocks.prsv into dist
+        working-directory: pokerogue-src
+        run: cp full_unlocks.prsv dist/full_unlocks.prsv
 
       - name: Generate AppImage
         working-directory: pokerogue-src

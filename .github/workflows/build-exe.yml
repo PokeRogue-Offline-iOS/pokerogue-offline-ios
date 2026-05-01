@@ -142,6 +142,12 @@ jobs:
           VITE_BYPASS_LOGIN: '1'
         run: pnpm build:app
 
+      - name: Copy full_unlocks.prsv into dist
+        working-directory: pokerogue-src
+        shell: bash
+        run: cp full_unlocks.prsv dist/full_unlocks.prsv
+
+
       - name: Generate Windows EXE
         working-directory: pokerogue-src
         env:
