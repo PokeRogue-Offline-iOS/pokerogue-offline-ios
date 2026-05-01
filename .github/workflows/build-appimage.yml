@@ -30,6 +30,11 @@ jobs:
         run: |
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+      - name: Download full unlocks save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
+            -o pokerogue-src/full_unlocks.prsv
 
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh appimage
@@ -96,7 +101,8 @@ jobs:
             "files": [
               "dist/**/*",
               "main.cjs",
-              "node_modules/**/*"
+              "node_modules/**/*",
+              "full_unlocks.prsv"
             ]
           };
           require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));

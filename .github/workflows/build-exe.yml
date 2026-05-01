@@ -34,6 +34,13 @@ jobs:
         run: |
           $version = (Get-Content ./pokerogue-src/package.json | ConvertFrom-Json).version
           Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+          
+      - name: Download full unlocks save file
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
+            -o pokerogue-src/full_unlocks.prsv
+
 
       - name: Apply patches
         shell: bash
@@ -122,6 +129,7 @@ jobs:
               "dist/**/*",
               "main.cjs",
               "appIcon.ico",
+              "full_unlocks.prsv",
               "node_modules/**/*"
             ]
           };
