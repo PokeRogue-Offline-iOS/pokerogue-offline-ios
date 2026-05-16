@@ -93,6 +93,10 @@ jobs:
           cp ${{ github.workspace }}/configs/desktop/tauri/main.rs src-tauri/src/main.rs
           cp ${{ github.workspace }}/configs/desktop/tauri/lib.rs src-tauri/src/lib.rs
 
+      - name: Generate Tauri icons
+        working-directory: pokerogue-src
+        run: pnpm tauri icon ${{ github.workspace }}/docs/appIcon.png
+
       - name: Set version in Tauri config
         working-directory: pokerogue-src/src-tauri
         run: |

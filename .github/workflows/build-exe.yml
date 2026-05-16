@@ -89,6 +89,11 @@ jobs:
           cp ../configs/desktop/tauri/main.rs src-tauri/src/main.rs
           cp ../configs/desktop/tauri/lib.rs src-tauri/src/lib.rs
 
+      - name: Generate Tauri icons
+        working-directory: pokerogue-src
+        shell: bash
+        run: pnpm tauri icon ../docs/appIcon.png
+
       - name: Set version in Tauri config
         working-directory: pokerogue-src/src-tauri
         shell: bash
