@@ -94,9 +94,6 @@ jobs:
                 "overlaysWebView": true,
                 "style": "DARK",
                 "backgroundColor": "#000000"
-              },
-              "SplashScreen": {
-                "launchShowDuration": 0
               }
             }
           }
