@@ -10,5 +10,10 @@
     "allowsLinkPreview": false,
     "webContentsDebuggingEnabled": false,
     "adjustMarginsForEdgeToEdge": "disable"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
   }
 }
