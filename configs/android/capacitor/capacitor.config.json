@@ -10,10 +10,5 @@
     "allowsLinkPreview": false,
     "webContentsDebuggingEnabled": false,
     "adjustMarginsForEdgeToEdge": "disable"
-  },
-  "plugins": {
-    "SystemBars": {
-      "insetsHandling": "disable"
-    }
   }
 }
