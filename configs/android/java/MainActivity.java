@@ -14,7 +14,14 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         EdgeToEdge.enable(this); // declare edge-to-edge before Capacitor initializes the WebView
         super.onCreate(savedInstanceState);
+        getWindow().setBackgroundDrawableResource(android.R.color.black);
         hideSystemUI(); // hide system bars immediately on launch
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        hideSystemUI();
     }
 
     // Re-apply immersive mode whenever the window regains focus
