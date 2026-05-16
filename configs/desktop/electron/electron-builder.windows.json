@@ -1,0 +1,18 @@
+{
+  "appId": "xyz.scooom.pkr",
+  "productName": "PokeRogue Offline",
+  "main": "main.cjs",
+  "win": {
+    "target": ["portable"],
+    "icon": "appIcon.ico",
+    "verifyUpdateCodeSignature": false,
+    "signAndEditExecutable": false
+  },
+  "files": [
+    "dist/**/*",
+    "main.cjs",
+    "appIcon.ico",
+    "full_unlocks.prsv",
+    "node_modules/**/*"
+  ]
+}

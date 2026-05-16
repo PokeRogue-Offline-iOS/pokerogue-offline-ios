@@ -22,28 +22,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
 
       - name: Install pnpm
         run: npm install -g pnpm
 
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libsoup-3.0-dev \
-            libssl-dev \
-            libgtk-3-dev \
-            librsvg2-dev \
-            build-essential \
-            curl \
-            wget
-
-      - name: Clone PokeRogue
+      - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
       - name: Get PokeRogue version
@@ -52,10 +36,15 @@ jobs:
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Download full unlocks save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
+            -o pokerogue-src/full_unlocks.prsv
+
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh appimage
 
-      - name: Inject build number into the banner
+      - name: Inject build number into banner
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
           sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
@@ -64,9 +53,9 @@ jobs:
         working-directory: pokerogue-src
         run: pnpm install
 
-      - name: Install Tauri CLI
+      - name: Install Electron dependencies
         working-directory: pokerogue-src
-        run: pnpm add -D @tauri-apps/cli@2.11.1
+        run: pnpm add -D electron electron-builder
 
       - name: Build PokeRogue
         working-directory: pokerogue-src
@@ -77,44 +66,42 @@ jobs:
       - name: Apply post-build patches
         run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh appimage
 
-      - name: Copy Tauri config into place
+      - name: Copy Electron config files into place
+        run: |
+          cp ${{ github.workspace }}/configs/desktop/electron/main.cjs pokerogue-src/main.cjs
+          cp ${{ github.workspace }}/configs/desktop/electron/electron-builder.appimage.json pokerogue-src/electron-builder.json
+          cp ${{ github.workspace }}/docs/appIcon.png pokerogue-src/appIcon.png
+          cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Set electron main in package.json
         working-directory: pokerogue-src
         run: |
-          mkdir -p src-tauri/src src-tauri/capabilities
-          cp ${{ github.workspace }}/configs/desktop/tauri/tauri.conf.json src-tauri/tauri.conf.json
-          cp ${{ github.workspace }}/configs/desktop/tauri/Cargo.toml src-tauri/Cargo.toml
-          cp ${{ github.workspace }}/configs/desktop/tauri/build.rs src-tauri/build.rs
-          cp ${{ github.workspace }}/configs/desktop/tauri/main.rs src-tauri/src/main.rs
-          cp ${{ github.workspace }}/configs/desktop/tauri/lib.rs src-tauri/src/lib.rs
-          cp ${{ github.workspace }}/configs/desktop/tauri/capabilities/localhost.json src-tauri/capabilities/localhost.json
+          node -e "
+            const pkg = require('./package.json');
+            if (!pkg.description) pkg.description = 'PokeRogue Offline';
+            if (!pkg.author) pkg.author = 'Scooom';
+            pkg.main = 'main.cjs';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
+          "
 
-      - name: Generate Tauri icons
+      - name: Generate AppImage
         working-directory: pokerogue-src
-        run: pnpm tauri icon ${{ github.workspace }}/docs/appIcon.png
-
-      - name: Set version in Tauri config
-        working-directory: pokerogue-src/src-tauri
-        run: |
-          VERSION="${{ steps.pokerogue_version.outputs.version }}"
-          BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3)
-          TAURI_VERSION="${MAJOR}.${MINOR}.${PATCH}${BUILD_NUM}"
-          sed -i "s/\"version\": \"0.0.0\"/\"version\": \"${TAURI_VERSION}\"/" tauri.conf.json
-
-      - name: Build AppImage
-        working-directory: pokerogue-src
-        run: pnpm tauri build --bundles appimage
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm electron-builder --linux AppImage --config electron-builder.json
 
       - name: Rename and save AppImage
+        id: appimage_path
         run: |
-          FILE=$(find pokerogue-src/src-tauri/target -name "*.AppImage" | head -n 1)
-          mv "$FILE" ./PokeRogueOffline.AppImage
+          FILE=$(find -type f -name "*.AppImage")
+          OUTPUT="./PokeRogueOffline.AppImage"
+          mv "$FILE" "$OUTPUT"
+          echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: PokeRogueOffline-AppImage
-          path: PokeRogueOffline.AppImage
+          path: ${{ steps.appimage_path.outputs.AppImage }}
           retention-days: 30

@@ -1,0 +1,17 @@
+{
+  "appId": "xyz.scooom.pkr",
+  "productName": "PokeRogue Offline",
+  "main": "main.cjs",
+  "linux": {
+    "target": ["AppImage"],
+    "category": "Game",
+    "icon": "appIcon.png"
+  },
+  "files": [
+    "dist/**/*",
+    "main.cjs",
+    "appIcon.png",
+    "full_unlocks.prsv",
+    "node_modules/**/*"
+  ]
+}
