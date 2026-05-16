@@ -1,4 +1,6 @@
 use std::net::TcpListener;
+use std::thread;
+use std::time::Duration;
 use tauri::{ipc::CapabilityBuilder, Manager, WebviewUrl, WebviewWindowBuilder};
 
 fn pick_port() -> u16 {
@@ -23,6 +25,8 @@ pub fn run() {
                     .remote(url.to_string())
                     .window("main"),
             )?;
+            // Wait for the localhost server to be ready before creating the window
+            thread::sleep(Duration::from_millis(500));
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("PokéRogue Offline")
                 .inner_size(1280.0, 720.0)
