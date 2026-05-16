@@ -1,0 +1,9 @@
+{
+  "$schema": "../schemas/capabilities.schema.json",
+  "identifier": "localhost",
+  "description": "Capability for localhost server access",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}
