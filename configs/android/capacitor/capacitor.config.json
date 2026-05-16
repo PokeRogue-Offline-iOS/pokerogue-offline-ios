@@ -8,7 +8,8 @@
     "captureInput": true,
     "scrollEnabled": false,
     "allowsLinkPreview": false,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": false,
+    "adjustMarginsForEdgeToEdge": "disable"
   },
   "plugins": {
     "SystemBars": {
