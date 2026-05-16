@@ -118,7 +118,7 @@ jobs:
 
       - name: Copy app icon
         run: |
-          ICON_SRC="docs/appIcon.png"
+          ICON_SRC="docs/appIcon-dev.png"
           ICON_DST="pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
           cp $ICON_SRC $ICON_DST
 
