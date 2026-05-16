@@ -8,10 +8,14 @@
     "captureInput": true,
     "scrollEnabled": false,
     "allowsLinkPreview": false,
-    "webContentsDebuggingEnabled": false,
-    "adjustMarginsForEdgeToEdge": "disable"
+    "webContentsDebuggingEnabled": false
   },
   "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "DARK",
+      "backgroundColor": "#00000000"
+    },
     "SplashScreen": {
       "launchShowDuration": 0
     }

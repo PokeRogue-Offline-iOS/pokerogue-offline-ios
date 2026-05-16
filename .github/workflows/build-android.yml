@@ -66,7 +66,7 @@ jobs:
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
-          pnpm add @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/share
+          pnpm add @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/share @capacitor/status-bar
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
@@ -80,15 +80,15 @@ jobs:
         working-directory: pokerogue-src
         run: npx cap sync android
 
-      - name: Override styles.xml to remove action bar
-        working-directory: pokerogue-src
-        run: cp ${{ github.workspace }}/configs/android/res/styles.xml android/app/src/main/res/values/styles.xml
-
       - name: Copy static MainActivity
         working-directory: pokerogue-src
         run: |
           DEST=$(find android/app/src/main/java -name "MainActivity.java" | head -n 1)
           cp ${{ github.workspace }}/configs/android/java/MainActivity.java "$DEST"
+
+      - name: Apply fullscreen immersive patch
+        working-directory: pokerogue-src
+        run: node ${{ github.workspace }}/patches/android/node/fullscreen-immersive.js
 
       - name: Patch AndroidManifest to prevent keyboard resize
         working-directory: pokerogue-src
