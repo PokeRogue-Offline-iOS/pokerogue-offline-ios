@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.ActionBar;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -14,6 +15,11 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         EdgeToEdge.enable(this); // declare edge-to-edge before Capacitor initializes the WebView
         super.onCreate(savedInstanceState);
+        // Hide the action bar (shows app name + Capacitor logo above WebView)
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.hide();
+        }
         hideSystemUI(); // hide system bars immediately on launch
     }
 
