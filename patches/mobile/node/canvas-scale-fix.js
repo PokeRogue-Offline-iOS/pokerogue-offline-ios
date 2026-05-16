@@ -54,14 +54,33 @@ const SCRIPT = `
       function fixScale() {
         var gameContainer = document.getElementById('app');
         if (!gameContainer) return;
-        var webViewWidth  = document.documentElement.clientWidth;
-        var webViewHeight = document.documentElement.clientHeight;
+
+        // Get safe area insets (non-zero on notched iOS devices)
+        var style = getComputedStyle(document.documentElement);
+        var insetTop    = parseFloat(style.getPropertyValue('--safe-area-inset-top'))    || 0;
+        var insetBottom = parseFloat(style.getPropertyValue('--safe-area-inset-bottom')) || 0;
+        var insetLeft   = parseFloat(style.getPropertyValue('--safe-area-inset-left'))   || 0;
+        var insetRight  = parseFloat(style.getPropertyValue('--safe-area-inset-right'))  || 0;
+
+        // Fall back to env() values if CSS vars not set (non-safe-area plugin path)
+        // We use clientWidth/Height minus any body padding added by notch-fix
+        var bodyStyle   = getComputedStyle(document.body);
+        var padTop      = parseFloat(bodyStyle.paddingTop)    || insetTop;
+        var padBottom   = parseFloat(bodyStyle.paddingBottom) || insetBottom;
+        var padLeft     = parseFloat(bodyStyle.paddingLeft)   || insetLeft;
+        var padRight    = parseFloat(bodyStyle.paddingRight)  || insetRight;
+
+        var webViewWidth  = document.documentElement.clientWidth  - padLeft   - padRight;
+        var webViewHeight = document.documentElement.clientHeight - padTop    - padBottom;
+
         var gameWidth     = gameContainer.offsetWidth;
         var gameHeight    = gameContainer.offsetHeight;
         if (!gameWidth || !gameHeight) return;
+
         var scaleX = webViewWidth  / gameWidth;
         var scaleY = webViewHeight / gameHeight;
         var scale  = Math.min(scaleX, scaleY);
+
         gameContainer.style.transform       = 'scale(' + scale + ')';
         gameContainer.style.transformOrigin = 'left top';
       }
