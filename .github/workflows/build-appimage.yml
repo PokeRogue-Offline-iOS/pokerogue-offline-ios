@@ -2,6 +2,11 @@ name: Build PokeRogueOffline AppImage
 
 on:
   workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number (leave blank to use this workflow run number)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -41,7 +46,8 @@ jobs:
 
       - name: Inject build number into the banner
         run: |
-          sed -i 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src

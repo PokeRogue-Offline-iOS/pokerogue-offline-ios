@@ -1,0 +1,20 @@
+{
+  "appId": "xyz.scooom.pkrdev",
+  "appName": "PokéRogue Offline Dev",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#000000",
+    "allowsLinkPreview": false,
+    "webContentsDebuggingEnabled": true,
+    "allowsBackForwardNavigationGestures": false
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "DARK",
+      "backgroundColor": "#000000"
+    }
+  }
+}

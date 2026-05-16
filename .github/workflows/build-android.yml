@@ -2,6 +2,11 @@ name: Build PokeRogueOffline APK
 
 on:
   workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number (leave blank to use this workflow run number)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -52,7 +57,8 @@ jobs:
 
       - name: Inject build number into banner
         run: |
-          sed -i 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
@@ -77,27 +83,7 @@ jobs:
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
-        run: |
-          cat > capacitor.config.json << 'CAPEOF'
-          {
-            "appId": "xyz.scooom.pkr",
-            "appName": "PokéRogue Offline",
-            "webDir": "dist",
-            "android": {
-              "backgroundColor": "#000000",
-              "allowMixedContent": false,
-              "captureInput": true,
-              "webContentsDebuggingEnabled": false
-            },
-            "plugins": {
-              "StatusBar": {
-                "overlaysWebView": true,
-                "style": "DARK",
-                "backgroundColor": "#000000"
-              }
-            }
-          }
-          CAPEOF
+        run: cp ${{ github.workspace }}/capacitorConfig/capacitor.config.android.json capacitor.config.json
 
       - name: Add Android platform
         working-directory: pokerogue-src
@@ -158,7 +144,7 @@ jobs:
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3)
-          RUN=${{ github.run_number }}
+          RUN=${{ inputs.build_number || github.run_number }}
 
           # VERSION_CODE: each component gets a fixed-width slot so codes are
           # always monotonically increasing within a game version.
@@ -168,7 +154,7 @@ jobs:
           #   RUN                 (supports 0-999, rolls over cleanly at 1000)
           # Max realistic value ~100_000_000 — well under Android's 2_100_000_000 limit.
           VERSION_CODE=$(( MAJOR * 10000000 + MINOR * 100000 + PATCH * 1000 + RUN ))
-          VERSION_NAME="${VERSION}.${{ github.run_number }}"
+          VERSION_NAME="${VERSION}.${RUN}"
 
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" build.gradle
           sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" build.gradle

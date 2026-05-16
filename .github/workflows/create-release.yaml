@@ -26,7 +26,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-ios.yml --ref "${{ github.ref_name }}"
+          gh workflow run build-ios.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       - name: Trigger Android build
@@ -35,7 +35,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-android.yml --ref "${{ github.ref_name }}"
+          gh workflow run build-android.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       - name: Trigger AppImage build
@@ -44,7 +44,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-appimage.yml --ref "${{ github.ref_name }}"
+          gh workflow run build-appimage.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       - name: Trigger Windows build
@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-exe.yml --ref "${{ github.ref_name }}"
+          gh workflow run build-exe.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
 

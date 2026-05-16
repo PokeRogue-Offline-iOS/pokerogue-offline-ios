@@ -2,6 +2,11 @@ name: Build PokeRogueOffline IPA
 
 on:
   workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number (leave blank to use this workflow run number)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -46,7 +51,8 @@ jobs:
 
       - name: Inject build number into banner
         run: |
-          sed -i '' 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
@@ -72,29 +78,8 @@ jobs:
       - name: Configure Capacitor
         working-directory: pokerogue-src
         run: |
-          cat > capacitor.config.json << 'CAPEOF'
-          {
-            "appId": "xyz.scooom.pkr",
-            "appName": "PokéRogue Offline",
-            "webDir": "dist",
-            "ios": {
-              "contentInset": "never",
-              "scrollEnabled": false,
-              "backgroundColor": "#000000",
-              "allowsLinkPreview": false,
-              "webContentsDebuggingEnabled": false,
-              "allowsBackForwardNavigationGestures": false
-            },
-            "plugins": {
-              "StatusBar": {
-                "overlaysWebView": false,
-                "style": "DARK",
-                "backgroundColor": "#000000"
-              }
-            }
-          }
-          CAPEOF
-          cat capacitor.config.json;
+          cp ${{ github.workspace }}/capacitorConfig/capacitor.config.ios.json capacitor.config.json
+          cat capacitor.config.json
 
       - name: Add iOS platform
         working-directory: pokerogue-src
@@ -107,8 +92,9 @@ jobs:
       - name: Set app version
         working-directory: pokerogue-src
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}" ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.pokerogue_version.outputs.version }}.${{ github.run_number }}" ios/App/App/Info.plist
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.pokerogue_version.outputs.version }}.${BUILD_NUM}" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.pokerogue_version.outputs.version }}.${BUILD_NUM}" ios/App/App/Info.plist
 
       - name: Configure iOS app settings
         working-directory: pokerogue-src
