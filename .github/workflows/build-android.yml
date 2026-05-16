@@ -101,7 +101,7 @@ jobs:
 
       - name: Patch AndroidManifest to prevent keyboard resize
         working-directory: pokerogue-src
-        run: node ${{ github.workspace }}/patches/android/node/keyboard-resize-fix.js
+        run: node ${{ github.workspace }}/patches/android/node/android-manifest-keyboard-fix.js
 
       - name: Fix Android permissions
         working-directory: pokerogue-src
