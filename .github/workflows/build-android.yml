@@ -80,9 +80,9 @@ jobs:
         working-directory: pokerogue-src
         run: npx cap sync android
 
-      - name: Debug styles.xml
+      - name: Override styles.xml to remove action bar
         working-directory: pokerogue-src
-        run: cat android/app/src/main/res/values/styles.xml
+        run: cp ${{ github.workspace }}/configs/android/res/styles.xml android/app/src/main/res/values/styles.xml
 
       - name: Copy static MainActivity
         working-directory: pokerogue-src
