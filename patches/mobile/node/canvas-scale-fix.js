@@ -74,8 +74,8 @@ const SCRIPT = `
         gameContainer.style.marginTop       = 'env(safe-area-inset-top, 0px)';
       }
 
-      // Run after initial render
-      window.addEventListener('load', fixScale);
+      // Run after initial render with a small delay to let iOS settle
+      window.addEventListener('load', function() { setTimeout(fixScale, 100); });
       // Re-run on resize and orientation change
       window.addEventListener('resize', fixScale);
       if (window.visualViewport) {
