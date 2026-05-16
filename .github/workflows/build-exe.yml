@@ -67,6 +67,10 @@ jobs:
           VITE_BYPASS_LOGIN: '1'
         run: pnpm build:app
 
+      - name: Apply post-build patches
+        shell: bash
+        run: bash scripts/apply-post-build-patches.sh exe
+
       - name: Copy Tauri config into place
         working-directory: pokerogue-src
         shell: bash

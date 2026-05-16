@@ -74,6 +74,9 @@ jobs:
           VITE_BYPASS_LOGIN: '1'
         run: pnpm build --mode app
 
+      - name: Apply post-build patches
+        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh appimage
+
       - name: Copy Tauri config into place
         working-directory: pokerogue-src
         run: |
