@@ -80,6 +80,10 @@ jobs:
         working-directory: pokerogue-src
         run: npx cap sync android
 
+      - name: Debug styles.xml
+        working-directory: pokerogue-src
+        run: cat android/app/src/main/res/values/styles.xml
+
       - name: Copy static MainActivity
         working-directory: pokerogue-src
         run: |
