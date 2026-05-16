@@ -55,23 +55,11 @@ const SCRIPT = `
         var gameContainer = document.getElementById('app');
         if (!gameContainer) return;
 
-        // Get safe area insets (non-zero on notched iOS devices)
-        var style = getComputedStyle(document.documentElement);
-        var insetTop    = parseFloat(style.getPropertyValue('--safe-area-inset-top'))    || 0;
-        var insetBottom = parseFloat(style.getPropertyValue('--safe-area-inset-bottom')) || 0;
-        var insetLeft   = parseFloat(style.getPropertyValue('--safe-area-inset-left'))   || 0;
-        var insetRight  = parseFloat(style.getPropertyValue('--safe-area-inset-right'))  || 0;
-
-        // Fall back to env() values if CSS vars not set (non-safe-area plugin path)
-        // We use clientWidth/Height minus any body padding added by notch-fix
-        var bodyStyle   = getComputedStyle(document.body);
-        var padTop      = parseFloat(bodyStyle.paddingTop)    || insetTop;
-        var padBottom   = parseFloat(bodyStyle.paddingBottom) || insetBottom;
-        var padLeft     = parseFloat(bodyStyle.paddingLeft)   || insetLeft;
-        var padRight    = parseFloat(bodyStyle.paddingRight)  || insetRight;
-
-        var webViewWidth  = document.documentElement.clientWidth  - padLeft   - padRight;
-        var webViewHeight = document.documentElement.clientHeight - padTop    - padBottom;
+        // visualViewport gives the actual visible area, excluding system UI
+        // and any browser chrome. Falls back to clientWidth/Height if not available.
+        var vv = window.visualViewport;
+        var webViewWidth  = vv ? vv.width  : document.documentElement.clientWidth;
+        var webViewHeight = vv ? vv.height : document.documentElement.clientHeight;
 
         var gameWidth     = gameContainer.offsetWidth;
         var gameHeight    = gameContainer.offsetHeight;
@@ -89,6 +77,9 @@ const SCRIPT = `
       window.addEventListener('load', fixScale);
       // Re-run on resize and orientation change
       window.addEventListener('resize', fixScale);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', fixScale);
+      }
       window.addEventListener('orientationchange', function () {
         // Small delay to let the viewport settle after rotation
         setTimeout(fixScale, 100);
