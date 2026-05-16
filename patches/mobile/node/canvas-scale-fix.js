@@ -71,6 +71,13 @@ const SCRIPT = `
 
         gameContainer.style.transform       = 'scale(' + scale + ')';
         gameContainer.style.transformOrigin = 'left top';
+
+        // In portrait, #app height stays at 100% but canvas is shorter.
+        // Shrink #app to match the canvas height so it doesn't leave empty space.
+        var canvas = gameContainer.querySelector('canvas');
+        if (canvas) {
+          gameContainer.style.height = canvas.offsetHeight + 'px';
+        }
       }
 
       // Run after initial render
