@@ -52,11 +52,6 @@ jobs:
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Download full unlocks save file
-        run: |
-          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
-            -o pokerogue-src/full_unlocks.prsv
-
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh appimage
 
@@ -78,10 +73,6 @@ jobs:
         env:
           VITE_BYPASS_LOGIN: '1'
         run: pnpm build --mode app
-
-      - name: Copy full_unlocks.prsv into dist
-        working-directory: pokerogue-src
-        run: cp full_unlocks.prsv dist/full_unlocks.prsv
 
       - name: Copy Tauri config into place
         working-directory: pokerogue-src

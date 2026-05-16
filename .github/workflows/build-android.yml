@@ -42,16 +42,6 @@ jobs:
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Download full unlocks save file
-        run: |
-          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
-            -o pokerogue-src/full_unlocks.prsv
-
-      - name: Download full reset save file
-        run: |
-          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/refs/heads/beta/test/utils/saves/data_new.prsv \
-            -o pokerogue-src/data_new.prsv
-
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh android
 
@@ -72,9 +62,6 @@ jobs:
 
       - name: Apply post-build patches
         run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh android
-
-      - name: Copy save file to dist
-        run: cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
       - name: Install Capacitor
         working-directory: pokerogue-src
