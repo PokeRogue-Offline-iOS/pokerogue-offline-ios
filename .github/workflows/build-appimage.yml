@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -98,7 +98,11 @@ jobs:
         run: |
           VERSION="${{ steps.pokerogue_version.outputs.version }}"
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          sed -i "s/\"version\": \"0.0.0\"/\"version\": \"${VERSION}.${BUILD_NUM}\"/" tauri.conf.json
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3)
+          TAURI_VERSION="${MAJOR}.${MINOR}.${PATCH}${BUILD_NUM}"
+          sed -i "s/\"version\": \"0.0.0\"/\"version\": \"${TAURI_VERSION}\"/" tauri.conf.json
 
       - name: Build AppImage
         working-directory: pokerogue-src
