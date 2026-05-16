@@ -32,7 +32,7 @@ if (src.includes(MARKER)) {
 
 // Remove any script tag referencing touch-controls
 const before = src;
-src = src.replace(/<script[^>]*touch-controls[^>]*><\/script>/gi, `<!-- ${MARKER}: touch controls removed for desktop -->`);
+src = src.replace(/<link[^>]*touch-controls[^>]*>/gi, `<!-- ${MARKER}: touch controls removed for desktop -->`);
 
 if (src === before) {
   console.log("No touch-controls script tag found, skipping.");
