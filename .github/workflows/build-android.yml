@@ -99,6 +99,10 @@ jobs:
           DEST=$(find android/app/src/main/java -name "MainActivity.java" | head -n 1)
           cp ${{ github.workspace }}/android/MainActivity.java "$DEST"
 
+      - name: Patch AndroidManifest to prevent keyboard resize
+        working-directory: pokerogue-src
+        run: node ${{ github.workspace }}/patches/android/node/keyboard-resize-fix.js
+
       - name: Fix Android permissions
         working-directory: pokerogue-src
         run: |
