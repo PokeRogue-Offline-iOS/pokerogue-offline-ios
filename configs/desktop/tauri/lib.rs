@@ -2,7 +2,7 @@ use tauri::{ipc::CapabilityBuilder, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let port = portpicker::pick_unused_port().expect("failed to find unused port");
+    let port = portpicker::pick_unused_port().unwrap_or(45831);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_localhost::Builder::new(port).build())
