@@ -280,6 +280,7 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}
           name: PokeRogueOffline v${{ steps.version.outputs.version }}
+          prerelease: true
           body: |
             ## PokeRogueOffline v${{ steps.version.outputs.version }}
 

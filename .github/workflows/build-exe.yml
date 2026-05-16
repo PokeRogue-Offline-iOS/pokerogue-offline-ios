@@ -82,9 +82,12 @@ jobs:
         working-directory: pokerogue-src
         shell: bash
         run: |
-          mkdir -p src-tauri
+          mkdir -p src-tauri/src
           cp ${{ github.workspace }}/configs/desktop/tauri/tauri.conf.json src-tauri/tauri.conf.json
           cp ${{ github.workspace }}/configs/desktop/tauri/Cargo.toml src-tauri/Cargo.toml
+          cp ${{ github.workspace }}/configs/desktop/tauri/build.rs src-tauri/build.rs
+          cp ${{ github.workspace }}/configs/desktop/tauri/main.rs src-tauri/src/main.rs
+          cp ${{ github.workspace }}/configs/desktop/tauri/lib.rs src-tauri/src/lib.rs
 
       - name: Set version in Tauri config
         working-directory: pokerogue-src/src-tauri
@@ -96,7 +99,7 @@ jobs:
 
       - name: Build EXE
         working-directory: pokerogue-src
-        run: pnpm tauri build --bundles none
+        run: pnpm tauri build --no-bundle
 
       - name: Rename and save EXE
         shell: bash
