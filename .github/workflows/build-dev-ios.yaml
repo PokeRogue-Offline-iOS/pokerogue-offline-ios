@@ -43,6 +43,7 @@ jobs:
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
           sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          sed -i '' "s/Unofficial Offline Client (Scooom)/Unofficial Offline Client (Scooom) Dev/" pokerogue-src/src/ui/handlers/title-ui-handler.ts
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
