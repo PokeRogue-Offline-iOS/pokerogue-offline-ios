@@ -78,7 +78,7 @@ jobs:
       - name: Configure Capacitor
         working-directory: pokerogue-src
         run: |
-          cp ${{ github.workspace }}/capacitorConfig/capacitor.config.ios.json capacitor.config.json
+          cp ${{ github.workspace }}/configs/ios/capacitor/capacitor.config.json capacitor.config.json
           cat capacitor.config.json
 
       - name: Add iOS platform

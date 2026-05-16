@@ -1,0 +1,27 @@
+{
+  "productName": "PokéRogue Offline",
+  "version": "0.0.0",
+  "identifier": "xyz.scooom.pkr",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "PokéRogue Offline",
+        "width": 1280,
+        "height": 720,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["../../../docs/appIcon.png"],
+    "targets": "all"
+  }
+}

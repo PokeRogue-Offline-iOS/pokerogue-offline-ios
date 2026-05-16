@@ -26,11 +26,14 @@ jobs:
 
       - name: Install pnpm
         run: npm install -g pnpm
-        
+
       - name: Configure Git line endings
         run: git config --global core.autocrlf false
 
-      - name: Clone PokeRogue fork
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Clone PokeRogue
         run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
       - name: Get PokeRogue version
@@ -39,13 +42,12 @@ jobs:
         run: |
           $version = (Get-Content ./pokerogue-src/package.json | ConvertFrom-Json).version
           Write-Output "version=$version" >> $env:GITHUB_OUTPUT
-          
+
       - name: Download full unlocks save file
         shell: bash
         run: |
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
             -o pokerogue-src/full_unlocks.prsv
-
 
       - name: Apply patches
         shell: bash
@@ -61,86 +63,9 @@ jobs:
         working-directory: pokerogue-src
         run: pnpm install
 
-      - name: Install Electron dependencies
+      - name: Install Tauri CLI
         working-directory: pokerogue-src
-        run: pnpm add -D electron electron-builder
-
-      - name: Convert app icon to ICO
-        shell: pwsh
-        run: |
-          # ImageMagick is pre-installed on windows-latest runners.
-          # Generate a multi-resolution ICO (256, 128, 64, 48, 32, 16) from the
-          # 1024x1024 source PNG so Windows shows a crisp icon at every size.
-          magick ${{ github.workspace }}\docs\appIcon.png `
-            -define icon:auto-resize=256,128,64,48,32,16 `
-            ${{ github.workspace }}\docs\appIcon.ico
-          Write-Host "ICO created at ${{ github.workspace }}\docs\appIcon.ico"
-
-      - name: Create Electron main process file
-        working-directory: pokerogue-src
-        shell: bash
-        run: |
-          cat > main.cjs << 'EOF'
-          const { app, BrowserWindow } = require('electron');
-          const path = require('path');
-
-          let mainWindow;
-
-          function createWindow() {
-            mainWindow = new BrowserWindow({
-              width: 1280,
-              height: 720,
-              icon: path.join(__dirname, 'appIcon.ico'),
-              webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true
-              }
-            });
-
-            mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
-            if (process.env.DEBUG) {
-              mainWindow.webContents.openDevTools();
-            }
-          }
-
-          app.on('ready', createWindow);
-          app.on('window-all-closed', () => {
-            if (process.platform !== 'darwin') app.quit();
-          });
-          EOF
-
-      - name: Copy icon into Electron project
-        shell: bash
-        run: cp "${{ github.workspace }}/docs/appIcon.ico" pokerogue-src/appIcon.ico
-
-      - name: Configure electron-builder for web app
-        working-directory: pokerogue-src
-        shell: bash
-        run: |
-          node << 'EOF'
-          const pkg = require('./package.json');
-          if (!pkg.description) pkg.description = 'PokeRogue Offline';
-          if (!pkg.author) pkg.author = 'Scooom';
-          pkg.main = 'main.cjs';
-          pkg.build = {
-            "appId": "com.scooom.pkr",
-            "productName": "PokeRogue Offline",
-            "win": {
-              "target": ["portable"],
-              "icon": "appIcon.ico",
-              "verifyUpdateCodeSignature": false,
-              "signAndEditExecutable": false
-            },
-            "files": [
-              "dist/**/*",
-              "main.cjs",
-              "appIcon.ico",
-              "full_unlocks.prsv",
-              "node_modules/**/*"
-            ]
-          };
-          require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
-          EOF
+        run: pnpm add -D @tauri-apps/cli
 
       - name: Build PokeRogue
         working-directory: pokerogue-src
@@ -153,30 +78,35 @@ jobs:
         shell: bash
         run: cp full_unlocks.prsv dist/full_unlocks.prsv
 
-
-      - name: Generate Windows EXE
+      - name: Copy Tauri config into place
         working-directory: pokerogue-src
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ''
-          WIN_CSC_LINK: ''
-        run: pnpm electron-builder --win portable
-
-      - name: Rename and save EXE
-        id: exe_path
         shell: bash
         run: |
-          FILE=$(find -type f -name "PokeRogue*Offline*.exe" | head -n1);
-          echo $FILE;
-          OUTPUT="./PokeRogueOffline.exe";
-          echo $OUTPUT;
-          mv "$FILE" "$OUTPUT";
-          echo "exe=$OUTPUT" >> $GITHUB_OUTPUT
+          mkdir -p src-tauri
+          cp ${{ github.workspace }}/configs/desktop/tauri/tauri.conf.json src-tauri/tauri.conf.json
+          cp ${{ github.workspace }}/configs/desktop/tauri/Cargo.toml src-tauri/Cargo.toml
+
+      - name: Set version in Tauri config
+        working-directory: pokerogue-src/src-tauri
+        shell: bash
+        run: |
+          VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i "s/\"version\": \"0.0.0\"/\"version\": \"${VERSION}.${BUILD_NUM}\"/" tauri.conf.json
+
+      - name: Build EXE
+        working-directory: pokerogue-src
+        run: pnpm tauri build --bundles none
+
+      - name: Rename and save EXE
+        shell: bash
+        run: |
+          FILE=$(find pokerogue-src/src-tauri/target/release -maxdepth 1 -name "*.exe" | head -n 1)
+          mv "$FILE" ./PokeRogueOffline.exe
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: PokeRogueOffline-Windows
-          path: ${{ steps.exe_path.outputs.exe }}
+          path: PokeRogueOffline.exe
           retention-days: 30

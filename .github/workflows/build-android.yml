@@ -83,7 +83,7 @@ jobs:
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
-        run: cp ${{ github.workspace }}/capacitorConfig/capacitor.config.android.json capacitor.config.json
+        run: cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config.json capacitor.config.json
 
       - name: Add Android platform
         working-directory: pokerogue-src
@@ -97,7 +97,7 @@ jobs:
         working-directory: pokerogue-src
         run: |
           DEST=$(find android/app/src/main/java -name "MainActivity.java" | head -n 1)
-          cp ${{ github.workspace }}/android/MainActivity.java "$DEST"
+          cp ${{ github.workspace }}/configs/android/java/MainActivity.java "$DEST"
 
       - name: Patch AndroidManifest to prevent keyboard resize
         working-directory: pokerogue-src
