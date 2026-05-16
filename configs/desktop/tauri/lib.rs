@@ -16,6 +16,7 @@ pub fn run() {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("PokéRogue Offline")
                 .inner_size(1280.0, 720.0)
+                .decorations(false)
                 .build()?;
             Ok(())
         })
