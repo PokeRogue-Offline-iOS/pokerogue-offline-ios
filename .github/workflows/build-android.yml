@@ -118,6 +118,7 @@ jobs:
           sudo apt-get install -y imagemagick
 
           ICON_SRC="${{ github.workspace }}/docs/appIcon.png"
+          ICON_ADAPTIVE="${{ github.workspace }}/docs/appIcon-adaptive.png"
           RES_DIR="pokerogue-src/android/app/src/main/res"
 
           # Legacy icons
@@ -134,11 +135,11 @@ jobs:
           cp "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png" "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
 
           # Foreground layers for adaptive icon (1.5x size)
-          convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-mdpi/ic_launcher_foreground.png"
-          convert "$ICON_SRC" -resize 108x108 "$RES_DIR/mipmap-hdpi/ic_launcher_foreground.png"
-          convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xhdpi/ic_launcher_foreground.png"
-          convert "$ICON_SRC" -resize 216x216 "$RES_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
-          convert "$ICON_SRC" -resize 288x288 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
+          convert "$ICON_ADAPTIVE" -resize 72x72   "$RES_DIR/mipmap-mdpi/ic_launcher_foreground.png"
+          convert "$ICON_ADAPTIVE" -resize 108x108 "$RES_DIR/mipmap-hdpi/ic_launcher_foreground.png"
+          convert "$ICON_ADAPTIVE" -resize 144x144 "$RES_DIR/mipmap-xhdpi/ic_launcher_foreground.png"
+          convert "$ICON_ADAPTIVE" -resize 216x216 "$RES_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
+          convert "$ICON_ADAPTIVE" -resize 288x288 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
 
           # Adaptive icon XMLs - same image for both layers for full bleed
           mkdir -p "$RES_DIR/mipmap-anydpi-v26"
