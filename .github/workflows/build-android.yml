@@ -143,21 +143,8 @@ jobs:
 
           # Adaptive icon XMLs - same image for both layers for full bleed
           mkdir -p "$RES_DIR/mipmap-anydpi-v26"
-          cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml" << 'XMLEOF'
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/ic_launcher_foreground"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-</adaptive-icon>
-XMLEOF
-
-          cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml" << 'XMLEOF'
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/ic_launcher_foreground"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-</adaptive-icon>
-XMLEOF
+          cp ${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher.xml "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml"
+          cp ${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher_round.xml "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml"
 
       - name: Set version in build.gradle
         working-directory: pokerogue-src/android/app
