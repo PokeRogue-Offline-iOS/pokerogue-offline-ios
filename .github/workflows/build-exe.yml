@@ -85,9 +85,9 @@ jobs:
       - name: Copy Electron config files into place
         shell: bash
         run: |
-          cp ${{ github.workspace }}/configs/desktop/electron/main.cjs pokerogue-src/main.cjs
-          cp ${{ github.workspace }}/configs/desktop/electron/electron-builder.windows.json pokerogue-src/electron-builder.json
-          cp ${{ github.workspace }}/docs/appIcon.ico pokerogue-src/appIcon.ico
+          cp configs/desktop/electron/main.cjs pokerogue-src/main.cjs
+          cp configs/desktop/electron/electron-builder.windows.json pokerogue-src/electron-builder.json
+          cp docs/appIcon.ico pokerogue-src/appIcon.ico
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
       - name: Set electron main in package.json
