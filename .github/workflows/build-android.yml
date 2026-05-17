@@ -153,12 +153,12 @@ jobs:
           convert "$ICON_SRC" -resize 216x216 "$RES_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
           convert "$ICON_SRC" -resize 288x288 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
 
-          # Adaptive icon XMLs
+          # Adaptive icon XMLs - use same image for both layers for full bleed
           mkdir -p "$RES_DIR/mipmap-anydpi-v26"
           cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml" << 'XMLEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@color/ic_launcher_background"/>
+              <background android:drawable="@mipmap/ic_launcher_foreground"/>
               <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
           </adaptive-icon>
           XMLEOF
@@ -166,15 +166,10 @@ jobs:
           cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml" << 'XMLEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@color/ic_launcher_background"/>
+              <background android:drawable="@mipmap/ic_launcher_foreground"/>
               <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
           </adaptive-icon>
           XMLEOF
-
-          # Background color matching the icon's purple
-          cat >> "$RES_DIR/values/colors.xml" << 'COLOREOF'
-          <color name="ic_launcher_background">#906f99</color>
-          COLOREOF
 
 
       - name: Set version in build.gradle
