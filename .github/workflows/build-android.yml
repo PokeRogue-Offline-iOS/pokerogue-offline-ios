@@ -133,22 +133,48 @@ jobs:
           ICON_SRC="${{ github.workspace }}/docs/appIcon.png"
           RES_DIR="pokerogue-src/android/app/src/main/res"
 
+          # Generate all sizes
           convert "$ICON_SRC" -resize 48x48   "$RES_DIR/mipmap-mdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-hdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 96x96   "$RES_DIR/mipmap-xhdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 192x192 "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"
 
-          convert "$ICON_SRC" -resize 48x48   "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
-          convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
-          convert "$ICON_SRC" -resize 96x96   "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
-          convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
-          convert "$ICON_SRC" -resize 192x192 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-mdpi/ic_launcher.png"     "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-hdpi/ic_launcher.png"     "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-xhdpi/ic_launcher.png"    "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"   "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"  "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
 
-          # Delete the adaptive icon XML directory so Android 8+ uses the
-          # plain PNGs instead of the default Capacitor adaptive icon which
-          # would otherwise override everything above.
-          rm -rf pokerogue-src/android/app/src/main/res/mipmap-anydpi-v26
+          # Foreground layers for adaptive icon (1.5x size)
+          convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-mdpi/ic_launcher_foreground.png"
+          convert "$ICON_SRC" -resize 108x108 "$RES_DIR/mipmap-hdpi/ic_launcher_foreground.png"
+          convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xhdpi/ic_launcher_foreground.png"
+          convert "$ICON_SRC" -resize 216x216 "$RES_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
+          convert "$ICON_SRC" -resize 288x288 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
+
+          # Adaptive icon XMLs
+          mkdir -p "$RES_DIR/mipmap-anydpi-v26"
+          cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml" << 'XMLEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background"/>
+              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+          </adaptive-icon>
+          XMLEOF
+
+          cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml" << 'XMLEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background"/>
+              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+          </adaptive-icon>
+          XMLEOF
+
+          # Background color matching the icon's purple
+          cat >> "$RES_DIR/values/colors.xml" << 'COLOREOF'
+          <color name="ic_launcher_background">#906f99</color>
+          COLOREOF
 
 
       - name: Set version in build.gradle
