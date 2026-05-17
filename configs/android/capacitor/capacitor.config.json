@@ -6,18 +6,13 @@
     "backgroundColor": "#000000",
     "allowMixedContent": false,
     "captureInput": true,
-    "scrollEnabled": false,
-    "allowsLinkPreview": false,
     "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "StatusBar": {
       "overlaysWebView": true,
       "style": "DARK",
-      "backgroundColor": "#00000000"
-    },
-    "SplashScreen": {
-      "launchShowDuration": 0
+      "backgroundColor": "#000000"
     }
   }
 }

@@ -2,6 +2,11 @@ name: Build PokeRogueOffline APK
 
 on:
   workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number (leave blank to use this workflow run number)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -52,7 +57,8 @@ jobs:
 
       - name: Inject build number into banner
         run: |
-          sed -i 's/BUILD_NUMBER_PLACEHOLDER/${{ github.run_number }}/g' pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
@@ -77,27 +83,7 @@ jobs:
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
-        run: |
-          cat > capacitor.config.json << 'CAPEOF'
-          {
-            "appId": "xyz.scooom.pkr",
-            "appName": "PokéRogue Offline",
-            "webDir": "dist",
-            "android": {
-              "backgroundColor": "#000000",
-              "allowMixedContent": false,
-              "captureInput": true,
-              "webContentsDebuggingEnabled": false
-            },
-            "plugins": {
-              "StatusBar": {
-                "overlaysWebView": true,
-                "style": "DARK",
-                "backgroundColor": "#000000"
-              }
-            }
-          }
-          CAPEOF
+        run: cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config.json capacitor.config.json
 
       - name: Add Android platform
         working-directory: pokerogue-src
@@ -107,9 +93,11 @@ jobs:
         working-directory: pokerogue-src
         run: npx cap sync android
 
-      - name: Patch MainActivity for fullscreen immersive mode
+      - name: Copy static MainActivity
         working-directory: pokerogue-src
-        run: node ${{ github.workspace }}/patches/android/node/fullscreen-immersive.js
+        run: |
+          DEST=$(find android/app/src/main/java -name "MainActivity.java" | head -n 1)
+          cp ${{ github.workspace }}/configs/android/java/MainActivity.java "$DEST"
 
       - name: Patch AndroidManifest to prevent keyboard resize
         working-directory: pokerogue-src
@@ -118,7 +106,6 @@ jobs:
       - name: Fix Android permissions
         working-directory: pokerogue-src
         run: |
-          # ---- Permissions ----
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           grep -q "WRITE_EXTERNAL_STORAGE" $MANIFEST || \
             sed -i 's|<application|<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <application|' $MANIFEST
@@ -133,18 +120,18 @@ jobs:
           ICON_SRC="${{ github.workspace }}/docs/appIcon.png"
           RES_DIR="pokerogue-src/android/app/src/main/res"
 
-          # Generate all sizes
+          # Legacy icons
           convert "$ICON_SRC" -resize 48x48   "$RES_DIR/mipmap-mdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-hdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 96x96   "$RES_DIR/mipmap-xhdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"
           convert "$ICON_SRC" -resize 192x192 "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"
 
-          cp "$RES_DIR/mipmap-mdpi/ic_launcher.png"     "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-hdpi/ic_launcher.png"     "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-xhdpi/ic_launcher.png"    "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"   "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"  "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-mdpi/ic_launcher.png"    "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-hdpi/ic_launcher.png"    "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-xhdpi/ic_launcher.png"   "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"  "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
+          cp "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png" "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
 
           # Foreground layers for adaptive icon (1.5x size)
           convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-mdpi/ic_launcher_foreground.png"
@@ -153,43 +140,35 @@ jobs:
           convert "$ICON_SRC" -resize 216x216 "$RES_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
           convert "$ICON_SRC" -resize 288x288 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
 
-          # Adaptive icon XMLs - use same image for both layers for full bleed
+          # Adaptive icon XMLs - same image for both layers for full bleed
           mkdir -p "$RES_DIR/mipmap-anydpi-v26"
           cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml" << 'XMLEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@mipmap/ic_launcher_foreground"/>
-              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-          </adaptive-icon>
-          XMLEOF
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_foreground"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+XMLEOF
 
           cat > "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml" << 'XMLEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@mipmap/ic_launcher_foreground"/>
-              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-          </adaptive-icon>
-          XMLEOF
-
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_foreground"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+XMLEOF
 
       - name: Set version in build.gradle
         working-directory: pokerogue-src/android/app
         run: |
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
           VERSION="${{ steps.pokerogue_version.outputs.version }}"
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3)
-          RUN=${{ github.run_number }}
 
-          # VERSION_CODE: each component gets a fixed-width slot so codes are
-          # always monotonically increasing within a game version.
-          #   MAJOR * 10_000_000  (supports 0-9)
-          #   MINOR *    100_000  (supports 0-99)
-          #   PATCH *      1_000  (supports 0-99)
-          #   RUN                 (supports 0-999, rolls over cleanly at 1000)
-          # Max realistic value ~100_000_000 — well under Android's 2_100_000_000 limit.
-          VERSION_CODE=$(( MAJOR * 10000000 + MINOR * 100000 + PATCH * 1000 + RUN ))
-          VERSION_NAME="${VERSION}.${{ github.run_number }}"
+          VERSION_CODE=$(( MAJOR * 10000000 + MINOR * 100000 + PATCH * 1000 + BUILD_NUM ))
+          VERSION_NAME="${VERSION}.${BUILD_NUM}"
 
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" build.gradle
           sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" build.gradle
