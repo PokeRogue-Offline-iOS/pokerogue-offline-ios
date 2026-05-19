@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Patch: export-fix.js
+ * Patch: capacitor-export-fix.js
  *
  * Fixes save data export in Capacitor native builds (iOS + Android).
  *
  * iOS   — writes to DOCUMENTS, opens share sheet (Files, AirDrop, etc.)
- * Android — constructs a Blob URL and triggers a WebView download, which
- *           hands the file to Android's download manager → Downloads folder.
- *           No plugins, no permissions, no share sheet needed.
+ * Android — writes directly to Downloads/ via EXTERNAL_STORAGE.
+ *           Skips the share sheet (Android doesn't recognise .prsv).
+ *           Shows a toast with the save path instead.
  *
  * Uses a regex anchor so minor upstream indentation / variable-name changes
  * don't break the match.
@@ -60,6 +60,7 @@ ${i}const cap = (window as any).Capacitor;
 ${i}if (cap?.isNativePlatform?.()) {
 ${i2}const stamp = new Date().toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '_');
 ${i2}const fileName = \`\${dataKey}-\${stamp}.prsv\`;
+${i2}const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
 ${i2}const platform = cap.getPlatform?.() ?? "ios";
 
 ${i2}const overlay = document.createElement("div");
@@ -79,7 +80,7 @@ ${i2}  textAlign: "center", padding: "0 24px",
 ${i2}});
 
 ${i2}const btn = document.createElement("button");
-${i2}btn.textContent = "💾 Save to Files";
+${i2}btn.textContent = platform === "android" ? "💾 Save to Downloads" : "📁 Save to Files";
 ${i2}Object.assign(btn.style, {
 ${i2}  padding: "18px 40px", fontSize: "20px", fontWeight: "bold",
 ${i2}  background: "#da3838", color: "#fff", border: "none",
@@ -98,36 +99,35 @@ ${i2}const removeOverlay = () => overlay.parentNode?.removeChild(overlay);
 ${i2}btn.addEventListener("click", () => {
 ${i2}  btn.disabled = true;
 ${i2}  btn.textContent = "Saving\u2026";
+${i2}  const Filesystem = cap.Plugins?.Filesystem;
+${i2}  const Share = cap.Plugins?.Share;
+${i2}  if (!Filesystem) { console.error("Capacitor Filesystem not available."); removeOverlay(); return; }
 
 ${i2}  if (platform === "android") {
-${i2}    // Write to app-private cache, then hand to Share.
-${i2}    // The blob/<a download> approach doesn't work without a native download listener.
-${i2}    // CACHE writes always succeed — no EXTERNAL_STORAGE permission needed.
-${i2}    const base64Android = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
-${i2}    const FilesystemAndroid = cap.Plugins?.Filesystem;
-${i2}    const ShareAndroid = cap.Plugins?.Share;
-${i2}    if (!FilesystemAndroid) { alert("Capacitor Filesystem not available."); removeOverlay(); return; }
-${i2}    FilesystemAndroid.writeFile({ path: fileName, data: base64Android, directory: "CACHE" })
-${i2}      .then(() => FilesystemAndroid.getUri({ path: fileName, directory: "CACHE" }))
-${i2}      .then(({ uri }) => {
-${i2}        if (ShareAndroid) {
-${i2}          return ShareAndroid.share({ title: fileName, url: uri, mimeType: "application/octet-stream", dialogTitle: \`Save \${fileName}\` });
-${i2}        } else {
-${i2}          // Share plugin not available — tell user where the cache file is
-${i2}          alert(\`File saved to app cache as \${fileName}. Install a file manager to move it.\`);
-${i2}        }
-${i2}      })
-${i2}      .then(() => removeOverlay())
-${i2}      .catch((err) => {
-${i2}        alert("Android export failed: " + err);
-${i2}        btn.disabled = false;
-${i2}        btn.textContent = "💾 Save to Files";
+${i2}    Filesystem.requestPermissions();
+${i2}    Filesystem.writeFile({
+${i2}      path: \`Download/\${fileName}\`,
+${i2}      data: base64,
+${i2}      directory: "EXTERNAL_STORAGE",
+${i2}    }).then(() => {
+${i2}      removeOverlay();
+${i2}      const toast = document.createElement("div");
+${i2}      toast.textContent = \`✓ Saved to Downloads/\${fileName}\`;
+${i2}      Object.assign(toast.style, {
+${i2}        position: "fixed", bottom: "40px", left: "50%", transform: "translateX(-50%)",
+${i2}        background: "rgba(0,0,0,0.85)", color: "#fff", padding: "14px 24px",
+${i2}        borderRadius: "10px", fontSize: "15px", zIndex: "99999",
+${i2}        textAlign: "center", maxWidth: "90vw",
 ${i2}      });
+${i2}      document.body.appendChild(toast);
+${i2}      setTimeout(() => toast.parentNode?.removeChild(toast), 3500);
+${i2}    }).catch((err) => {
+${i2}      alert("Android export failed: " + err);
+${i2}      btn.disabled = false;
+${i2}      btn.textContent = "💾 Save to Downloads";
+${i2}    });
 ${i2}  } else {
-${i2}    const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
-${i2}    const Filesystem = cap.Plugins?.Filesystem;
-${i2}    const Share = cap.Plugins?.Share;
-${i2}    if (!Filesystem || !Share) { console.error("Capacitor Filesystem/Share not available."); removeOverlay(); return; }
+${i2}    if (!Share) { console.error("Capacitor Share not available."); removeOverlay(); return; }
 ${i2}    Filesystem.writeFile({ path: fileName, data: base64, directory: "DOCUMENTS" })
 ${i2}      .then(() => Filesystem.getUri({ path: fileName, directory: "DOCUMENTS" }))
 ${i2}      .then(({ uri }) => Share.share({ title: fileName, url: uri, dialogTitle: \`Save \${fileName}\` }))
