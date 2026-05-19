@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Patch: capacitor-export-fix.js
+ * Patch: export-fix.js
  *
  * Fixes save data export in Capacitor native builds (iOS + Android).
  *
  * iOS   — writes to DOCUMENTS, opens share sheet (Files, AirDrop, etc.)
- * Android — writes directly to Downloads/PokeRogueOffline/ via EXTERNAL_STORAGE.
- *           Skips the share sheet (Android doesn't recognise .prsv).
- *           Shows a toast with the save path instead.
+ * Android — writes to app CACHE, then opens the native share sheet so the
+ *           user can pick their own destination (Downloads, Drive, etc.).
+ *           Avoids EXTERNAL_STORAGE entirely — no permissions required,
+ *           works on Android 10+ scoped-storage without recursive mkdir.
  *
  * Uses a regex anchor so minor upstream indentation / variable-name changes
  * don't break the match.
@@ -80,7 +81,7 @@ ${i2}  textAlign: "center", padding: "0 24px",
 ${i2}});
 
 ${i2}const btn = document.createElement("button");
-${i2}btn.textContent = platform === "android" ? "💾 Save to Downloads" : "📁 Save to Files";
+${i2}btn.textContent = "💾 Save to Files";
 ${i2}Object.assign(btn.style, {
 ${i2}  padding: "18px 40px", fontSize: "20px", fontWeight: "bold",
 ${i2}  background: "#da3838", color: "#fff", border: "none",
@@ -104,29 +105,18 @@ ${i2}  const Share = cap.Plugins?.Share;
 ${i2}  if (!Filesystem) { console.error("Capacitor Filesystem not available."); removeOverlay(); return; }
 
 ${i2}  if (platform === "android") {
-${i2}    Filesystem.requestPermissions();
-${i2}    Filesystem.writeFile({
-${i2}      path: \`Download/PokeRogueOffline/\${fileName}\`,
-${i2}      data: base64,
-${i2}      directory: "EXTERNAL_STORAGE",
-${i2}      recursive: true,
-${i2}    }).then(() => {
-${i2}      removeOverlay();
-${i2}      const toast = document.createElement("div");
-${i2}      toast.textContent = \`✓ Saved to Downloads/PokeRogueOffline/\${fileName}\`;
-${i2}      Object.assign(toast.style, {
-${i2}        position: "fixed", bottom: "40px", left: "50%", transform: "translateX(-50%)",
-${i2}        background: "rgba(0,0,0,0.85)", color: "#fff", padding: "14px 24px",
-${i2}        borderRadius: "10px", fontSize: "15px", zIndex: "99999",
-${i2}        textAlign: "center", maxWidth: "90vw",
+${i2}    // Write to app-private cache (always permitted, no EXTERNAL_STORAGE needed).
+${i2}    // Then hand the URI to Android's share sheet so the user picks the destination.
+${i2}    if (!Share) { console.error("Capacitor Share not available."); removeOverlay(); return; }
+${i2}    Filesystem.writeFile({ path: fileName, data: base64, directory: "CACHE" })
+${i2}      .then(() => Filesystem.getUri({ path: fileName, directory: "CACHE" }))
+${i2}      .then(({ uri }) => Share.share({ title: fileName, url: uri, dialogTitle: \`Save \${fileName}\` }))
+${i2}      .then(() => removeOverlay())
+${i2}      .catch((err) => {
+${i2}        alert("Android export failed: " + err);
+${i2}        btn.disabled = false;
+${i2}        btn.textContent = "💾 Save to Files";
 ${i2}      });
-${i2}      document.body.appendChild(toast);
-${i2}      setTimeout(() => toast.parentNode?.removeChild(toast), 3500);
-${i2}    }).catch((err) => {
-${i2}      alert("Android export failed: " + err);
-${i2}      btn.disabled = false;
-${i2}      btn.textContent = "💾 Save to Downloads";
-${i2}    });
 ${i2}  } else {
 ${i2}    if (!Share) { console.error("Capacitor Share not available."); removeOverlay(); return; }
 ${i2}    Filesystem.writeFile({ path: fileName, data: base64, directory: "DOCUMENTS" })
