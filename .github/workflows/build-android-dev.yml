@@ -63,9 +63,6 @@ jobs:
       - name: Apply post-build patches
         run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh android
 
-      - name: Copy save file to dist
-        run: cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
-
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
