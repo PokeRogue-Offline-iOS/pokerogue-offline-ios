@@ -5,10 +5,9 @@
  * Fixes save data export in Capacitor native builds (iOS + Android).
  *
  * iOS   — writes to DOCUMENTS, opens share sheet (Files, AirDrop, etc.)
- * Android — writes to app CACHE, then opens the native share sheet so the
- *           user can pick their own destination (Downloads, Drive, etc.).
- *           Avoids EXTERNAL_STORAGE entirely — no permissions required,
- *           works on Android 10+ scoped-storage without recursive mkdir.
+ * Android — constructs a Blob URL and triggers a WebView download, which
+ *           hands the file to Android's download manager → Downloads folder.
+ *           No plugins, no permissions, no share sheet needed.
  *
  * Uses a regex anchor so minor upstream indentation / variable-name changes
  * don't break the match.
@@ -61,7 +60,6 @@ ${i}const cap = (window as any).Capacitor;
 ${i}if (cap?.isNativePlatform?.()) {
 ${i2}const stamp = new Date().toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '_');
 ${i2}const fileName = \`\${dataKey}-\${stamp}.prsv\`;
-${i2}const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
 ${i2}const platform = cap.getPlatform?.() ?? "ios";
 
 ${i2}const overlay = document.createElement("div");
@@ -100,25 +98,23 @@ ${i2}const removeOverlay = () => overlay.parentNode?.removeChild(overlay);
 ${i2}btn.addEventListener("click", () => {
 ${i2}  btn.disabled = true;
 ${i2}  btn.textContent = "Saving\u2026";
-${i2}  const Filesystem = cap.Plugins?.Filesystem;
-${i2}  const Share = cap.Plugins?.Share;
-${i2}  if (!Filesystem) { console.error("Capacitor Filesystem not available."); removeOverlay(); return; }
 
 ${i2}  if (platform === "android") {
-${i2}    // Write to app-private cache (always permitted, no EXTERNAL_STORAGE needed).
-${i2}    // Then hand the URI to Android's share sheet so the user picks the destination.
-${i2}    if (!Share) { console.error("Capacitor Share not available."); removeOverlay(); return; }
-${i2}    Filesystem.writeFile({ path: fileName, data: base64, directory: "CACHE" })
-${i2}      .then(() => Filesystem.getUri({ path: fileName, directory: "CACHE" }))
-${i2}      .then(({ uri }) => Share.share({ title: fileName, url: uri, dialogTitle: \`Save \${fileName}\` }))
-${i2}      .then(() => removeOverlay())
-${i2}      .catch((err) => {
-${i2}        alert("Android export failed: " + err);
-${i2}        btn.disabled = false;
-${i2}        btn.textContent = "💾 Save to Files";
-${i2}      });
+${i2}    // Blob download — the Capacitor WebView forwards <a download> clicks to
+${i2}    // Android's download manager, which saves to Downloads with no permissions needed.
+${i2}    const blob = new Blob([${encryptVar}.toString()], { type: "application/octet-stream" });
+${i2}    const url = URL.createObjectURL(blob);
+${i2}    const a = document.createElement("a");
+${i2}    a.href = url;
+${i2}    a.download = fileName;
+${i2}    document.body.appendChild(a);
+${i2}    a.click();
+${i2}    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); removeOverlay(); }, 500);
 ${i2}  } else {
-${i2}    if (!Share) { console.error("Capacitor Share not available."); removeOverlay(); return; }
+${i2}    const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
+${i2}    const Filesystem = cap.Plugins?.Filesystem;
+${i2}    const Share = cap.Plugins?.Share;
+${i2}    if (!Filesystem || !Share) { console.error("Capacitor Filesystem/Share not available."); removeOverlay(); return; }
 ${i2}    Filesystem.writeFile({ path: fileName, data: base64, directory: "DOCUMENTS" })
 ${i2}      .then(() => Filesystem.getUri({ path: fileName, directory: "DOCUMENTS" }))
 ${i2}      .then(({ uri }) => Share.share({ title: fileName, url: uri, dialogTitle: \`Save \${fileName}\` }))
