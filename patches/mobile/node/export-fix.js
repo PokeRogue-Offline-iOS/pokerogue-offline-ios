@@ -100,16 +100,29 @@ ${i2}  btn.disabled = true;
 ${i2}  btn.textContent = "Saving\u2026";
 
 ${i2}  if (platform === "android") {
-${i2}    // Blob download — the Capacitor WebView forwards <a download> clicks to
-${i2}    // Android's download manager, which saves to Downloads with no permissions needed.
-${i2}    const blob = new Blob([${encryptVar}.toString()], { type: "application/octet-stream" });
-${i2}    const url = URL.createObjectURL(blob);
-${i2}    const a = document.createElement("a");
-${i2}    a.href = url;
-${i2}    a.download = fileName;
-${i2}    document.body.appendChild(a);
-${i2}    a.click();
-${i2}    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); removeOverlay(); }, 500);
+${i2}    // Write to app-private cache, then hand to Share.
+${i2}    // The blob/<a download> approach doesn't work without a native download listener.
+${i2}    // CACHE writes always succeed — no EXTERNAL_STORAGE permission needed.
+${i2}    const base64Android = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
+${i2}    const FilesystemAndroid = cap.Plugins?.Filesystem;
+${i2}    const ShareAndroid = cap.Plugins?.Share;
+${i2}    if (!FilesystemAndroid) { alert("Capacitor Filesystem not available."); removeOverlay(); return; }
+${i2}    FilesystemAndroid.writeFile({ path: fileName, data: base64Android, directory: "CACHE" })
+${i2}      .then(() => FilesystemAndroid.getUri({ path: fileName, directory: "CACHE" }))
+${i2}      .then(({ uri }) => {
+${i2}        if (ShareAndroid) {
+${i2}          return ShareAndroid.share({ title: fileName, url: uri, mimeType: "application/octet-stream", dialogTitle: \`Save \${fileName}\` });
+${i2}        } else {
+${i2}          // Share plugin not available — tell user where the cache file is
+${i2}          alert(\`File saved to app cache as \${fileName}. Install a file manager to move it.\`);
+${i2}        }
+${i2}      })
+${i2}      .then(() => removeOverlay())
+${i2}      .catch((err) => {
+${i2}        alert("Android export failed: " + err);
+${i2}        btn.disabled = false;
+${i2}        btn.textContent = "💾 Save to Files";
+${i2}      });
 ${i2}  } else {
 ${i2}    const base64 = btoa(unescape(encodeURIComponent(${encryptVar}.toString())));
 ${i2}    const Filesystem = cap.Plugins?.Filesystem;
