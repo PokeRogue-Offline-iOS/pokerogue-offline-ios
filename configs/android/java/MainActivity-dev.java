@@ -1,4 +1,4 @@
-package xyz.scooom.pkr;
+package xyz.scooom.pkrdev;
 
 import android.os.Build;
 import android.os.Bundle;
