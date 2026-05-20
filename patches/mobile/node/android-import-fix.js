@@ -54,12 +54,10 @@ if (!src.includes(CONDITION_OLD)) {
 src = src.replace(CONDITION_OLD, CONDITION_NEW);
 
 // Replace the auto-click guard
-const CLICK_OLD = `// Only auto-click on non-iOS devices
-    if (!isIos()) {
+const CLICK_OLD = `if (!isIos()) {
       saveFile.click();
     }`;
-const CLICK_NEW = `// Only auto-click on non-native platforms
-    if (!isNative()) {
+const CLICK_NEW = `if (!isNative()) {
       saveFile.click();
     }`;
 
