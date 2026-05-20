@@ -22,7 +22,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Compute build number
         id: build
-        run: echo "number=${{ github.run_number + 100 }}" >> $GITHUB_OUTPUT
+        run: echo "number=$(( ${{ github.run_number }} + 100 ))" >> $GITHUB_OUTPUT
 
       - name: Trigger iOS build
         id: trigger_ios
