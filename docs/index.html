@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PokéRogue Offline — iOS &amp; Android</title>
+  <title>PokéRogue Offline — iOS, Android &amp; Desktop</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="icon" type="image/png" href="favicon.png" />
@@ -27,6 +27,12 @@
       --android-green: #3ddc84;
       --android-green-dim: rgba(61,220,132,0.12);
       --android-green-border: rgba(61,220,132,0.3);
+      --linux-blue: #7aa2f7;
+      --linux-blue-dim: rgba(122,162,247,0.10);
+      --linux-blue-border: rgba(122,162,247,0.28);
+      --windows-cyan: #4ec9e0;
+      --windows-cyan-dim: rgba(78,201,224,0.10);
+      --windows-cyan-border: rgba(78,201,224,0.28);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -237,6 +243,8 @@
     }
     .platform-badge.ios { background: rgba(201,168,76,0.1); color: var(--gold); border: 1px solid rgba(201,168,76,0.35); }
     .platform-badge.android { background: var(--android-green-dim); color: var(--android-green); border: 1px solid var(--android-green-border); }
+    .platform-badge.linux { background: var(--linux-blue-dim); color: var(--linux-blue); border: 1px solid var(--linux-blue-border); }
+    .platform-badge.windows { background: var(--windows-cyan-dim); color: var(--windows-cyan); border: 1px solid var(--windows-cyan-border); }
     .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
     .btn {
       display: inline-flex;
@@ -384,9 +392,11 @@
       border: none;
       transition: all 0.2s;
     }
-    .platform-tab:first-child { border-right: 1px solid var(--border); }
+    .platform-tab:not(:last-child) { border-right: 1px solid var(--border); }
     .platform-tab.active-ios { background: rgba(128,0,0,0.3); color: var(--gold); }
     .platform-tab.active-android { background: var(--android-green-dim); color: var(--android-green); }
+    .platform-tab.active-linux { background: var(--linux-blue-dim); color: var(--linux-blue); }
+    .platform-tab.active-windows { background: var(--windows-cyan-dim); color: var(--windows-cyan); }
     .platform-panel { display: none; }
     .platform-panel.active { display: block; }
 
@@ -414,6 +424,18 @@
     }
     .install-card.android-card::before { background: linear-gradient(to right, transparent, var(--android-green), transparent); }
     .install-card.android-card:hover { border-color: rgba(61,220,132,0.5); box-shadow: 0 4px 30px rgba(61,220,132,0.07); }
+    .install-card.linux-card {
+      background: linear-gradient(135deg, rgba(15,25,60,0.4) 0%, rgba(10,14,36,0.6) 100%);
+      border-color: var(--linux-blue-border);
+    }
+    .install-card.linux-card::before { background: linear-gradient(to right, transparent, var(--linux-blue), transparent); }
+    .install-card.linux-card:hover { border-color: rgba(122,162,247,0.5); box-shadow: 0 4px 30px rgba(122,162,247,0.07); }
+    .install-card.windows-card {
+      background: linear-gradient(135deg, rgba(10,40,50,0.4) 0%, rgba(8,26,34,0.6) 100%);
+      border-color: var(--windows-cyan-border);
+    }
+    .install-card.windows-card::before { background: linear-gradient(to right, transparent, var(--windows-cyan), transparent); }
+    .install-card.windows-card:hover { border-color: rgba(78,201,224,0.5); box-shadow: 0 4px 30px rgba(78,201,224,0.07); }
 
     .card-header {
       display: flex; align-items: flex-start; justify-content: space-between;
@@ -469,6 +491,16 @@
       background: var(--android-green-dim);
       border-color: var(--android-green-border);
     }
+    .linux-card .steps .step-n {
+      color: var(--linux-blue);
+      background: var(--linux-blue-dim);
+      border-color: var(--linux-blue-border);
+    }
+    .windows-card .steps .step-n {
+      color: var(--windows-cyan);
+      background: var(--windows-cyan-dim);
+      border-color: var(--windows-cyan-border);
+    }
     .steps a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,168,76,0.3); transition: all 0.2s; }
     .steps a:hover { color: var(--cream); border-color: var(--cream); }
 
@@ -483,6 +515,8 @@
       border-radius: 0 3px 3px 0;
     }
     .card-note.android-note { background: rgba(61,220,132,0.04); border-left-color: rgba(61,220,132,0.4); }
+    .card-note.linux-note { background: rgba(122,162,247,0.04); border-left-color: rgba(122,162,247,0.4); }
+    .card-note.windows-note { background: rgba(78,201,224,0.04); border-left-color: rgba(78,201,224,0.4); }
 
     .steps-sub { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(201,168,76,0.1); }
     .steps-sub-title {
@@ -626,6 +660,8 @@
     <div class="platform-badges">
       <span class="platform-badge ios">🍎 iOS</span>
       <span class="platform-badge android">🤖 Android</span>
+      <span class="platform-badge linux">🐧 Linux</span>
+      <span class="platform-badge windows">🪟 Windows</span>
     </div>
     <div class="hero-cta">
       <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" class="btn btn-primary">↓ Download</a>
@@ -736,6 +772,8 @@
     <div class="platform-tabs reveal">
       <button class="platform-tab active-ios" id="tab-ios" onclick="switchTab('ios')">🍎 iOS</button>
       <button class="platform-tab" id="tab-android" onclick="switchTab('android')">🤖 Android</button>
+      <button class="platform-tab" id="tab-linux" onclick="switchTab('linux')">🐧 Linux</button>
+      <button class="platform-tab" id="tab-windows" onclick="switchTab('windows')">🪟 Windows</button>
     </div>
 
     <!-- iOS Panel -->
@@ -835,6 +873,87 @@
           </div>
           <div class="card-note android-note">
             The APK is debug-signed. Your device may show a warning during install — this is expected and safe to proceed through.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Linux Panel -->
+    <div class="platform-panel" id="panel-linux">
+      <div class="install-grid">
+        <div class="install-card linux-card reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num" style="color:var(--linux-blue);opacity:0.7;">Linux</p>
+              <h3 class="card-title">Run the AppImage</h3>
+            </div>
+            <span class="badge" style="background:var(--linux-blue-dim);color:var(--linux-blue);border:1px solid var(--linux-blue-border);">Portable</span>
+          </div>
+          <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+            No installation needed — the AppImage is fully self-contained. Just download, mark as executable, and run.
+          </p>
+          <div class="steps">
+            <div class="step-row"><span class="step-n">1</span><span>Go to the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank">latest release</a> and download <code>PokeRogueOffline.AppImage</code></span></div>
+            <div class="step-row"><span class="step-n">2</span><span>Open a terminal in the download directory and run: <code>chmod +x PokeRogueOffline.AppImage</code></span></div>
+            <div class="step-row"><span class="step-n">3</span><span>Run it: <code>./PokeRogueOffline.AppImage</code></span></div>
+          </div>
+
+          <div class="steps-sub">
+            <p class="steps-sub-title">⚠️ Sandbox Error Fix</p>
+            <p style="color:var(--text-dim); font-size:0.93rem; margin-bottom:1rem;">
+              If you see a fatal sandbox error mentioning <code>chrome-sandbox</code> not being owned by root or missing mode <code>4755</code>, your system's AppArmor or kernel settings are blocking the Chromium sandbox. There are two ways to fix this:
+            </p>
+            <p style="color:var(--text); font-size:0.93rem; margin-bottom:0.5rem;"><strong>Option A — Pass <code>--no-sandbox</code> (quickest)</strong></p>
+            <p style="color:var(--text-dim); font-size:0.93rem; margin-bottom:1rem;">
+              Run the AppImage with the sandbox disabled:
+            </p>
+            <code style="display:block; padding:0.75rem 1rem; margin-bottom:1.25rem; font-size:0.85rem; line-height:1.6; white-space:pre-wrap;">./PokeRogueOffline.AppImage --no-sandbox</code>
+            <p style="color:var(--text); font-size:0.93rem; margin-bottom:0.5rem;"><strong>Option B — AppArmor unprivileged user namespace (recommended)</strong></p>
+            <p style="color:var(--text-dim); font-size:0.93rem; margin-bottom:1rem;">
+              On Ubuntu 23.10+ and other distros that restrict unprivileged user namespaces, you can create an AppArmor profile that allows the AppImage to sandbox itself properly without disabling security globally:
+            </p>
+            <code style="display:block; padding:0.75rem 1rem; margin-bottom:0.75rem; font-size:0.85rem; line-height:1.6; white-space:pre-wrap;">sudo aa-status | grep apparmor</code>
+            <p style="color:var(--text-dim); font-size:0.93rem; margin-bottom:0.75rem;">If AppArmor is running, create a profile to allow user namespaces for the AppImage:</p>
+            <code style="display:block; padding:0.75rem 1rem; margin-bottom:0.75rem; font-size:0.85rem; line-height:1.6; white-space:pre-wrap;">sudo tee /etc/apparmor.d/pokerogue-offline &lt;&lt;'EOF'
+abi &lt;abi/4.0&gt;,
+include &lt;tunables/global&gt;
+
+profile pokerogue-offline /path/to/PokeRogueOffline.AppImage flags=(unconfined) {
+  userns,
+}
+EOF
+sudo apparmor_parser -r /etc/apparmor.d/pokerogue-offline</code>
+            <p style="color:var(--text-dim); font-size:0.88rem; font-style:italic;">Replace <code>/path/to/PokeRogueOffline.AppImage</code> with the actual path on your system. After running, launch the AppImage normally without <code>--no-sandbox</code>.</p>
+          </div>
+
+          <div class="card-note linux-note">
+            The AppImage bundles everything it needs. No dependency installation required.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Windows Panel -->
+    <div class="platform-panel" id="panel-windows">
+      <div class="install-grid">
+        <div class="install-card windows-card reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num" style="color:var(--windows-cyan);opacity:0.7;">Windows</p>
+              <h3 class="card-title">Run the Portable EXE</h3>
+            </div>
+            <span class="badge" style="background:var(--windows-cyan-dim);color:var(--windows-cyan);border:1px solid var(--windows-cyan-border);">Portable</span>
+          </div>
+          <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+            No installation needed — the EXE is a portable build. Just download and run.
+          </p>
+          <div class="steps">
+            <div class="step-row"><span class="step-n">1</span><span>Go to the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank">latest release</a> and download <code>PokeRogueOffline.exe</code></span></div>
+            <div class="step-row"><span class="step-n">2</span><span>Double-click the file to run it</span></div>
+            <div class="step-row"><span class="step-n">3</span><span>If Windows SmartScreen appears, click <strong>More info</strong> then <strong>Run anyway</strong> — this is expected for unsigned portable builds</span></div>
+          </div>
+          <div class="card-note windows-note">
+            The EXE is unsigned. Windows Defender or SmartScreen may flag it on first run — this is a false positive. You can verify the file by checking the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank" style="color:var(--gold);text-decoration:none;border-bottom:1px solid rgba(201,168,76,0.3);">release page</a> SHA or building from source.
           </div>
         </div>
       </div>
@@ -945,25 +1064,23 @@
     }
 
     function switchTab(platform) {
-      const tabIos = document.getElementById('tab-ios');
-      const tabAndroid = document.getElementById('tab-android');
-      const panelIos = document.getElementById('panel-ios');
-      const panelAndroid = document.getElementById('panel-android');
-      if (platform === 'ios') {
-        tabIos.className = 'platform-tab active-ios';
-        tabAndroid.className = 'platform-tab';
-        panelIos.classList.add('active');
-        panelAndroid.classList.remove('active');
-      } else {
-        tabAndroid.className = 'platform-tab active-android';
-        tabIos.className = 'platform-tab';
-        panelAndroid.classList.add('active');
-        panelIos.classList.remove('active');
-        document.querySelectorAll('#panel-android .reveal').forEach(el => el.classList.add('visible'));
-      }
+      const tabs = ['ios', 'android', 'linux', 'windows'];
+      tabs.forEach(p => {
+        const tab = document.getElementById(`tab-${p}`);
+        const panel = document.getElementById(`panel-${p}`);
+        if (p === platform) {
+          tab.className = `platform-tab active-${p}`;
+          panel.classList.add('active');
+          document.querySelectorAll(`#panel-${p} .reveal`).forEach(el => el.classList.add('visible'));
+        } else {
+          tab.className = 'platform-tab';
+          panel.classList.remove('active');
+        }
+      });
     }
 
-    if (window.location.hash === '#android') switchTab('android');
+    const hash = window.location.hash.replace('#', '');
+    if (['android', 'linux', 'windows'].includes(hash)) switchTab(hash);
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((e, i) => {
