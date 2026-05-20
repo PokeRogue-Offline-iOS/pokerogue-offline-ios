@@ -1,4 +1,4 @@
-name: Build PokeRogueOffline IPA (Dev)
+name: Build PokeRogueOffline IPA (Branch)
 
 on:
   workflow_dispatch:
