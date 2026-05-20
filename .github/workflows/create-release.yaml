@@ -20,13 +20,17 @@ jobs:
       # resulting run ID by finding the first run created after that moment.
       # This avoids any dependency on workflow inputs being queryable via API.
       # -----------------------------------------------------------------------
+      - name: Compute build number
+        id: build
+        run: echo "number=${{ github.run_number + 100 }}" >> $GITHUB_OUTPUT
+
       - name: Trigger iOS build
         id: trigger_ios
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-ios.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
+          gh workflow run build-ios.yml --ref "${{ github.ref_name }}" -f build_number=${{ steps.build.outputs.number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       - name: Trigger Android build
@@ -35,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-android.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
+          gh workflow run build-android.yml --ref "${{ github.ref_name }}" -f build_number=${{ steps.build.outputs.number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       - name: Trigger AppImage build
@@ -44,7 +48,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-appimage.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
+          gh workflow run build-appimage.yml --ref "${{ github.ref_name }}" -f build_number=${{ steps.build.outputs.number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
       - name: Trigger Windows build
@@ -53,7 +57,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run build-exe.yml --ref "${{ github.ref_name }}" -f build_number=${{ github.run_number }}
+          gh workflow run build-exe.yml --ref "${{ github.ref_name }}" -f build_number=${{ steps.build.outputs.number }}
           echo "triggered_after=$TS" >> $GITHUB_OUTPUT
 
 
@@ -278,7 +282,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.version }}-${{ steps.build.outputs.number }}
           name: PokeRogueOffline v${{ steps.version.outputs.version }}
           prerelease: true
           body: |
@@ -305,7 +309,7 @@ jobs:
       - name: Update AltStore source
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
-          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_NUMBER: ${{ steps.build.outputs.number }}
           IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
         run: node scripts/update-altstore-source.js
 
@@ -353,4 +357,3 @@ jobs:
           cancel_active_runs "build-android.yml" "Android"
           cancel_active_runs "build-appimage.yml" "AppImage"
           cancel_active_runs "build-exe.yml" "Windows"
-
