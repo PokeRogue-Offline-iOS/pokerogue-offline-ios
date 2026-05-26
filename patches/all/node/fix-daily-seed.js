@@ -133,11 +133,11 @@ ${i2}// fix-daily-seed: read the seed cached by the Daily Run option handler.
 ${i2}// Falls back to date-based seed if cache is somehow missing.
 ${i2}const fallbackSeed: string = btoa(new Date().toISOString().slice(0, 10));
 ${i2}let seed: string = localStorage.getItem("daily_seed") ?? fallbackSeed;
-${i2}if (Overrides.DAILY_RUN_SEED_OVERRIDE != null) {
+${i2}if (activeOverrides.DAILY_RUN_SEED_OVERRIDE != null) {
 ${i2}  seed =
-${i2}    typeof Overrides.DAILY_RUN_SEED_OVERRIDE === "string"
-${i2}      ? Overrides.DAILY_RUN_SEED_OVERRIDE
-${i2}      : JSON.stringify(Overrides.DAILY_RUN_SEED_OVERRIDE);
+${i2}    typeof activeOverrides.DAILY_RUN_SEED_OVERRIDE === "string"
+${i2}      ? activeOverrides.DAILY_RUN_SEED_OVERRIDE
+${i2}      : JSON.stringify(activeOverrides.DAILY_RUN_SEED_OVERRIDE);
 ${i2}}
 ${i2}generateDaily(seed);
 ${i}}`;

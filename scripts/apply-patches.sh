@@ -33,8 +33,8 @@ apply_patch "update-title-labels.js"  all
 if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
 
   # Pending upstream PRs
-  apply_patch "iosImport.patch"  mobile  # PKR 7222
-  apply_patch "noZoom.patch"     mobile  # PKR 7223
+  # apply_patch "iosImport.patch"  mobile  # PKR 7222
+  # apply_patch "noZoom.patch"     mobile  # PKR 7223
 
   # Targeted Patches
   apply_patch "android-import-fix.js"        mobile
