@@ -87,12 +87,13 @@ jobs:
           "
       - name: Get 3 Num Version
         id: old_ver
+        working-directory: pokerogue-src
         shell: bash
         run: |
-          VERSION=$(sed -E -n 's/.*"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)".*/\1\2/p' ./pokerogue-src/package.json)
+          VERSION=$(sed -E -n 's/.*"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)".*/\1\2/p' package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          find . -name package.json;
-          echo "Detected Version: '$VERSION'";
+          echo "Detected Version: '$VERSION'"
+
 
       - name: Generate AppImage
         working-directory: pokerogue-src
