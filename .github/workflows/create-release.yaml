@@ -315,8 +315,8 @@ jobs:
 
       - name: Commit updated repo.json
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "ScooomBot"
+          git config user.email "scooombot@scooom.xyz"
           git add docs/repo.json
           git commit -m "Update AltStore source for v${{ steps.version.outputs.version }}"
           git push
