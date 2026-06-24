@@ -91,7 +91,7 @@ jobs:
         run: |
           VERSION=$(sed -E -n 's/.*"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)".*/\1\2/p' ./pokerogue-src/package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
+          echo "Detected Version: '$VERSION'";
 
       - name: Generate AppImage
         working-directory: pokerogue-src
