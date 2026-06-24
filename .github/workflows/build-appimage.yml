@@ -90,7 +90,7 @@ jobs:
         working-directory: pokerogue-src
         shell: bash
         run: |
-          VERSION=$(sed -E -n 's/.*"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)".*/\1\2/p' package.json)
+          VERSION=$(jq -r '.version | sub("(?<v>[0-9]+\\.[0-9]+\\.[0-9]+)\\.(?<h>[0-9]+)"; .v + .h)' package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected Version: '$VERSION'"
 
