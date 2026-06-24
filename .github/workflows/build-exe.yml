@@ -92,11 +92,6 @@ jobs:
           cp docs/appIcon.ico pokerogue-src/appIcon.ico
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
-      - name: Fix Version
-        shell: bash
-        run: |
-          sed -i -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1-\2"/' ./pokerogue-src/package.json
-
       - name: Set electron main in package.json
         working-directory: pokerogue-src
         shell: bash
@@ -108,6 +103,17 @@ jobs:
             pkg.main = 'main.cjs';
             require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           "
+          
+          
+      - name: Get 3 Num Version
+        id: old_ver
+        working-directory: pokerogue-src
+        shell: bash
+        run: |
+          sed -i -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1-\2"/' package.json
+          VERSION=$(jq -r '.version | sub("(?<v>[0-9]+\\.[0-9]+\\.[0-9]+)\\-(?<h>[0-9]+)"; .v + .h)' package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected Version: '$VERSION'"
 
       - name: Generate Windows EXE
         working-directory: pokerogue-src
@@ -116,7 +122,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ''
           WIN_CSC_LINK: ''
-        run: pnpm electron-builder --win portable --config electron-builder.json
+        run: pnpm electron-builder --win portable --config electron-builder.json --config.extraMetadata.version=${{ steps.old_ver.outputs.version }}
 
       - name: Rename and save EXE
         id: exe_path
