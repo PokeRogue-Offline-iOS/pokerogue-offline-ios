@@ -85,10 +85,12 @@ jobs:
             pkg.main = 'main.cjs';
             require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           "
-      - name: Fix Version
+      - name: Get 3 Num Version
+        id: old_ver
         shell: bash
         run: |
-          sed -i -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1-\2"/' ./pokerogue-src/package.json
+          $VERSION=$(sed -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1"/' ./pokerogue-src/package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
 
       - name: Generate AppImage
@@ -96,7 +98,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm electron-builder --linux AppImage --config electron-builder.json
+        run: pnpm electron-builder --linux AppImage --config electron-builder.json -c.extraMetadata.version=${{ steps.old_ver.version }}
 
       - name: Rename and save AppImage
         id: appimage_path
