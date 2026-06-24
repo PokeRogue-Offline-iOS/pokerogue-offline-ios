@@ -34,7 +34,8 @@ jobs:
         id: pokerogue_version
         run: |
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          echo "version=$VERSION.$BUILD_NUM" >> $GITHUB_OUTPUT
 
       - name: Download full unlocks save file
         run: |

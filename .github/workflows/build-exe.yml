@@ -38,7 +38,9 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content ./pokerogue-src/package.json | ConvertFrom-Json).version
-          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+          $build = ${{ inputs.build_number || github.run_number }}
+
+          Write-Output "version=$version.$build" >> $env:GITHUB_OUTPUT
 
       - name: Download full unlocks save file
         shell: bash

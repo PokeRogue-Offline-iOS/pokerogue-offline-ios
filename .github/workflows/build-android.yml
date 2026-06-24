@@ -138,11 +138,13 @@ jobs:
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
           VERSION="${{ steps.pokerogue_version.outputs.version }}"
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3)
 
-          VERSION_CODE=$(( MAJOR * 10000000 + MINOR * 100000 + PATCH * 1000 + BUILD_NUM ))
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+          HOTFIX=$(echo "$VERSION" | cut -d. -f4)
+
+          VERSION_CODE=$(( MINOR * 100000000 + PATCH * 1000000 + HOTFIX * 10000 + BUILD_NUM ))
           VERSION_NAME="${VERSION}.${BUILD_NUM}"
 
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" build.gradle
