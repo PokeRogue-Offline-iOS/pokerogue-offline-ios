@@ -1,1 +1,1 @@
-OTt8KXxYpofEoYRRndfBaw==
+{"seed":"megapride26-02","starters":[{"speciesId":951,"variant":2,"moveset":[680,787,885,73],"ability":103,"nature":2},{"speciesId":48,"variant":1,"moveset":[500,147,188,324],"ability":110,"nature":15},{"speciesId":35,"variant":1,"moveset":[347,577,849,192],"ability":132,"nature":5}],"biome":3,"luck":14,"forcedWaves":[{"waveIndex":28,"tier":4}],"boss":{"speciesId":773,"formIndex":3,"variant":2,"moveset":[718,53,57,58],"nature":24},"mysteryEncounters":[{"waveIndex":6,"type":29},{"waveIndex":43,"type":29}]}
