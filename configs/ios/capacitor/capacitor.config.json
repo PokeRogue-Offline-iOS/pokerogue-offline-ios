@@ -24,8 +24,8 @@
         "twitter": false
       },
       "google": {
-        "iOSClientId": "REPLACE_WITH_IOS_CLIENT_ID.apps.googleusercontent.com",
-        "iOSServerClientId": "REPLACE_WITH_WEB_CLIENT_ID.apps.googleusercontent.com",
+        "iOSClientId": "856587427302-ejrsdp1qu750amcjupo943593vmeje1k.apps.googleusercontent.com",
+        "iOSServerClientId": "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
         "mode": "online"
       }
     }
