@@ -60,7 +60,7 @@ jobs:
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
-          pnpm add @capacitor/core @capacitor/cli @capacitor/ios @capacitor/filesystem @capacitor/share @capacitor/status-bar
+          pnpm add @capacitor/core @capacitor/cli @capacitor/ios @capacitor/filesystem @capacitor/share @capacitor/status-bar @capgo/capacitor-social-login@8.3.33
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
@@ -115,6 +115,14 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification dict" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array" ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string prsv" ios/App/App/Info.plist
+
+      - name: Register Google Sign-In URL scheme
+        working-directory: pokerogue-src
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string ${{ secrets.GOOGLE_IOS_REVERSED_CLIENT_ID }}" ios/App/App/Info.plist
 
       - name: Copy app icon
         run: |

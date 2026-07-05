@@ -1,13 +1,48 @@
 package xyz.scooom.pkr;
 
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginHandle;
+// Required by @capgo/capacitor-social-login for Google sign-in's activity
+// result to be routed back to the plugin correctly. Per the plugin's own
+// docs: "ModifiedMainActivityForSocialLoginPlugin is VERY VERY important."
+import ee.forgr.capacitor.social.login.GoogleProvider;
+import ee.forgr.capacitor.social.login.ModifiedMainActivityForSocialLoginPlugin;
+import ee.forgr.capacitor.social.login.SocialLoginPlugin;
 
-public class MainActivity extends BridgeActivity {
+public class MainActivity extends BridgeActivity implements ModifiedMainActivityForSocialLoginPlugin {
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode >= GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MIN
+                && requestCode < GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MAX) {
+            PluginHandle pluginHandle = getBridge().getPlugin("SocialLogin");
+            if (pluginHandle == null) {
+                Log.i("Google Activity Result", "SocialLogin plugin handle is null");
+                return;
+            }
+            Plugin plugin = pluginHandle.getInstance();
+            if (plugin instanceof SocialLoginPlugin) {
+                // TODO — VERIFY BEFORE SHIPPING: the exact dispatch call from here
+                // into the plugin's GoogleProvider was not fully visible in the
+                // plugin's published docs/migration guide at the time this was
+                // written (the guide's Android setup snippet was truncated right
+                // around this point). Confirm the correct method against the
+                // plugin's actual source before relying on this:
+                // https://github.com/Cap-go/capacitor-social-login/blob/main/docs/setup_google.md
+                ((SocialLoginPlugin) plugin).notifyGoogleActivityResult(requestCode, resultCode, data);
+            }
+        }
+    }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
@@ -39,3 +74,4 @@ public class MainActivity extends BridgeActivity {
         }
     }
 }
+

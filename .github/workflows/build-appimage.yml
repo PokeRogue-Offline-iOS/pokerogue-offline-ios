@@ -70,9 +70,15 @@ jobs:
       - name: Copy Electron config files into place
         run: |
           cp ${{ github.workspace }}/configs/desktop/electron/main.cjs pokerogue-src/main.cjs
+          cp ${{ github.workspace }}/configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
           cp ${{ github.workspace }}/configs/desktop/electron/electron-builder.appimage.json pokerogue-src/electron-builder.json
           cp ${{ github.workspace }}/docs/appIcon.png pokerogue-src/appIcon.png
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Inject Google OAuth credentials into main.cjs
+        run: |
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}/g" pokerogue-src/main.cjs
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}/g" pokerogue-src/main.cjs
 
       - name: Set electron main in package.json
         working-directory: pokerogue-src

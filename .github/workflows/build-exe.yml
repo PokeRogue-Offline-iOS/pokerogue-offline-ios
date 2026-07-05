@@ -88,9 +88,16 @@ jobs:
         shell: bash
         run: |
           cp configs/desktop/electron/main.cjs pokerogue-src/main.cjs
+          cp configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
           cp configs/desktop/electron/electron-builder.windows.json pokerogue-src/electron-builder.json
           cp docs/appIcon.ico pokerogue-src/appIcon.ico
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Inject Google OAuth credentials into main.cjs
+        shell: bash
+        run: |
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}/g" pokerogue-src/main.cjs
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}/g" pokerogue-src/main.cjs
 
       - name: Set electron main in package.json
         working-directory: pokerogue-src
