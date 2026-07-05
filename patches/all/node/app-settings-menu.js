@@ -33,12 +33,13 @@
  *        existing `isApp` flag using the same excludedMenus pattern already
  *        used for LOG_OUT/bypassLogin in this file.
  *
- *   6. locales/en/menu.json
- *        Add the "offlineSettings" label key. English only, deliberately —
- *        this is an offline-client-only feature, not worth pulling in the
- *        separate locales submodule's full translation workflow for.
+ *   6. src/ui/handlers/menu-ui-handler.ts (same file as #5, second edit)
+ *        Hardcode the "Offline Settings" label directly in the option-label
+ *        map, bypassing i18next entirely. Deliberately NOT touching the
+ *        locales submodule — this is an offline-client-only feature, not
+ *        worth pulling in the full translation workflow for.
  *
- * NOTE ON TESTING: sub-patches 1-5 have been checked against a fresh clone of
+ * NOTE ON TESTING: sub-patches 1-6 have been checked against a fresh clone of
  * pagefaultgames/pokerogue and the anchors are confirmed present at the time
  * this was written. The new UI handler's runtime behavior (screen layout,
  * live label refresh) has NOT been verified in an actual build — see the
@@ -212,19 +213,33 @@ if (menuSrc.includes("OFFLINE_SETTINGS")) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-patch 6: locales/en/menu.json  →  add label key
+// Sub-patch 6: src/ui/handlers/menu-ui-handler.ts  →  hardcode the label
+//
+// Deliberately NOT touching the locales submodule for this — this is an
+// offline-client-only feature, not worth translating, so the label is
+// special-cased directly in the option-label map rather than routed through
+// i18next at all.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LOCALE_PATH = path.join("pokerogue-src", "locales", "en", "menu.json");
-let localeSrc = readFile(LOCALE_PATH);
+menuSrc = readFile(MENU_PATH); // re-read: sub-patch 5 already rewrote this file above
 
-if (localeSrc.includes('"offlineSettings"')) {
-  console.log("SKIP menu.json — offlineSettings key already present");
+if (menuSrc.includes("Offline Settings")) {
+  console.log("SKIP menu-ui-handler.ts label — already hardcoded");
 } else {
-  const LOCALE_ANCHOR = `"gameSettings": "Game Settings"`;
-  requireAnchor(localeSrc, LOCALE_ANCHOR, "gameSettings key in menu.json");
-  localeSrc = localeSrc.replace(LOCALE_ANCHOR, `${LOCALE_ANCHOR},\n  "offlineSettings": "Offline Settings"`);
-  writeFile(LOCALE_PATH, localeSrc);
+  const LABEL_ANCHOR =
+    'this.menuOptions.map(o => `${i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`)}`).join("\\n"),';
+  requireAnchor(menuSrc, LABEL_ANCHOR, "menuOptions label-building line in menu-ui-handler.ts");
+  menuSrc = menuSrc.replace(
+    LABEL_ANCHOR,
+    `this.menuOptions
+        .map(o =>
+          o === MenuOptions.OFFLINE_SETTINGS
+            ? "Offline Settings"
+            : \`\${i18next.t(\`menuUiHandler:\${toCamelCase(MenuOptions[o])}\`)}\`,
+        )
+        .join("\\n"),`,
+  );
+  writeFile(MENU_PATH, menuSrc);
 }
 
 console.log("\napp-settings-menu patch applied successfully.");
