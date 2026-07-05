@@ -54,15 +54,6 @@ jobs:
         working-directory: pokerogue-src
         run: pnpm install
 
-      - name: Build PokeRogue
-        working-directory: pokerogue-src
-        env:
-          VITE_BYPASS_LOGIN: '1'
-        run: pnpm build --mode app
-
-      - name: Apply post-build patches
-        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh android
-
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
@@ -71,6 +62,15 @@ jobs:
       - name: Configure Capacitor
         working-directory: pokerogue-src
         run: cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config.json capacitor.config.json
+
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build --mode app
+
+      - name: Apply post-build patches
+        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh android
 
       - name: Add Android platform
         working-directory: pokerogue-src

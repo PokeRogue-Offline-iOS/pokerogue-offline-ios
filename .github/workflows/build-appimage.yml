@@ -58,6 +58,16 @@ jobs:
         working-directory: pokerogue-src
         run: pnpm add -D electron electron-builder
 
+      - name: Install Capacitor plugin stub for shared code resolution
+        working-directory: pokerogue-src
+        # google-drive-backup.ts dynamically imports @capgo/capacitor-social-login,
+        # gated behind an isCapacitor() runtime check that's always false on
+        # Electron — but Vite/Rolldown still needs the package resolvable at
+        # BUILD time to code-split it, even though the chunk never actually
+        # loads here. Without this, the build fails with an unresolved-import
+        # error even on a platform that will never execute that branch.
+        run: pnpm add @capacitor/core@8.3.4 @capgo/capacitor-social-login@8.3.33
+
       - name: Build PokeRogue
         working-directory: pokerogue-src
         env:

@@ -66,6 +66,15 @@ jobs:
         working-directory: pokerogue-src
         run: pnpm add -D electron electron-builder
 
+      - name: Install Capacitor plugin stub for shared code resolution
+        working-directory: pokerogue-src
+        shell: bash
+        # See the identical step in build-appimage.yml — google-drive-backup.ts
+        # dynamically imports @capgo/capacitor-social-login behind an
+        # isCapacitor() check that's always false here, but Vite/Rolldown
+        # still needs the package resolvable at build time.
+        run: pnpm add @capacitor/core@8.3.4 @capgo/capacitor-social-login@8.3.33
+
       - name: Convert app icon to ICO
         shell: pwsh
         run: |
