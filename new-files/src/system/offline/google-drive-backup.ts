@@ -71,7 +71,7 @@ export async function signIn(): Promise<string> {
         // webClientId is intentionally used here even though we're on a
         // native platform — see capacitor.config.json comments; this is a
         // "Web application" type client used purely as the token audience.
-        webClientId: "REPLACE_WITH_WEB_CLIENT_ID.apps.googleusercontent.com",
+        webClientId: "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
         mode: "online", // plain access token, not the server-auth-code/offline flow
       },
     });
