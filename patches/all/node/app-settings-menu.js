@@ -2,48 +2,62 @@
 /**
  * Patch: app-settings-menu.js
  *
- * Adds an "Offline Settings" option to the pause menu, directly under "Game
- * Settings". Opens a standalone screen (NOT a tab in the real Settings tab
- * system) showing last-played time + total battles, plus Google
- * Drive backup (sign in, manual "Backup Save"). No restore/import in v1.
+ * Adds an "Offline" tab to the REAL Settings screen (alongside
+ * General/Display/Audio/Gamepad/Keyboard), via NavigationManager's
+ * documented extension point. Two interactive rows (Google sign-in,
+ * manual "Backup Save"), two read-only rows (Last Played, Battles).
  *
- * Six sub-patches, applied in order:
+ * v2 of this patch — replaces the earlier standalone screen + separate
+ * pause-menu entry entirely. That approach worked but looked wrong (a
+ * flat option list, not the tabbed grid look). This version integrates
+ * directly into the real Settings tab system instead.
+ *
+ * Seven sub-patches, applied in order:
  *
  *   1. src/enums/ui-mode.ts
- *        Append APP_SETTINGS enum value (after ALERT_MODAL, the last entry —
- *        appending rather than inserting mid-list to minimize the odds of
- *        colliding with wherever upstream is actively adding new modes).
+ *        Append APP_SETTINGS enum value (after ALERT_MODAL, the last entry).
  *
- *   2. src/system/offline/google-drive-backup.ts  (new file)
+ *   2. src/system/offline/google-drive-backup.ts  (new file, unchanged from v1)
  *        Cross-platform (Capacitor / Electron) Drive backup helper.
- *        Excludes sessionData*_<user> keys, includes everything else.
  *
- *   3. src/ui/handlers/app-settings-ui-handler.ts  (new file)
- *        The actual screen. Extends BaseOptionSelectUiHandler (same base
- *        class as ConfirmUiHandler) rather than the tabbed Settings system.
+ *   3. src/ui/settings/offline-settings-ui-handler.ts  (new file)
+ *        Extends BaseSettingsUiHandler (same base class as the real
+ *        General/Display/Audio tabs) instead of BaseOptionSelectUiHandler,
+ *        so it renders with the identical tab-bar + grid-row look.
  *
  *   4. src/ui/ui.ts
- *        Import AppSettingsUiHandler, register at the position matching
- *        UiMode.APP_SETTINGS (end of the array, matching the enum append),
- *        and add UiMode.APP_SETTINGS to noTransitionModes.
+ *        Import OfflineSettingsUiHandler, register at the position matching
+ *        UiMode.APP_SETTINGS, add to noTransitionModes.
  *
- *   5. src/ui/handlers/menu-ui-handler.ts
- *        Add MenuOptions.OFFLINE_SETTINGS immediately after GAME_SETTINGS
- *        (both in the enum and in the switch-case), gated behind the
- *        existing `isApp` flag using the same excludedMenus pattern already
- *        used for LOG_OUT/bypassLogin in this file.
+ *   5. src/ui/settings/navigation-menu.ts
+ *        Append UiMode.APP_SETTINGS + a hardcoded "Offline" label to
+ *        NavigationManager's `modes`/`labels` arrays — this is what actually
+ *        makes it show up as a 6th tab in the real Settings screen.
  *
- *   6. src/ui/handlers/menu-ui-handler.ts (same file as #5, second edit)
- *        Hardcode the "Offline Settings" label directly in the option-label
- *        map, bypassing i18next entirely. Deliberately NOT touching the
- *        locales submodule — this is an offline-client-only feature, not
- *        worth pulling in the full translation workflow for.
+ *   6. src/system/settings/settings.ts
+ *        Append SettingType.APP; append 4 new SettingKeys entries; append
+ *        4 new Setting entries (2 activatable action rows, 2 read-only
+ *        display rows) to the shared Setting[] array, all type: APP so they
+ *        only ever show up on our tab.
  *
- * NOTE ON TESTING: sub-patches 1-6 have been checked against a fresh clone of
- * pagefaultgames/pokerogue and the anchors are confirmed present at the time
- * this was written. The new UI handler's runtime behavior (screen layout,
- * live label refresh) has NOT been verified in an actual build — see the
- * comments in app-settings-ui-handler.ts for the specific risk.
+ *   7. src/ui/settings/base-settings-ui-handler.ts
+ *        Widen `optionValueLabels` and `activateSetting` from private to
+ *        protected. PURE VISIBILITY CHANGE — no other line in this file is
+ *        touched. This is what lets our subclass (a) update a row's
+ *        displayed text after an async action completes, and (b) add our
+ *        own activatable-row cases without editing the base class's switch
+ *        statement directly.
+ *
+ * REMOVED from v1: the standalone MenuOptions.OFFLINE_SETTINGS pause-menu
+ * entry and its screen are gone entirely — reachable now only via
+ * Game Settings → cycle tabs, same as every other settings category.
+ *
+ * NOTE ON TESTING: all 7 sub-patches have been checked against a fresh clone
+ * of pagefaultgames/pokerogue and the anchors are confirmed present at the
+ * time this was written. The new UI handler's runtime behavior (reaching
+ * into optionValueLabels after construction, the activateSetting override)
+ * has NOT been verified in an actual build — see the comments in
+ * offline-settings-ui-handler.ts for the specific risk.
  */
 
 const fs = require("fs");
@@ -77,7 +91,7 @@ function requireAnchor(src, anchor, label) {
 }
 
 // This patch script lives at patches/all/node/app-settings-menu.js in the
-// pkr-offline repo. The two new source files it writes are checked into this
+// pkr-offline repo. The new source files it writes are checked into this
 // same repo (under new-files/) so this script and its payload stay together.
 const NEW_FILES_DIR = path.join(__dirname, "..", "..", "..", "new-files");
 
@@ -111,15 +125,18 @@ if (fs.existsSync(BACKUP_MODULE_PATH)) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-patch 3: src/ui/handlers/app-settings-ui-handler.ts  (new file)
+// Sub-patch 3: src/ui/settings/offline-settings-ui-handler.ts  (new file)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HANDLER_PATH = path.join("pokerogue-src", "src", "ui", "handlers", "app-settings-ui-handler.ts");
+const HANDLER_PATH = path.join("pokerogue-src", "src", "ui", "settings", "offline-settings-ui-handler.ts");
 
 if (fs.existsSync(HANDLER_PATH)) {
-  console.log("SKIP app-settings-ui-handler.ts — already exists");
+  console.log("SKIP offline-settings-ui-handler.ts — already exists");
 } else {
-  const src = fs.readFileSync(path.join(NEW_FILES_DIR, "src", "ui", "handlers", "app-settings-ui-handler.ts"), "utf8");
+  const src = fs.readFileSync(
+    path.join(NEW_FILES_DIR, "src", "ui", "settings", "offline-settings-ui-handler.ts"),
+    "utf8",
+  );
   writeFile(HANDLER_PATH, src);
 }
 
@@ -130,24 +147,20 @@ if (fs.existsSync(HANDLER_PATH)) {
 const UI_PATH = path.join("pokerogue-src", "src", "ui", "ui.ts");
 let uiSrc = readFile(UI_PATH);
 
-if (uiSrc.includes("AppSettingsUiHandler")) {
-  console.log("SKIP ui.ts — AppSettingsUiHandler already present");
+if (uiSrc.includes("OfflineSettingsUiHandler")) {
+  console.log("SKIP ui.ts — OfflineSettingsUiHandler already present");
 } else {
-  // 4a. Import — insert after the AlertModalUiHandler import (the last handler import).
   const IMPORT_ANCHOR = `import { AlertModalUiHandler } from "#ui/alert-modal-ui-handler";`;
   requireAnchor(uiSrc, IMPORT_ANCHOR, "AlertModalUiHandler import in ui.ts");
   uiSrc = uiSrc.replace(
     IMPORT_ANCHOR,
-    `${IMPORT_ANCHOR}\nimport { AppSettingsUiHandler } from "#ui/app-settings-ui-handler";`,
+    `${IMPORT_ANCHOR}\nimport { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";`,
   );
 
-  // 4b. Register handler — insert after new AlertModalUiHandler(), matching
-  // its position at the end of the array to line up with the appended enum value.
   const HANDLER_ANCHOR = `new AlertModalUiHandler(),`;
   requireAnchor(uiSrc, HANDLER_ANCHOR, "new AlertModalUiHandler() in ui.ts");
-  uiSrc = uiSrc.replace(HANDLER_ANCHOR, `${HANDLER_ANCHOR}\n      new AppSettingsUiHandler(),`);
+  uiSrc = uiSrc.replace(HANDLER_ANCHOR, `${HANDLER_ANCHOR}\n      new OfflineSettingsUiHandler(),`);
 
-  // 4c. noTransitionModes — insert after UiMode.ALERT_MODAL (also last in that list).
   const NO_TRANSITION_ANCHOR = `UiMode.ALERT_MODAL,`;
   requireAnchor(uiSrc, NO_TRANSITION_ANCHOR, "UiMode.ALERT_MODAL in noTransitionModes");
   uiSrc = uiSrc.replace(NO_TRANSITION_ANCHOR, `${NO_TRANSITION_ANCHOR}\n  UiMode.APP_SETTINGS,`);
@@ -156,90 +169,135 @@ if (uiSrc.includes("AppSettingsUiHandler")) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-patch 5: src/ui/handlers/menu-ui-handler.ts  →  add pause-menu entry
+// Sub-patch 5: src/ui/settings/navigation-menu.ts  →  register the 6th tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MENU_PATH = path.join("pokerogue-src", "src", "ui", "handlers", "menu-ui-handler.ts");
-let menuSrc = readFile(MENU_PATH);
+const NAV_PATH = path.join("pokerogue-src", "src", "ui", "settings", "navigation-menu.ts");
+let navSrc = readFile(NAV_PATH);
 
-if (menuSrc.includes("OFFLINE_SETTINGS")) {
-  console.log("SKIP menu-ui-handler.ts — OFFLINE_SETTINGS already present");
+if (navSrc.includes("UiMode.APP_SETTINGS")) {
+  console.log("SKIP navigation-menu.ts — APP_SETTINGS tab already present");
 } else {
-  // 5a. Enum — insert immediately after GAME_SETTINGS so it renders directly
-  // below "Game Settings" in the pause menu list order.
-  const ENUM_ANCHOR = "enum MenuOptions {\n  GAME_SETTINGS,";
-  requireAnchor(menuSrc, ENUM_ANCHOR, "MenuOptions.GAME_SETTINGS in menu-ui-handler.ts");
-  menuSrc = menuSrc.replace(ENUM_ANCHOR, `${ENUM_ANCHOR}\n  OFFLINE_SETTINGS,`);
+  const MODES_ANCHOR = `UiMode.SETTINGS_KEYBOARD,\n    ];`;
+  requireAnchor(navSrc, MODES_ANCHOR, "modes array in navigation-menu.ts");
+  navSrc = navSrc.replace(MODES_ANCHOR, `UiMode.SETTINGS_KEYBOARD,\n      UiMode.APP_SETTINGS,\n    ];`);
 
-  // 5b. Import UiMode.APP_SETTINGS is already covered — UiMode is already
-  // imported in this file. Add the import for the new handler's UiMode isn't
-  // needed since we only reference UiMode.APP_SETTINGS, which is a member of
-  // the already-imported UiMode enum.
+  const LABELS_ANCHOR = `i18next.t("settings:keyboard"),\n    ];`;
+  requireAnchor(navSrc, LABELS_ANCHOR, "labels array in navigation-menu.ts");
+  // Hardcoded, deliberately not routed through i18next — offline-client-only feature.
+  navSrc = navSrc.replace(LABELS_ANCHOR, `i18next.t("settings:keyboard"),\n      "Offline",\n    ];`);
 
-  // 5c. Gate visibility behind isApp, matching the existing bypassLogin
-  // pattern used for LOG_OUT. Two occurrences: constructor's excludedMenus
-  // and render()'s excludedMenus (render() rebuilds the list every open).
-  const CTOR_EXCLUSION_ANCHOR = `{ condition: bypassLogin, options: [MenuOptions.LOG_OUT] },\n    ];`;
-  requireAnchor(menuSrc, CTOR_EXCLUSION_ANCHOR, "constructor excludedMenus in menu-ui-handler.ts");
-  menuSrc = menuSrc.replace(
-    CTOR_EXCLUSION_ANCHOR,
-    `{ condition: bypassLogin, options: [MenuOptions.LOG_OUT] },\n      { condition: !isApp, options: [MenuOptions.OFFLINE_SETTINGS] },\n    ];`,
-  );
-
-  const RENDER_EXCLUSION_ANCHOR = `{ condition: !globalScene.currentBattle, options: [MenuOptions.SAVE_AND_QUIT] },\n    ];`;
-  requireAnchor(menuSrc, RENDER_EXCLUSION_ANCHOR, "render() excludedMenus in menu-ui-handler.ts");
-  menuSrc = menuSrc.replace(
-    RENDER_EXCLUSION_ANCHOR,
-    `{ condition: !globalScene.currentBattle, options: [MenuOptions.SAVE_AND_QUIT] },\n      { condition: !isApp, options: [MenuOptions.OFFLINE_SETTINGS] },\n    ];`,
-  );
-
-  // 5d. Switch-case — mirror the GAME_SETTINGS case exactly, opening our new
-  // standalone mode instead of UiMode.SETTINGS.
-  const CASE_ANCHOR = `case MenuOptions.GAME_SETTINGS:
-          ui.setOverlayMode(UiMode.SETTINGS);
-          success = true;
-          break;`;
-  requireAnchor(menuSrc, CASE_ANCHOR, "MenuOptions.GAME_SETTINGS case in menu-ui-handler.ts");
-  menuSrc = menuSrc.replace(
-    CASE_ANCHOR,
-    `${CASE_ANCHOR}
-        case MenuOptions.OFFLINE_SETTINGS:
-          ui.setOverlayMode(UiMode.APP_SETTINGS);
-          success = true;
-          break;`,
-  );
-
-  writeFile(MENU_PATH, menuSrc);
+  writeFile(NAV_PATH, navSrc);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-patch 6: src/ui/handlers/menu-ui-handler.ts  →  hardcode the label
-//
-// Deliberately NOT touching the locales submodule for this — this is an
-// offline-client-only feature, not worth translating, so the label is
-// special-cased directly in the option-label map rather than routed through
-// i18next at all.
+// Sub-patch 6: src/system/settings/settings.ts  →  SettingType, SettingKeys, Setting[]
 // ─────────────────────────────────────────────────────────────────────────────
 
-menuSrc = readFile(MENU_PATH); // re-read: sub-patch 5 already rewrote this file above
+const SETTINGS_PATH = path.join("pokerogue-src", "src", "system", "settings", "settings.ts");
+let settingsSrc = readFile(SETTINGS_PATH);
 
-if (menuSrc.includes("Offline Settings")) {
-  console.log("SKIP menu-ui-handler.ts label — already hardcoded");
+if (settingsSrc.includes("SettingType.APP")) {
+  console.log("SKIP settings.ts — SettingType.APP already present");
 } else {
-  const LABEL_ANCHOR =
-    'this.menuOptions.map(o => `${i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`)}`).join("\\n"),';
-  requireAnchor(menuSrc, LABEL_ANCHOR, "menuOptions label-building line in menu-ui-handler.ts");
-  menuSrc = menuSrc.replace(
-    LABEL_ANCHOR,
-    `this.menuOptions
-        .map(o =>
-          o === MenuOptions.OFFLINE_SETTINGS
-            ? "Offline Settings"
-            : \`\${i18next.t(\`menuUiHandler:\${toCamelCase(MenuOptions[o])}\`)}\`,
-        )
-        .join("\\n"),`,
+  // 6a. SettingType enum — append APP.
+  const TYPE_ANCHOR = `export enum SettingType {\n  GENERAL,\n  DISPLAY,\n  AUDIO,\n}`;
+  requireAnchor(settingsSrc, TYPE_ANCHOR, "SettingType enum in settings.ts");
+  settingsSrc = settingsSrc.replace(
+    TYPE_ANCHOR,
+    `export enum SettingType {\n  GENERAL,\n  DISPLAY,\n  AUDIO,\n  APP,\n}`,
   );
-  writeFile(MENU_PATH, menuSrc);
+
+  // 6b. SettingKeys — append 4 new keys.
+  const KEYS_ANCHOR = `Prefer_Baton_Pass: "PREFER_BATON_PASS",\n};`;
+  requireAnchor(settingsSrc, KEYS_ANCHOR, "SettingKeys object in settings.ts");
+  settingsSrc = settingsSrc.replace(
+    KEYS_ANCHOR,
+    `Prefer_Baton_Pass: "PREFER_BATON_PASS",
+  Offline_Google_Connect: "OFFLINE_GOOGLE_CONNECT",
+  Offline_Backup_Save: "OFFLINE_BACKUP_SAVE",
+  Offline_Last_Played: "OFFLINE_LAST_PLAYED",
+  Offline_Battles: "OFFLINE_BATTLES",
+};`,
+  );
+
+  // 6c. Setting[] array — append 4 new rows.
+  const SETTING_ANCHOR = `  {
+    key: SettingKeys.Prefer_Baton_Pass,
+    label: i18next.t("settings:preferBatonPass"),
+    options: OFF_ON,
+    default: 1,
+    type: SettingType.DISPLAY,
+  },
+];`;
+  requireAnchor(settingsSrc, SETTING_ANCHOR, "last Setting[] entry in settings.ts");
+  settingsSrc = settingsSrc.replace(
+    SETTING_ANCHOR,
+    `  {
+    key: SettingKeys.Prefer_Baton_Pass,
+    label: i18next.t("settings:preferBatonPass"),
+    options: OFF_ON,
+    default: 1,
+    type: SettingType.DISPLAY,
+  },
+  {
+    key: SettingKeys.Offline_Google_Connect,
+    label: "Connect Google Account",
+    options: [{ value: "0", label: "Not Connected" }],
+    default: 0,
+    type: SettingType.APP,
+    activatable: true,
+  },
+  {
+    key: SettingKeys.Offline_Backup_Save,
+    label: "Backup Save",
+    options: [{ value: "0", label: "Google Drive" }],
+    default: 0,
+    type: SettingType.APP,
+    activatable: true,
+  },
+  {
+    key: SettingKeys.Offline_Last_Played,
+    label: "Last Played",
+    options: [{ value: "0", label: "—" }],
+    default: 0,
+    type: SettingType.APP,
+  },
+  {
+    key: SettingKeys.Offline_Battles,
+    label: "Battles",
+    options: [{ value: "0", label: "0" }],
+    default: 0,
+    type: SettingType.APP,
+  },
+];`,
+  );
+
+  writeFile(SETTINGS_PATH, settingsSrc);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-patch 7: src/ui/settings/base-settings-ui-handler.ts  →  widen visibility
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BASE_HANDLER_PATH = path.join("pokerogue-src", "src", "ui", "settings", "base-settings-ui-handler.ts");
+let baseHandlerSrc = readFile(BASE_HANDLER_PATH);
+
+if (baseHandlerSrc.includes("protected optionValueLabels")) {
+  console.log("SKIP base-settings-ui-handler.ts — already widened");
+} else {
+  const FIELD_ANCHOR = `private optionValueLabels: Phaser.GameObjects.Text[][];`;
+  requireAnchor(baseHandlerSrc, FIELD_ANCHOR, "optionValueLabels field in base-settings-ui-handler.ts");
+  baseHandlerSrc = baseHandlerSrc.replace(FIELD_ANCHOR, `protected optionValueLabels: Phaser.GameObjects.Text[][];`);
+
+  const METHOD_ANCHOR = `private activateSetting(setting: Setting): boolean {`;
+  requireAnchor(baseHandlerSrc, METHOD_ANCHOR, "activateSetting method in base-settings-ui-handler.ts");
+  baseHandlerSrc = baseHandlerSrc.replace(
+    METHOD_ANCHOR,
+    `protected activateSetting(setting: Setting): boolean {`,
+  );
+
+  writeFile(BASE_HANDLER_PATH, baseHandlerSrc);
 }
 
 console.log("\napp-settings-menu patch applied successfully.");
