@@ -3,13 +3,15 @@
  *
  * Backs up every localStorage key EXCEPT in-progress session data
  * (`sessionData`, `sessionData1`..`sessionData4`, per-user) to the user's
- * hidden Drive "appDataFolder". Manual-trigger only — no auto-sync of any
- * kind, in either direction.
+ * hidden Drive "appDataFolder" — UNLESS the "Include Current Run" setting
+ * (Offline tab) is turned on, in which case session keys are included too.
+ * Manual-trigger only — no auto-sync of any kind, in either direction.
  *
- * Restore is now implemented ({@link restoreFromBackup}) — downloads the
- * existing backup file and writes every key straight back into
- * localStorage. Since the backup never contained session keys to begin
- * with, restoring can't touch an in-progress run either way.
+ * Restore ({@link restoreFromBackup}) downloads the existing backup file and
+ * writes every key it contains straight back into localStorage — including
+ * session keys, if the backup happens to have them (i.e. it was made with
+ * "Include Current Run" on). No separate "detect and restore session" logic
+ * is needed: restore just writes back whatever's actually in the file.
  *
  * Token model: on Electron, main.cjs now requests offline access and
  * persists a refresh token (encrypted via Electron's safeStorage where
@@ -25,6 +27,8 @@
  * multipart-upload format, but treat this as a solid first draft that needs
  * to be verified end-to-end once wired into an actual build.
  */
+
+import { SettingKeys } from "#system/settings";
 
 const BACKUP_FILE_NAME = "pkroffline-save-backup.json";
 const DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
@@ -166,12 +170,34 @@ export async function signIn(): Promise<string> {
   throw new Error("Google sign-in is not supported in this build.");
 }
 
-/** Collect every localStorage key/value except in-progress session slots. */
+/** Reads the persisted "Include Current Run" toggle directly from the shared settings blob. */
+function includeCurrentRunEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem("settings");
+    if (!raw) {
+      return false;
+    }
+    const parsed = JSON.parse(raw);
+    return parsed?.[SettingKeys.Offline_Include_Current_Run] === 1;
+  } catch (err) {
+    console.error("google-drive-backup: failed to read Include Current Run setting", err);
+    return false;
+  }
+}
+
+/**
+ * Collect every localStorage key/value — session keys included only if the
+ * "Include Current Run" toggle (Offline settings tab) is on.
+ */
 function collectBackupPayload(): Record<string, string> {
+  const includeSession = includeCurrentRunEnabled();
   const payload: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!key || SESSION_KEY_PATTERN.test(key)) {
+    if (!key) {
+      continue;
+    }
+    if (!includeSession && SESSION_KEY_PATTERN.test(key)) {
       continue;
     }
     const value = localStorage.getItem(key);
@@ -249,44 +275,15 @@ export async function backupSave(): Promise<string> {
   return madeAt;
 }
 
-/** A single file's metadata as returned by Drive's files.list, for the debug listing screen. */
-export interface AppDataFileInfo {
-  id: string;
-  name: string;
-  modifiedTime: string;
-  size: string;
-}
-
-/** Lists every file currently in the app's hidden Drive appDataFolder. */
-export async function listAppDataFiles(): Promise<AppDataFileInfo[]> {
-  if (!cachedAccessToken) {
-    throw new Error("Not signed in — call signIn() first.");
-  }
-
-  const params = new URLSearchParams({
-    spaces: "appDataFolder",
-    fields: "files(id, name, modifiedTime, size)",
-  });
-
-  const res = await fetch(`${DRIVE_FILES_URL}?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${cachedAccessToken}` },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Drive file listing failed: ${res.status}`);
-  }
-
-  const body = await res.json();
-  return body.files ?? [];
-}
-
 /**
  * Downloads and restores the existing Drive backup, overwriting every key it
- * contains directly into localStorage. Since the backup payload never
- * includes session keys (see {@link collectBackupPayload}), this can't touch
- * an in-progress run either way — but the caller is still expected to force
- * a reload afterward so the game actually picks up the restored data, since
- * most of it (save data, unlocks, dex) is only ever read once at boot.
+ * contains directly into localStorage. Whether that includes session keys
+ * depends entirely on whether the backup was made with "Include Current
+ * Run" on — this function doesn't special-case it either way, it just
+ * writes back whatever the file actually has. The caller is still expected
+ * to force a reload afterward so the game actually picks up the restored
+ * data, since most of it (save data, unlocks, dex) is only ever read once
+ * at boot.
  *
  * Throws if there's no existing backup to restore from.
  */
@@ -312,10 +309,50 @@ export async function restoreFromBackup(): Promise<void> {
   const data: Record<string, string> = parsed?.data ?? {};
 
   for (const [key, value] of Object.entries(data)) {
-    if (SESSION_KEY_PATTERN.test(key)) {
-      // Defensive only — backups should never contain these to begin with.
-      continue;
-    }
     localStorage.setItem(key, value);
+  }
+}
+
+/**
+ * Downloads the existing Drive backup (if any) purely to read the embedded
+ * save's last-played time — doesn't write anything to localStorage. Used by
+ * the "Drive Last Played" row, which shows the backup's save time rather
+ * than the local one, and only ever once actually connected.
+ *
+ * Returns null if there's no backup yet, rather than throwing, since "no
+ * backup exists" is an expected, displayable state, not an error.
+ */
+export async function getRemoteLastPlayed(): Promise<string | null> {
+  if (!cachedAccessToken) {
+    throw new Error("Not signed in — call signIn() first.");
+  }
+
+  const existingId = await findExistingBackupFileId(cachedAccessToken);
+  if (!existingId) {
+    return null;
+  }
+
+  const res = await fetch(`${DRIVE_FILES_URL}/${existingId}?alt=media`, {
+    headers: { Authorization: `Bearer ${cachedAccessToken}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Drive download failed: ${res.status} ${await res.text()}`);
+  }
+
+  const parsed = await res.json();
+  const data: Record<string, string> = parsed?.data ?? {};
+  const rawSystemData = data["data_Guest"];
+  if (!rawSystemData) {
+    return null;
+  }
+
+  try {
+    const json = decodeURIComponent(atob(rawSystemData));
+    const saveData = JSON.parse(json);
+    return saveData?.timestamp ? new Date(saveData.timestamp).toLocaleString() : null;
+  } catch (err) {
+    console.error("google-drive-backup: failed to parse embedded save data from backup", err);
+    return null;
   }
 }

@@ -6,35 +6,44 @@
  * General/Display/Audio/Gamepad/Keyboard), via NavigationManager's
  * documented extension point.
  *
- * v3 of this patch — adds Restore Backup, Clear All Data, and a
- * "Debug: List AppData Files" screen on top of v2's Connect/Backup/
- * Last Played/Battles rows. Every row except Connect (and the two
- * read-only info rows) is now greyed out and inert while signed out,
- * using the game's existing TextStyle.SETTINGS_LOCKED convention.
+ * v5 of this patch. Changes from v4 (verified working):
+ *   - REMOVED entirely: "Debug: List AppData Files" (row, screen, UiMode,
+ *     new file) and the local "Last Played" / "Battles" info rows.
+ *   - "Clear All Data" no longer locked behind being connected — wiping
+ *     local data has nothing to do with Google Drive.
+ *   - NEW "Include Current Run" row — a genuine two-option Setting (Off/On),
+ *     NOT activatable, so it uses the base class's existing generic
+ *     Left/Right-cycle-and-persist mechanism with zero custom code. Governs
+ *     whether Backup Save includes sessionData keys. Locked until connected
+ *     (it's meaningless otherwise).
+ *   - NEW "Drive Last Played" row — read-only, shows the *Drive backup's*
+ *     embedded save timestamp (not the local one), refreshed whenever the
+ *     tab detects a live connection.
+ *   - Locked rows are now grouped together in the row order: Connect,
+ *     [Backup Save, Restore Backup, Include Current Run], Drive Last
+ *     Played, Clear All Data.
  *
  * Sub-patches, applied in order:
  *
  *   1. src/enums/ui-mode.ts
- *        Append APP_SETTINGS and APP_DEBUG_FILE_LIST (after ALERT_MODAL,
- *        the last entry).
+ *        Append APP_SETTINGS (after ALERT_MODAL, the last entry).
  *
  *   2. src/system/offline/google-drive-backup.ts  (new file)
- *        Cross-platform (Capacitor / Electron) Drive backup helper. Now
- *        also exposes listAppDataFiles() and restoreFromBackup().
+ *        Cross-platform (Capacitor / Electron) Drive backup helper.
+ *        collectBackupPayload() now respects "Include Current Run";
+ *        restoreFromBackup() no longer excludes session keys (it just
+ *        writes back whatever a given backup actually contains); adds
+ *        getRemoteLastPlayed(). listAppDataFiles() removed — nothing
+ *        uses it now that the debug screen is gone.
  *
  *   3. src/ui/settings/offline-settings-ui-handler.ts  (new file)
  *        Extends BaseSettingsUiHandler (same base class as the real
  *        General/Display/Audio tabs) instead of BaseOptionSelectUiHandler,
  *        so it renders with the identical tab-bar + grid-row look.
  *
- *   3b. src/ui/settings/debug-appdata-list-ui-handler.ts  (new file)
- *        Modeled directly on ConfirmUiHandler's shape — a dynamic list of
- *        Drive appDataFolder files, any selection or Cancel just closes it.
- *
  *   4. src/ui/ui.ts
- *        Import both new handlers, register at the positions matching
- *        UiMode.APP_SETTINGS / UiMode.APP_DEBUG_FILE_LIST, add both to
- *        noTransitionModes.
+ *        Import OfflineSettingsUiHandler, register at the position
+ *        matching UiMode.APP_SETTINGS, add to noTransitionModes.
  *
  *   5. src/ui/settings/navigation-menu.ts
  *        Append UiMode.APP_SETTINGS + a hardcoded "Offline" label to
@@ -42,26 +51,28 @@
  *        makes it show up as a 6th tab in the real Settings screen.
  *
  *   6. src/system/settings/settings.ts
- *        Append SettingType.APP; append 7 SettingKeys entries; append 7
- *        Setting entries (5 activatable action rows, 2 read-only display
- *        rows) to the shared Setting[] array, all type: APP so they only
- *        ever show up on our tab.
+ *        Append SettingType.APP; append 6 SettingKeys entries; append 6
+ *        Setting entries (grouped: 3 locked action/toggle rows, 1 read-only
+ *        info row, 1 always-on action row) to the shared Setting[] array,
+ *        all type: APP so they only ever show up on our tab.
  *
  *   7. src/ui/settings/base-settings-ui-handler.ts
- *        Widen `settingLabels`, `optionValueLabels`, and `activateSetting`
- *        from private to protected. PURE VISIBILITY CHANGE — no other line
- *        in this file is touched. This is what lets our subclass (a) grey
- *        out / restyle a row's label and value text, (b) update displayed
- *        text after an async action completes, and (c) add our own
- *        activatable-row cases without editing the base class's switch
+ *        Widen `settingLabels`, `optionValueLabels`, `optionCursors`, and
+ *        `activateSetting` from private to protected. PURE VISIBILITY
+ *        CHANGE — no other line in this file is touched. This is what lets
+ *        our subclass (a) grey out / restyle a row's label and value text
+ *        — including correctly restoring which option was selected on a
+ *        multi-option row like "Include Current Run" — (b) update
+ *        displayed text after an async action completes, and (c) add our
+ *        own activatable-row cases without editing the base class's switch
  *        statement directly.
  *
  * NOTE ON TESTING: all sub-patches have been checked against a fresh clone
  * of pagefaultgames/pokerogue and the anchors are confirmed present at the
  * time this was written. The new UI handler's runtime behavior (reaching
- * into optionValueLabels/settingLabels after construction, the
- * activateSetting override, the UiMode.CONFIRM delay/message flow) has NOT
- * been verified in an actual build.
+ * into optionValueLabels/settingLabels/optionCursors after construction,
+ * the activateSetting override, the UiMode.CONFIRM delay/message flow) has
+ * NOT been verified in an actual build.
  */
 
 const fs = require("fs");
@@ -111,7 +122,7 @@ if (uiModeSrc.includes("APP_SETTINGS")) {
 } else {
   const ANCHOR = "ALERT_MODAL,";
   requireAnchor(uiModeSrc, ANCHOR, "ALERT_MODAL in ui-mode.ts");
-  uiModeSrc = uiModeSrc.replace(ANCHOR, `${ANCHOR}\n  APP_SETTINGS,\n  APP_DEBUG_FILE_LIST,`);
+  uiModeSrc = uiModeSrc.replace(ANCHOR, `${ANCHOR}\n  APP_SETTINGS,`);
   writeFile(UI_MODE_PATH, uiModeSrc);
 }
 
@@ -145,28 +156,6 @@ if (fs.existsSync(HANDLER_PATH)) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-patch 3b: src/ui/settings/debug-appdata-list-ui-handler.ts  (new file)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const DEBUG_LIST_HANDLER_PATH = path.join(
-  "pokerogue-src",
-  "src",
-  "ui",
-  "settings",
-  "debug-appdata-list-ui-handler.ts",
-);
-
-if (fs.existsSync(DEBUG_LIST_HANDLER_PATH)) {
-  console.log("SKIP debug-appdata-list-ui-handler.ts — already exists");
-} else {
-  const src = fs.readFileSync(
-    path.join(NEW_FILES_DIR, "src", "ui", "settings", "debug-appdata-list-ui-handler.ts"),
-    "utf8",
-  );
-  writeFile(DEBUG_LIST_HANDLER_PATH, src);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Sub-patch 4: src/ui/ui.ts  →  import + register + noTransitionModes
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -180,22 +169,16 @@ if (uiSrc.includes("OfflineSettingsUiHandler")) {
   requireAnchor(uiSrc, IMPORT_ANCHOR, "AlertModalUiHandler import in ui.ts");
   uiSrc = uiSrc.replace(
     IMPORT_ANCHOR,
-    `${IMPORT_ANCHOR}\nimport { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";\nimport { DebugAppDataListUiHandler } from "#ui/debug-appdata-list-ui-handler";`,
+    `${IMPORT_ANCHOR}\nimport { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";`,
   );
 
   const HANDLER_ANCHOR = `new AlertModalUiHandler(),`;
   requireAnchor(uiSrc, HANDLER_ANCHOR, "new AlertModalUiHandler() in ui.ts");
-  uiSrc = uiSrc.replace(
-    HANDLER_ANCHOR,
-    `${HANDLER_ANCHOR}\n      new OfflineSettingsUiHandler(),\n      new DebugAppDataListUiHandler(),`,
-  );
+  uiSrc = uiSrc.replace(HANDLER_ANCHOR, `${HANDLER_ANCHOR}\n      new OfflineSettingsUiHandler(),`);
 
   const NO_TRANSITION_ANCHOR = `UiMode.ALERT_MODAL,`;
   requireAnchor(uiSrc, NO_TRANSITION_ANCHOR, "UiMode.ALERT_MODAL in noTransitionModes");
-  uiSrc = uiSrc.replace(
-    NO_TRANSITION_ANCHOR,
-    `${NO_TRANSITION_ANCHOR}\n  UiMode.APP_SETTINGS,\n  UiMode.APP_DEBUG_FILE_LIST,`,
-  );
+  uiSrc = uiSrc.replace(NO_TRANSITION_ANCHOR, `${NO_TRANSITION_ANCHOR}\n  UiMode.APP_SETTINGS,`);
 
   writeFile(UI_PATH, uiSrc);
 }
@@ -240,7 +223,7 @@ if (settingsSrc.includes("SettingType.APP")) {
     `export enum SettingType {\n  GENERAL,\n  DISPLAY,\n  AUDIO,\n  APP,\n}`,
   );
 
-  // 6b. SettingKeys — append 4 new keys.
+  // 6b. SettingKeys — append 6 new keys.
   const KEYS_ANCHOR = `Prefer_Baton_Pass: "PREFER_BATON_PASS",\n};`;
   requireAnchor(settingsSrc, KEYS_ANCHOR, "SettingKeys object in settings.ts");
   settingsSrc = settingsSrc.replace(
@@ -248,15 +231,14 @@ if (settingsSrc.includes("SettingType.APP")) {
     `Prefer_Baton_Pass: "PREFER_BATON_PASS",
   Offline_Google_Connect: "OFFLINE_GOOGLE_CONNECT",
   Offline_Backup_Save: "OFFLINE_BACKUP_SAVE",
-  Offline_Last_Played: "OFFLINE_LAST_PLAYED",
-  Offline_Battles: "OFFLINE_BATTLES",
   Offline_Restore_Backup: "OFFLINE_RESTORE_BACKUP",
+  Offline_Include_Current_Run: "OFFLINE_INCLUDE_CURRENT_RUN",
+  Offline_Drive_Last_Played: "OFFLINE_DRIVE_LAST_PLAYED",
   Offline_Clear_Data: "OFFLINE_CLEAR_DATA",
-  Offline_Debug_List_Files: "OFFLINE_DEBUG_LIST_FILES",
 };`,
   );
 
-  // 6c. Setting[] array — append 4 new rows.
+  // 6c. Setting[] array — append 6 new rows, locked ones grouped together.
   const SETTING_ANCHOR = `  {
     key: SettingKeys.Prefer_Baton_Pass,
     label: i18next.t("settings:preferBatonPass"),
@@ -292,20 +274,6 @@ if (settingsSrc.includes("SettingType.APP")) {
     activatable: true,
   },
   {
-    key: SettingKeys.Offline_Last_Played,
-    label: "Last Played",
-    options: [{ value: "0", label: "—" }],
-    default: 0,
-    type: SettingType.APP,
-  },
-  {
-    key: SettingKeys.Offline_Battles,
-    label: "Battles",
-    options: [{ value: "0", label: "0" }],
-    default: 0,
-    type: SettingType.APP,
-  },
-  {
     key: SettingKeys.Offline_Restore_Backup,
     label: "Restore Backup",
     options: [{ value: "0", label: "Restore" }],
@@ -314,17 +282,26 @@ if (settingsSrc.includes("SettingType.APP")) {
     activatable: true,
   },
   {
+    key: SettingKeys.Offline_Include_Current_Run,
+    label: "Include Current Run",
+    options: [
+      { value: "0", label: "Off" },
+      { value: "1", label: "On" },
+    ],
+    default: 0,
+    type: SettingType.APP,
+  },
+  {
+    key: SettingKeys.Offline_Drive_Last_Played,
+    label: "Drive Last Played",
+    options: [{ value: "0", label: "—" }],
+    default: 0,
+    type: SettingType.APP,
+  },
+  {
     key: SettingKeys.Offline_Clear_Data,
     label: "Clear All Data",
     options: [{ value: "0", label: "Clear" }],
-    default: 0,
-    type: SettingType.APP,
-    activatable: true,
-  },
-  {
-    key: SettingKeys.Offline_Debug_List_Files,
-    label: "Debug: List AppData Files",
-    options: [{ value: "0", label: "View" }],
     default: 0,
     type: SettingType.APP,
     activatable: true,
@@ -349,16 +326,20 @@ if (baseHandlerSrc.includes("protected optionValueLabels")) {
   requireAnchor(baseHandlerSrc, LABELS_FIELD_ANCHOR, "settingLabels field in base-settings-ui-handler.ts");
   baseHandlerSrc = baseHandlerSrc.replace(LABELS_FIELD_ANCHOR, `protected settingLabels: Phaser.GameObjects.Text[];`);
 
-  const FIELD_ANCHOR = `private optionValueLabels: Phaser.GameObjects.Text[][];`;
-  requireAnchor(baseHandlerSrc, FIELD_ANCHOR, "optionValueLabels field in base-settings-ui-handler.ts");
-  baseHandlerSrc = baseHandlerSrc.replace(FIELD_ANCHOR, `protected optionValueLabels: Phaser.GameObjects.Text[][];`);
+  const VALUES_FIELD_ANCHOR = `private optionValueLabels: Phaser.GameObjects.Text[][];`;
+  requireAnchor(baseHandlerSrc, VALUES_FIELD_ANCHOR, "optionValueLabels field in base-settings-ui-handler.ts");
+  baseHandlerSrc = baseHandlerSrc.replace(
+    VALUES_FIELD_ANCHOR,
+    `protected optionValueLabels: Phaser.GameObjects.Text[][];`,
+  );
+
+  const CURSORS_FIELD_ANCHOR = `private optionCursors: number[];`;
+  requireAnchor(baseHandlerSrc, CURSORS_FIELD_ANCHOR, "optionCursors field in base-settings-ui-handler.ts");
+  baseHandlerSrc = baseHandlerSrc.replace(CURSORS_FIELD_ANCHOR, `protected optionCursors: number[];`);
 
   const METHOD_ANCHOR = `private activateSetting(setting: Setting): boolean {`;
   requireAnchor(baseHandlerSrc, METHOD_ANCHOR, "activateSetting method in base-settings-ui-handler.ts");
-  baseHandlerSrc = baseHandlerSrc.replace(
-    METHOD_ANCHOR,
-    `protected activateSetting(setting: Setting): boolean {`,
-  );
+  baseHandlerSrc = baseHandlerSrc.replace(METHOD_ANCHOR, `protected activateSetting(setting: Setting): boolean {`);
 
   writeFile(BASE_HANDLER_PATH, baseHandlerSrc);
 }

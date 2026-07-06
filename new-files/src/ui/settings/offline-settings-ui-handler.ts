@@ -12,32 +12,38 @@ import * as offlineBackup from "#system/offline/google-drive-backup";
  * General/Display/Audio/Gamepad/Keyboard, added via NavigationManager's
  * documented extension point (append to `modes`/`labels`).
  *
- * Rows:
+ * Rows, in display order (locked ones grouped together):
  *   - Connect Google Account (always interactive)
- *   - Backup Save
- *   - Restore Backup (confirm, then a second press to reload)
- *   - Clear All Data (confirm with a delay, then reload)
- *   - Debug: List AppData Files (opens DebugAppDataListUiHandler)
- *   - Last Played / Battles (read-only info, never locked)
+ *   - Backup Save                    \
+ *   - Restore Backup                  } locked until connected
+ *   - Include Current Run (Off/On)   /
+ *   - Drive Last Played (read-only, populates once connected — not
+ *     itself "locked", just shows a placeholder until there's something
+ *     to show)
+ *   - Clear All Data (always interactive — wiping local data has nothing
+ *     to do with being connected)
  *
- * Every row except "Connect" and the two info rows is greyed out
- * (TextStyle.SETTINGS_LOCKED, same style already used elsewhere for
- * unavailable keybind rows) and inert while not signed in.
+ * "Include Current Run" is a genuine two-option Setting (not activatable),
+ * so its Left/Right cycling and persistence are entirely free — the base
+ * class's existing generic mechanism handles it with zero code from us,
+ * same as every other real setting in the game. It governs whether
+ * backupSave() includes sessionData keys; restoreFromBackup() doesn't need
+ * to know about the toggle at all, since it just writes back whatever a
+ * given backup actually contains.
  *
  * NOTE: This has not been exercised in a live Phaser build yet. The
- * `optionValueLabels`/`settingLabels`/`activateSetting` visibility changes
- * this depends on (private → protected in base-settings-ui-handler.ts) are
- * pure visibility widenings with no other logic touched, but the actual
- * runtime behavior of reaching into those rows post-construction hasn't
- * been confirmed on a real device/build.
+ * `settingLabels`/`optionValueLabels`/`optionCursors`/`activateSetting`
+ * visibility changes this depends on (private → protected in
+ * base-settings-ui-handler.ts) are pure visibility widenings with no other
+ * logic touched, but the actual runtime behavior of reaching into those
+ * rows post-construction hasn't been confirmed on a real device/build.
  */
 export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   /** Rows that get greyed out and made inert while signed out. */
   private static readonly LOCKABLE_KEYS = [
     SettingKeys.Offline_Backup_Save,
     SettingKeys.Offline_Restore_Backup,
-    SettingKeys.Offline_Clear_Data,
-    SettingKeys.Offline_Debug_List_Files,
+    SettingKeys.Offline_Include_Current_Run,
   ];
 
   /**
@@ -58,7 +64,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     return this.settings.findIndex(s => s.key === key);
   }
 
-  /** Directly overwrites a row's displayed (single-option) value text. */
+  /** Directly overwrites a single-option row's displayed value text. */
   private setRowText(key: string, text: string): void {
     const idx = this.rowIndex(key);
     if (idx === -1) {
@@ -70,24 +76,36 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     }
   }
 
-  /** Greys out (or restores) both the label and value text for one row. */
+  /**
+   * Greys out (or restores) a row's label and every one of its value
+   * options. Handles both our single-option action rows and genuine
+   * multi-option rows (currently just "Include Current Run") — when
+   * unlocking a multi-option row, the previously-selected option correctly
+   * goes back to SETTINGS_SELECTED rather than every option looking the
+   * same.
+   */
   private setRowLocked(key: string, locked: boolean): void {
     const idx = this.rowIndex(key);
     if (idx === -1) {
       return;
     }
-    const labelStyle = locked ? TextStyle.SETTINGS_LOCKED : TextStyle.SETTINGS_LABEL;
-    // Our rows only ever have a single option, so it's always "selected" when unlocked.
-    const valueStyle = locked ? TextStyle.SETTINGS_LOCKED : TextStyle.SETTINGS_SELECTED;
 
+    const labelStyle = locked ? TextStyle.SETTINGS_LOCKED : TextStyle.SETTINGS_LABEL;
     const labelText = this.settingLabels[idx];
     if (labelText) {
       labelText.setColor(getTextColor(labelStyle)).setShadowColor(getTextColor(labelStyle, true));
     }
-    const valueText = this.optionValueLabels[idx]?.[0];
-    if (valueText) {
+
+    const values = this.optionValueLabels[idx] ?? [];
+    const selectedCursor = this.optionCursors[idx];
+    values.forEach((valueText, optionIdx) => {
+      const valueStyle = locked
+        ? TextStyle.SETTINGS_LOCKED
+        : optionIdx === selectedCursor
+          ? TextStyle.SETTINGS_SELECTED
+          : TextStyle.SETTINGS_VALUE;
       valueText.setColor(getTextColor(valueStyle)).setShadowColor(getTextColor(valueStyle, true));
-    }
+    });
   }
 
   private applyLockedStyling(): void {
@@ -106,29 +124,27 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     return false;
   }
 
-  private readSaveSummary(): { lastPlayed: string; battles: number } {
-    try {
-      const raw = localStorage.getItem("data_Guest");
-      if (!raw) {
-        return { lastPlayed: "—", battles: 0 };
-      }
-      const json = decodeURIComponent(atob(raw));
-      const parsed = JSON.parse(json);
-      const lastPlayed = parsed?.timestamp ? new Date(parsed.timestamp).toLocaleString() : "—";
-      const battles = parsed?.gameStats?.battles ?? 0;
-      return { lastPlayed, battles };
-    } catch (err) {
-      console.error("OfflineSettingsUiHandler: failed to read save summary", err);
-      return { lastPlayed: "—", battles: 0 };
-    }
-  }
-
   private refreshDisplay(): void {
-    const { lastPlayed, battles } = this.readSaveSummary();
-    this.setRowText(SettingKeys.Offline_Last_Played, lastPlayed);
-    this.setRowText(SettingKeys.Offline_Battles, `${battles}`);
     this.setRowText(SettingKeys.Offline_Google_Connect, offlineBackup.isSignedIn() ? "Connected" : "Not Connected");
     this.applyLockedStyling();
+  }
+
+  /** Fetches and displays the Drive backup's embedded save time — only meaningful once connected. */
+  private refreshDriveLastPlayed(): void {
+    if (!offlineBackup.isSignedIn()) {
+      this.setRowText(SettingKeys.Offline_Drive_Last_Played, "—");
+      return;
+    }
+    this.setRowText(SettingKeys.Offline_Drive_Last_Played, "Checking…");
+    offlineBackup
+      .getRemoteLastPlayed()
+      .then(lastPlayed => {
+        this.setRowText(SettingKeys.Offline_Drive_Last_Played, lastPlayed ?? "No backup found");
+      })
+      .catch(err => {
+        console.error("Failed to fetch Drive last-played time:", err);
+        this.setRowText(SettingKeys.Offline_Drive_Last_Played, "—");
+      });
   }
 
   public override show(args: any[]): boolean {
@@ -138,6 +154,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     this.setRowText(SettingKeys.Offline_Restore_Backup, "Restore");
 
     this.refreshDisplay();
+    this.refreshDriveLastPlayed();
 
     // Attempt a silent reconnect if we're not already signed in this
     // session. On Electron this is fast and popup-free when a stored
@@ -150,6 +167,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
         .tryRestoreSession()
         .then(() => {
           this.refreshDisplay();
+          this.refreshDriveLastPlayed();
         })
         .catch(err => {
           console.warn("Silent session restore failed:", err);
@@ -163,7 +181,9 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   /**
    * Overrides the base class's (now-protected) activateSetting to add our
    * action rows, falling back to super for everything else (currently just
-   * the touch-controls config row).
+   * the touch-controls config row). Note "Include Current Run" is NOT
+   * handled here — it's a normal cycling Setting, not activatable, so it
+   * never reaches this method at all.
    */
   protected override activateSetting(setting: Setting): boolean {
     switch (setting.key) {
@@ -179,9 +199,6 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
       case SettingKeys.Offline_Clear_Data:
         this.handleClearDataPress();
         return true;
-      case SettingKeys.Offline_Debug_List_Files:
-        this.handleDebugListPress();
-        return true;
     }
     return super.activateSetting(setting);
   }
@@ -195,6 +212,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
       .signIn()
       .then(() => {
         this.refreshDisplay();
+        this.refreshDriveLastPlayed();
       })
       .catch(err => {
         console.error("Google sign-in failed:", err);
@@ -213,6 +231,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
       .then(() => {
         this.setRowText(SettingKeys.Offline_Backup_Save, "Google Drive");
         this.showText("Backup complete.", 0, () => this.showText("", 0), 1500);
+        this.refreshDriveLastPlayed();
       })
       .catch(err => {
         console.error("Backup failed:", err);
@@ -236,7 +255,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
 
     const ui = this.getUi();
     ui.showText(
-      "This will overwrite your current save data with your Google Drive backup. Your active run is not affected. Continue?",
+      "This will overwrite your current save data with your Google Drive backup. Continue?",
       null,
       () => {
         ui.setOverlayMode(
@@ -273,10 +292,8 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   }
 
   private handleClearDataPress(): void {
-    if (!this.requireSignedIn()) {
-      return;
-    }
-
+    // Deliberately NOT gated behind requireSignedIn() — wiping local data has
+    // nothing to do with being connected to Google.
     const ui = this.getUi();
     ui.showText(
       "This will ERASE ALL local data — save, settings, everything — and cannot be undone. Continue?",
@@ -301,24 +318,5 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
         );
       },
     );
-  }
-
-  private handleDebugListPress(): void {
-    if (!this.requireSignedIn()) {
-      return;
-    }
-
-    this.setRowText(SettingKeys.Offline_Debug_List_Files, "Loading…");
-    offlineBackup
-      .listAppDataFiles()
-      .then(files => {
-        this.setRowText(SettingKeys.Offline_Debug_List_Files, "View");
-        this.getUi().setOverlayMode(UiMode.APP_DEBUG_FILE_LIST, files);
-      })
-      .catch(err => {
-        console.error("Failed to list appDataFolder files:", err);
-        this.setRowText(SettingKeys.Offline_Debug_List_Files, "View");
-        this.showText("Failed to list files. Check the console for details.", 0, () => this.showText("", 0), 1500);
-      });
   }
 }
