@@ -78,6 +78,25 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   public override show(args: any[]): boolean {
     const result = super.show(args);
     this.refreshDisplay();
+
+    // Attempt a silent reconnect if we're not already signed in this
+    // session. On Electron this is fast and popup-free when a stored
+    // refresh token exists (see google-drive-backup.ts / main.cjs); it's a
+    // no-op if there's nothing stored. Fire-and-forget — show() itself stays
+    // synchronous, the row just updates once this resolves.
+    if (!offlineBackup.isSignedIn()) {
+      this.setRowText(SettingKeys.Offline_Google_Connect, "Checking connection…");
+      offlineBackup
+        .tryRestoreSession()
+        .then(() => {
+          this.refreshDisplay();
+        })
+        .catch(err => {
+          console.warn("Silent session restore failed:", err);
+          this.refreshDisplay();
+        });
+    }
+
     return result;
   }
 

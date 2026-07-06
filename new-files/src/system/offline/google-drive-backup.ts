@@ -7,11 +7,14 @@
  *   - No auto-sync of any kind.
  *   - No restore/import — that's deferred to a future pass.
  *
- * Token model: plain OAuth access token (drive.appdata scope), NOT the
- * server-auth-code/offline-access pattern. This app has no backend, so
- * there's nothing to hand a long-lived refresh flow to — the user is always
- * present when a backup happens (it's a manual button press), so a
- * short-lived access token obtained fresh each time is all that's needed.
+ * Token model: on Electron, main.cjs now requests offline access and
+ * persists a refresh token (encrypted via Electron's safeStorage where
+ * available) so the connection survives app restarts — see main.cjs for the
+ * full explanation of why the original online-only flow lost the connection
+ * every time the app reopened. On Capacitor, the native Google Sign-In SDKs
+ * typically persist sign-in state on-device themselves; whether that means
+ * no extra work is needed here or whether an explicit "restore previous
+ * sign-in" call is required has NOT been verified yet — flagged below.
  *
  * NOTE: This module has not been exercised against a live Drive account or a
  * real device/build yet. The request shapes follow Drive API v3's documented
@@ -35,6 +38,8 @@ declare global {
     // Injected by configs/desktop/electron/preload.cjs on the Electron build.
     pkrOffline?: {
       googleSignIn: () => Promise<string>;
+      hasStoredGoogleCredentials: () => Promise<boolean>;
+      googleSignOut: () => Promise<boolean>;
     };
   }
 }
@@ -52,6 +57,50 @@ let cachedAccessToken: string | null = null;
 /** Whether we currently hold an access token from a prior sign-in this session. */
 export function isSignedIn(): boolean {
   return !!cachedAccessToken;
+}
+
+/**
+ * Attempts to silently restore a connection from a previous session, without
+ * prompting the user. Safe to call on every screen open — on Electron this
+ * hits the fast/no-browser-popup path in main.cjs when a stored refresh
+ * token exists, and does nothing if one doesn't. Returns whether it
+ * succeeded.
+ *
+ * On Capacitor: NOT YET IMPLEMENTED. The native SDKs likely handle this
+ * automatically or via their own "restore previous sign-in" call, but that
+ * hasn't been confirmed against the actual plugin — see the plan doc's list
+ * of unverified items. Always returns false here for now rather than
+ * guessing at an API call that might not exist.
+ */
+export async function tryRestoreSession(): Promise<boolean> {
+  if (cachedAccessToken) {
+    return true;
+  }
+
+  if (isElectron()) {
+    try {
+      const hasStored = await window.pkrOffline!.hasStoredGoogleCredentials();
+      if (!hasStored) {
+        return false;
+      }
+      cachedAccessToken = await window.pkrOffline!.googleSignIn();
+      return true;
+    } catch (err) {
+      console.warn("Silent Google session restore failed:", err);
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/** Forgets the current connection, on Electron also deleting the stored refresh token. */
+export async function signOut(): Promise<void> {
+  cachedAccessToken = null;
+  if (isElectron()) {
+    await window.pkrOffline!.googleSignOut();
+  }
+  // Capacitor sign-out not implemented yet — same caveat as tryRestoreSession.
 }
 
 /**
