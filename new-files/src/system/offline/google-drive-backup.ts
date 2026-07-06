@@ -3,9 +3,13 @@
  *
  * Backs up every localStorage key EXCEPT in-progress session data
  * (`sessionData`, `sessionData1`..`sessionData4`, per-user) to the user's
- * hidden Drive "appDataFolder". Manual-trigger only:
- *   - No auto-sync of any kind.
- *   - No restore/import — that's deferred to a future pass.
+ * hidden Drive "appDataFolder". Manual-trigger only — no auto-sync of any
+ * kind, in either direction.
+ *
+ * Restore is now implemented ({@link restoreFromBackup}) — downloads the
+ * existing backup file and writes every key straight back into
+ * localStorage. Since the backup never contained session keys to begin
+ * with, restoring can't touch an in-progress run either way.
  *
  * Token model: on Electron, main.cjs now requests offline access and
  * persists a refresh token (encrypted via Electron's safeStorage where
@@ -243,4 +247,75 @@ export async function backupSave(): Promise<string> {
   }
 
   return madeAt;
+}
+
+/** A single file's metadata as returned by Drive's files.list, for the debug listing screen. */
+export interface AppDataFileInfo {
+  id: string;
+  name: string;
+  modifiedTime: string;
+  size: string;
+}
+
+/** Lists every file currently in the app's hidden Drive appDataFolder. */
+export async function listAppDataFiles(): Promise<AppDataFileInfo[]> {
+  if (!cachedAccessToken) {
+    throw new Error("Not signed in — call signIn() first.");
+  }
+
+  const params = new URLSearchParams({
+    spaces: "appDataFolder",
+    fields: "files(id, name, modifiedTime, size)",
+  });
+
+  const res = await fetch(`${DRIVE_FILES_URL}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${cachedAccessToken}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Drive file listing failed: ${res.status}`);
+  }
+
+  const body = await res.json();
+  return body.files ?? [];
+}
+
+/**
+ * Downloads and restores the existing Drive backup, overwriting every key it
+ * contains directly into localStorage. Since the backup payload never
+ * includes session keys (see {@link collectBackupPayload}), this can't touch
+ * an in-progress run either way — but the caller is still expected to force
+ * a reload afterward so the game actually picks up the restored data, since
+ * most of it (save data, unlocks, dex) is only ever read once at boot.
+ *
+ * Throws if there's no existing backup to restore from.
+ */
+export async function restoreFromBackup(): Promise<void> {
+  if (!cachedAccessToken) {
+    throw new Error("Not signed in — call signIn() first.");
+  }
+
+  const existingId = await findExistingBackupFileId(cachedAccessToken);
+  if (!existingId) {
+    throw new Error("No backup found in Google Drive to restore from.");
+  }
+
+  const res = await fetch(`${DRIVE_FILES_URL}/${existingId}?alt=media`, {
+    headers: { Authorization: `Bearer ${cachedAccessToken}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Drive download failed: ${res.status} ${await res.text()}`);
+  }
+
+  const parsed = await res.json();
+  const data: Record<string, string> = parsed?.data ?? {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (SESSION_KEY_PATTERN.test(key)) {
+      // Defensive only — backups should never contain these to begin with.
+      continue;
+    }
+    localStorage.setItem(key, value);
+  }
 }

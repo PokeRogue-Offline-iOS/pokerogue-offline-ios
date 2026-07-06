@@ -4,30 +4,37 @@
  *
  * Adds an "Offline" tab to the REAL Settings screen (alongside
  * General/Display/Audio/Gamepad/Keyboard), via NavigationManager's
- * documented extension point. Two interactive rows (Google sign-in,
- * manual "Backup Save"), two read-only rows (Last Played, Battles).
+ * documented extension point.
  *
- * v2 of this patch — replaces the earlier standalone screen + separate
- * pause-menu entry entirely. That approach worked but looked wrong (a
- * flat option list, not the tabbed grid look). This version integrates
- * directly into the real Settings tab system instead.
+ * v3 of this patch — adds Restore Backup, Clear All Data, and a
+ * "Debug: List AppData Files" screen on top of v2's Connect/Backup/
+ * Last Played/Battles rows. Every row except Connect (and the two
+ * read-only info rows) is now greyed out and inert while signed out,
+ * using the game's existing TextStyle.SETTINGS_LOCKED convention.
  *
- * Seven sub-patches, applied in order:
+ * Sub-patches, applied in order:
  *
  *   1. src/enums/ui-mode.ts
- *        Append APP_SETTINGS enum value (after ALERT_MODAL, the last entry).
+ *        Append APP_SETTINGS and APP_DEBUG_FILE_LIST (after ALERT_MODAL,
+ *        the last entry).
  *
- *   2. src/system/offline/google-drive-backup.ts  (new file, unchanged from v1)
- *        Cross-platform (Capacitor / Electron) Drive backup helper.
+ *   2. src/system/offline/google-drive-backup.ts  (new file)
+ *        Cross-platform (Capacitor / Electron) Drive backup helper. Now
+ *        also exposes listAppDataFiles() and restoreFromBackup().
  *
  *   3. src/ui/settings/offline-settings-ui-handler.ts  (new file)
  *        Extends BaseSettingsUiHandler (same base class as the real
  *        General/Display/Audio tabs) instead of BaseOptionSelectUiHandler,
  *        so it renders with the identical tab-bar + grid-row look.
  *
+ *   3b. src/ui/settings/debug-appdata-list-ui-handler.ts  (new file)
+ *        Modeled directly on ConfirmUiHandler's shape — a dynamic list of
+ *        Drive appDataFolder files, any selection or Cancel just closes it.
+ *
  *   4. src/ui/ui.ts
- *        Import OfflineSettingsUiHandler, register at the position matching
- *        UiMode.APP_SETTINGS, add to noTransitionModes.
+ *        Import both new handlers, register at the positions matching
+ *        UiMode.APP_SETTINGS / UiMode.APP_DEBUG_FILE_LIST, add both to
+ *        noTransitionModes.
  *
  *   5. src/ui/settings/navigation-menu.ts
  *        Append UiMode.APP_SETTINGS + a hardcoded "Offline" label to
@@ -35,29 +42,26 @@
  *        makes it show up as a 6th tab in the real Settings screen.
  *
  *   6. src/system/settings/settings.ts
- *        Append SettingType.APP; append 4 new SettingKeys entries; append
- *        4 new Setting entries (2 activatable action rows, 2 read-only
- *        display rows) to the shared Setting[] array, all type: APP so they
- *        only ever show up on our tab.
+ *        Append SettingType.APP; append 7 SettingKeys entries; append 7
+ *        Setting entries (5 activatable action rows, 2 read-only display
+ *        rows) to the shared Setting[] array, all type: APP so they only
+ *        ever show up on our tab.
  *
  *   7. src/ui/settings/base-settings-ui-handler.ts
- *        Widen `optionValueLabels` and `activateSetting` from private to
- *        protected. PURE VISIBILITY CHANGE — no other line in this file is
- *        touched. This is what lets our subclass (a) update a row's
- *        displayed text after an async action completes, and (b) add our
- *        own activatable-row cases without editing the base class's switch
+ *        Widen `settingLabels`, `optionValueLabels`, and `activateSetting`
+ *        from private to protected. PURE VISIBILITY CHANGE — no other line
+ *        in this file is touched. This is what lets our subclass (a) grey
+ *        out / restyle a row's label and value text, (b) update displayed
+ *        text after an async action completes, and (c) add our own
+ *        activatable-row cases without editing the base class's switch
  *        statement directly.
  *
- * REMOVED from v1: the standalone MenuOptions.OFFLINE_SETTINGS pause-menu
- * entry and its screen are gone entirely — reachable now only via
- * Game Settings → cycle tabs, same as every other settings category.
- *
- * NOTE ON TESTING: all 7 sub-patches have been checked against a fresh clone
+ * NOTE ON TESTING: all sub-patches have been checked against a fresh clone
  * of pagefaultgames/pokerogue and the anchors are confirmed present at the
  * time this was written. The new UI handler's runtime behavior (reaching
- * into optionValueLabels after construction, the activateSetting override)
- * has NOT been verified in an actual build — see the comments in
- * offline-settings-ui-handler.ts for the specific risk.
+ * into optionValueLabels/settingLabels after construction, the
+ * activateSetting override, the UiMode.CONFIRM delay/message flow) has NOT
+ * been verified in an actual build.
  */
 
 const fs = require("fs");
@@ -107,7 +111,7 @@ if (uiModeSrc.includes("APP_SETTINGS")) {
 } else {
   const ANCHOR = "ALERT_MODAL,";
   requireAnchor(uiModeSrc, ANCHOR, "ALERT_MODAL in ui-mode.ts");
-  uiModeSrc = uiModeSrc.replace(ANCHOR, `${ANCHOR}\n  APP_SETTINGS,`);
+  uiModeSrc = uiModeSrc.replace(ANCHOR, `${ANCHOR}\n  APP_SETTINGS,\n  APP_DEBUG_FILE_LIST,`);
   writeFile(UI_MODE_PATH, uiModeSrc);
 }
 
@@ -141,6 +145,28 @@ if (fs.existsSync(HANDLER_PATH)) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sub-patch 3b: src/ui/settings/debug-appdata-list-ui-handler.ts  (new file)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEBUG_LIST_HANDLER_PATH = path.join(
+  "pokerogue-src",
+  "src",
+  "ui",
+  "settings",
+  "debug-appdata-list-ui-handler.ts",
+);
+
+if (fs.existsSync(DEBUG_LIST_HANDLER_PATH)) {
+  console.log("SKIP debug-appdata-list-ui-handler.ts — already exists");
+} else {
+  const src = fs.readFileSync(
+    path.join(NEW_FILES_DIR, "src", "ui", "settings", "debug-appdata-list-ui-handler.ts"),
+    "utf8",
+  );
+  writeFile(DEBUG_LIST_HANDLER_PATH, src);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Sub-patch 4: src/ui/ui.ts  →  import + register + noTransitionModes
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -154,16 +180,22 @@ if (uiSrc.includes("OfflineSettingsUiHandler")) {
   requireAnchor(uiSrc, IMPORT_ANCHOR, "AlertModalUiHandler import in ui.ts");
   uiSrc = uiSrc.replace(
     IMPORT_ANCHOR,
-    `${IMPORT_ANCHOR}\nimport { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";`,
+    `${IMPORT_ANCHOR}\nimport { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";\nimport { DebugAppDataListUiHandler } from "#ui/debug-appdata-list-ui-handler";`,
   );
 
   const HANDLER_ANCHOR = `new AlertModalUiHandler(),`;
   requireAnchor(uiSrc, HANDLER_ANCHOR, "new AlertModalUiHandler() in ui.ts");
-  uiSrc = uiSrc.replace(HANDLER_ANCHOR, `${HANDLER_ANCHOR}\n      new OfflineSettingsUiHandler(),`);
+  uiSrc = uiSrc.replace(
+    HANDLER_ANCHOR,
+    `${HANDLER_ANCHOR}\n      new OfflineSettingsUiHandler(),\n      new DebugAppDataListUiHandler(),`,
+  );
 
   const NO_TRANSITION_ANCHOR = `UiMode.ALERT_MODAL,`;
   requireAnchor(uiSrc, NO_TRANSITION_ANCHOR, "UiMode.ALERT_MODAL in noTransitionModes");
-  uiSrc = uiSrc.replace(NO_TRANSITION_ANCHOR, `${NO_TRANSITION_ANCHOR}\n  UiMode.APP_SETTINGS,`);
+  uiSrc = uiSrc.replace(
+    NO_TRANSITION_ANCHOR,
+    `${NO_TRANSITION_ANCHOR}\n  UiMode.APP_SETTINGS,\n  UiMode.APP_DEBUG_FILE_LIST,`,
+  );
 
   writeFile(UI_PATH, uiSrc);
 }
@@ -218,6 +250,9 @@ if (settingsSrc.includes("SettingType.APP")) {
   Offline_Backup_Save: "OFFLINE_BACKUP_SAVE",
   Offline_Last_Played: "OFFLINE_LAST_PLAYED",
   Offline_Battles: "OFFLINE_BATTLES",
+  Offline_Restore_Backup: "OFFLINE_RESTORE_BACKUP",
+  Offline_Clear_Data: "OFFLINE_CLEAR_DATA",
+  Offline_Debug_List_Files: "OFFLINE_DEBUG_LIST_FILES",
 };`,
   );
 
@@ -270,6 +305,30 @@ if (settingsSrc.includes("SettingType.APP")) {
     default: 0,
     type: SettingType.APP,
   },
+  {
+    key: SettingKeys.Offline_Restore_Backup,
+    label: "Restore Backup",
+    options: [{ value: "0", label: "Restore" }],
+    default: 0,
+    type: SettingType.APP,
+    activatable: true,
+  },
+  {
+    key: SettingKeys.Offline_Clear_Data,
+    label: "Clear All Data",
+    options: [{ value: "0", label: "Clear" }],
+    default: 0,
+    type: SettingType.APP,
+    activatable: true,
+  },
+  {
+    key: SettingKeys.Offline_Debug_List_Files,
+    label: "Debug: List AppData Files",
+    options: [{ value: "0", label: "View" }],
+    default: 0,
+    type: SettingType.APP,
+    activatable: true,
+  },
 ];`,
   );
 
@@ -286,6 +345,10 @@ let baseHandlerSrc = readFile(BASE_HANDLER_PATH);
 if (baseHandlerSrc.includes("protected optionValueLabels")) {
   console.log("SKIP base-settings-ui-handler.ts — already widened");
 } else {
+  const LABELS_FIELD_ANCHOR = `private settingLabels: Phaser.GameObjects.Text[];`;
+  requireAnchor(baseHandlerSrc, LABELS_FIELD_ANCHOR, "settingLabels field in base-settings-ui-handler.ts");
+  baseHandlerSrc = baseHandlerSrc.replace(LABELS_FIELD_ANCHOR, `protected settingLabels: Phaser.GameObjects.Text[];`);
+
   const FIELD_ANCHOR = `private optionValueLabels: Phaser.GameObjects.Text[][];`;
   requireAnchor(baseHandlerSrc, FIELD_ANCHOR, "optionValueLabels field in base-settings-ui-handler.ts");
   baseHandlerSrc = baseHandlerSrc.replace(FIELD_ANCHOR, `protected optionValueLabels: Phaser.GameObjects.Text[][];`);
