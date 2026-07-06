@@ -45,6 +45,10 @@ jobs:
           sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           sed -i '' "s/Unofficial Offline Client (Scooom)/Unofficial Offline Client (Scooom) Dev/" pokerogue-src/src/ui/handlers/title-ui-handler.ts
 
+      - name: Inject Google iOS Client ID (dev)
+        run: |
+          sed -i '' "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-k9ns6u546mgn6vjv1mcks32mn76u1v01.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
+
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
         run: pnpm install
@@ -76,6 +80,10 @@ jobs:
       - name: Sync Capacitor
         working-directory: pokerogue-src
         run: npx cap sync ios
+
+      - name: Wire up Google Sign-In URL handling in AppDelegate
+        working-directory: pokerogue-src
+        run: python3 ${{ github.workspace }}/scripts/patch-ios-appdelegate.py ios/App/App/AppDelegate.swift
 
       - name: Set app version
         working-directory: pokerogue-src

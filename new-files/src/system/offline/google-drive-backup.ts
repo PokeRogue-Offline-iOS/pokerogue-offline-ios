@@ -121,6 +121,20 @@ export async function signIn(): Promise<string> {
         // native platform — see capacitor.config.json comments; this is a
         // "Web application" type client used purely as the token audience.
         webClientId: "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
+        // REQUIRED on iOS specifically — without this, SocialLogin.login()
+        // throws "No provider was initialized" on iOS even though the exact
+        // same call works fine on Android with only webClientId set. Harmless
+        // to include on Android too, so it's set unconditionally here rather
+        // than branching on platform.
+        //
+        // This value is DIFFERENT for the prod (xyz.scooom.pkr) vs dev
+        // (xyz.scooom.pkrdev) iOS builds, since Google's iOS OAuth clients are
+        // bundle-ID-locked — substituted at build time via sed, sourced from
+        // GOOGLE_IOS_CLIENT_ID / GOOGLE_IOS_DEV_CLIENT_ID secrets. Android
+        // ignores this field entirely, so it gets the prod value there too —
+        // doesn't matter functionally, just keeps one substitution convention.
+        iOSClientId: "IOS_CLIENT_ID_PLACEHOLDER",
+        iOSServerClientId: "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
         mode: "online", // plain access token, not the server-auth-code/offline flow
       },
     });

@@ -50,6 +50,10 @@ jobs:
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
           sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
 
+      - name: Inject Google iOS Client ID
+        run: |
+          sed -i "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-ejrsdp1qu750amcjupo943593vmeje1k.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
+
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
         run: pnpm install
