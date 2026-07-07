@@ -64,15 +64,6 @@ jobs:
             sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           fi
 
-      - name: Inject Google Android Client ID
-        run: |
-          if [ "${{ inputs.dev }}" = "true" ]; then
-            sed -i "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-qinbf8pl0ljqi5mdbj88l9omhohde10s.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
-          else
-            sed -i "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-ejrsdp1qu750amcjupo943593vmeje1k.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
-          fi
-
-
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
         run: pnpm install

@@ -40,13 +40,12 @@ paths in the `pokerogue-offline` repo root.
 - Both Electron `.cjs` files pass `node --check`
 - The plugin swap from the archived `@codetrix-studio/capacitor-google-auth` to the maintained `@capgo/capacitor-social-login@8.3.33` (peer dep confirmed against Capacitor 8 on the npm registry)
 - Both `electron-builder.*.json` files needed `preload.cjs` added to their `files` allowlist — caught and fixed (would've been a silent runtime break otherwise)
+- `MainActivity.java`'s `notifyGoogleActivityResult(...)` call — confirmed against the plugin's actual setup docs and migration guide; method name/signature/dispatch pattern match exactly
+- `app-settings-ui-handler.ts`'s live label refresh (calling `show()` again from inside a button handler) — confirmed working in a real build
+- The Drive API v3 multipart upload request shape in `google-drive-backup.ts` and the OAuth loopback flow in `main.cjs` — confirmed working end-to-end: save on iOS, restore on the AppImage build using the same Google account
 
 **NOT verified — needs your attention before this ships:**
-- `MainActivity.java`'s final line (`notifyGoogleActivityResult(...)`) — the plugin's own Android setup doc was truncated right at this point in every source available; the method name is a best guess following the plugin's naming conventions, not confirmed against its actual source. Marked with a `TODO` comment pointing at the docs page to check.
-- `app-settings-ui-handler.ts`'s live label refresh (calling `show()` again from inside a button handler) — untested in a real Phaser build. Comment in the file notes the fallback (close/reopen instead of refresh-in-place) if it misbehaves.
 - The Scooom icon badge — deliberately left out of v1 rather than guessing at Phaser's dynamic texture-loading API blind. Maroon background tint is in; the icon is a follow-up once the game's actual loader-scene pattern can be confirmed.
-- `locales/en/menu.json`'s anchor (`"gameSettings": "Game Settings"`) — the locales submodule isn't checked out in a shallow clone, so this one anchor couldn't be tested end-to-end like the other five. Very likely fine (it's a simple, stable key) but flagged for honesty.
-- The Drive API v3 multipart upload request shape in `google-drive-backup.ts` and the OAuth loopback flow in `main.cjs` — both written against Google's documented formats, neither has been run against a real Google Cloud OAuth client yet.
 
 ## Suggested test order once secrets are in place
 
