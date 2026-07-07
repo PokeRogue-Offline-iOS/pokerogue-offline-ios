@@ -51,12 +51,12 @@
  *        makes it show up as a 6th tab in the real Settings screen.
  *
  *   6. src/system/settings/settings.ts
- *        Append SettingType.APP; append 9 SettingKeys entries; append 9
+ *        Append SettingType.APP; append 10 SettingKeys entries; append 10
  *        Setting entries (grouped: 3 locked action/toggle rows, 1 read-only
  *        info row, 1 always-on action row, then 1 always-on action row +
- *        2 always-on read-only info rows for Force Daily Seed) to the
- *        shared Setting[] array, all type: APP so they only ever show up
- *        on our tab.
+ *        3 always-on read-only info rows — Value, Fetched, Expires — for
+ *        the daily seed cache) to the shared Setting[] array, all
+ *        type: APP so they only ever show up on our tab.
  *
  *   7. src/ui/settings/base-settings-ui-handler.ts
  *        Widen `settingLabels`, `optionValueLabels`, `optionCursors`, and
@@ -239,7 +239,8 @@ if (settingsSrc.includes("SettingType.APP")) {
   Offline_Clear_Data: "OFFLINE_CLEAR_DATA",
   Offline_Force_Daily_Seed: "OFFLINE_FORCE_DAILY_SEED",
   Offline_Daily_Seed_Value: "OFFLINE_DAILY_SEED_VALUE",
-  Offline_Daily_Seed_Info: "OFFLINE_DAILY_SEED_INFO",
+  Offline_Daily_Seed_Fetched: "OFFLINE_DAILY_SEED_FETCHED",
+  Offline_Daily_Seed_Expires: "OFFLINE_DAILY_SEED_EXPIRES",
 };`,
   );
 
@@ -327,8 +328,15 @@ if (settingsSrc.includes("SettingType.APP")) {
     type: SettingType.APP,
   },
   {
-    key: SettingKeys.Offline_Daily_Seed_Info,
-    label: "Daily Seed Info",
+    key: SettingKeys.Offline_Daily_Seed_Fetched,
+    label: "Daily Seed Fetched",
+    options: [{ value: "0", label: "—" }],
+    default: 0,
+    type: SettingType.APP,
+  },
+  {
+    key: SettingKeys.Offline_Daily_Seed_Expires,
+    label: "Daily Seed Expires",
     options: [{ value: "0", label: "—" }],
     default: 0,
     type: SettingType.APP,

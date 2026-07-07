@@ -60,7 +60,8 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
    */
   private static readonly ALWAYS_LOCKED_KEYS = [
     SettingKeys.Offline_Daily_Seed_Value,
-    SettingKeys.Offline_Daily_Seed_Info,
+    SettingKeys.Offline_Daily_Seed_Fetched,
+    SettingKeys.Offline_Daily_Seed_Expires,
   ];
 
   /**
@@ -146,21 +147,43 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     }
   }
 
-  /** Zero-pads a number to 2 digits for UTC time formatting. */
-  private static pad2(n: number): string {
-    return n.toString().padStart(2, "0");
-  }
+  /**
+   * Formats the (always non-negative) gap between `target` and `now` as a
+   * relative string, floored to 5-minute increments — e.g. "1h 45m ago",
+   * "in 3h", "just now". Sub-5-minute gaps collapse to "just now"/"in a
+   * moment" rather than showing "0m", since a 5-minute floor can't
+   * distinguish "2 minutes ago" from "right now" anyway.
+   */
+  private static formatRelative(target: Date, now: Date): string {
+    const diffMs = target.getTime() - now.getTime();
+    const past = diffMs <= 0;
+    const totalMinutesRaw = Math.floor(Math.abs(diffMs) / 60000);
+    const totalMinutes = totalMinutesRaw - (totalMinutesRaw % 5); // floor to nearest 5
 
-  /** Formats a Date as "MM-DD HH:MM UTC", consistent with the rest of the app's UTC-only time handling. */
-  private static formatUtc(date: Date): string {
-    const p = OfflineSettingsUiHandler.pad2;
-    return `${p(date.getUTCMonth() + 1)}-${p(date.getUTCDate())} ${p(date.getUTCHours())}:${p(date.getUTCMinutes())} UTC`;
+    if (totalMinutes < 5) {
+      return past ? "just now" : "in a moment";
+    }
+
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const mins = totalMinutes % 60;
+
+    let body: string;
+    if (days > 0) {
+      body = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+    } else if (hours > 0) {
+      body = mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    } else {
+      body = `${mins}m`;
+    }
+
+    return past ? `${body} ago` : `in ${body}`;
   }
 
   /**
    * Reads the daily seed cache (written by fix-daily-seed.js, or by
-   * handleForceDailySeedPress below) and reflects it in the two read-only
-   * rows: the seed value itself, and a combined fetched/expiry line.
+   * handleForceDailySeedPress below) and reflects it in three read-only
+   * rows: the seed value itself, when it was fetched, and when it expires.
    * Expiry is the next UTC midnight after the cached date, since that's
    * when fix-daily-seed.js's own date check invalidates the cache.
    */
@@ -172,20 +195,22 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     this.setRowText(SettingKeys.Offline_Daily_Seed_Value, seed ?? "None");
 
     if (!seed || !cachedDate) {
-      this.setRowText(SettingKeys.Offline_Daily_Seed_Info, "—");
+      this.setRowText(SettingKeys.Offline_Daily_Seed_Fetched, "—");
+      this.setRowText(SettingKeys.Offline_Daily_Seed_Expires, "—");
       return;
     }
 
+    const now = new Date();
+
     const expiry = new Date(`${cachedDate}T00:00:00.000Z`);
     expiry.setUTCDate(expiry.getUTCDate() + 1);
-    const expiryText = OfflineSettingsUiHandler.formatUtc(expiry);
+    this.setRowText(SettingKeys.Offline_Daily_Seed_Expires, OfflineSettingsUiHandler.formatRelative(expiry, now));
 
     const fetchedAtMs = fetchedAtRaw ? Number(fetchedAtRaw) : Number.NaN;
-    const fetchedText = Number.isFinite(fetchedAtMs)
-      ? OfflineSettingsUiHandler.formatUtc(new Date(fetchedAtMs))
-      : "unknown";
-
-    this.setRowText(SettingKeys.Offline_Daily_Seed_Info, `Fetched ${fetchedText} · Expires ${expiryText}`);
+    this.setRowText(
+      SettingKeys.Offline_Daily_Seed_Fetched,
+      Number.isFinite(fetchedAtMs) ? OfflineSettingsUiHandler.formatRelative(new Date(fetchedAtMs), now) : "unknown",
+    );
   }
 
   /** Guard for the top of every action handler except Connect itself. */
