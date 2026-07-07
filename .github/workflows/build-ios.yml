@@ -74,7 +74,7 @@ jobs:
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
-          pnpm add @capacitor/core @capacitor/cli @capacitor/ios @capacitor/filesystem @capacitor/share @capacitor/status-bar @capgo/capacitor-social-login@8.3.33
+          pnpm add @capacitor/core@8.4.1 @capacitor/cli@8.4.1 @capacitor/ios@8.4.1 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2 @capgo/capacitor-social-login@8.3.33
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
