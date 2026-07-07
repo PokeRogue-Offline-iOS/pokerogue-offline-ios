@@ -44,22 +44,20 @@ const MONTH_LABELS = [
 const COLUMNS = 7;
 const ROWS = 6;
 const CELL_W = 44;
-const CELL_H = 18;
+const CELL_H = 22;
 const GRID_X = 4;
 
 // Layout budget against the real 320x180 canvas (see scene-base.ts
 // scaledCanvas). Each section gets its own fixed band so nothing overlaps:
 //   Header (title):     0-14
 //   Weekday row:        15-25
-//   Day grid:           26-134  (6 rows x 18px)
-//   Footer (today/tmrw):136-162
-//   Hint text:          164-172
+//   Day grid:           26-158  (6 rows x 22px)
+//   Footer (today/tmrw):160-178 (single line each, side by side)
 const HEADER_H = 14;
 const WEEKDAY_Y = HEADER_H + 1;
 const GRID_Y = 26;
 const FOOTER_Y = GRID_Y + ROWS * CELL_H + 2;
-const FOOTER_H = 26;
-const HINT_Y = FOOTER_Y + FOOTER_H + 2;
+const FOOTER_H = 18;
 
 interface DayCell {
   container: Phaser.GameObjects.Container;
@@ -92,8 +90,6 @@ export class GachaCalendarUiHandler extends UiHandler {
   private todayIcon: Phaser.GameObjects.Sprite;
   private tomorrowLabel: Phaser.GameObjects.Text;
   private tomorrowIcon: Phaser.GameObjects.Sprite;
-
-  private hintText: Phaser.GameObjects.Text;
 
   /** Currently displayed UTC year/month (month is 0-11) */
   private viewYear: number;
@@ -152,8 +148,8 @@ export class GachaCalendarUiHandler extends UiHandler {
         cellContainer.add(dateText);
 
         // Icon anchored toward the bottom-right, clear of the date number
-        // in the top-left corner even at this smaller cell height.
-        const icon = globalScene.add.sprite(34, 9, "pokemon_icons_0").setScale(0.4).setOrigin(0.5);
+        // in the top-left corner.
+        const icon = globalScene.add.sprite(34, 12, "pokemon_icons_0").setScale(0.45).setOrigin(0.5);
         cellContainer.add(icon);
 
         this.calendarContainer.add(cellContainer);
@@ -165,32 +161,23 @@ export class GachaCalendarUiHandler extends UiHandler {
     this.cursorObj = globalScene.add.image(0, 0, "select_cursor").setOrigin(0);
     this.calendarContainer.add(this.cursorObj);
 
-    // Today / tomorrow summary footer
+    // Today / tomorrow summary footer - single line each, side by side.
     const footerWindow = addWindow(0, FOOTER_Y, globalScene.scaledCanvas.width, FOOTER_H).setOrigin(0);
     this.calendarContainer.add(footerWindow);
 
-    this.todayIcon = globalScene.add.sprite(10, FOOTER_Y + 13, "pokemon_icons_0").setScale(0.5);
+    this.todayIcon = globalScene.add.sprite(10, FOOTER_Y + 9, "pokemon_icons_0").setScale(0.5);
     this.calendarContainer.add(this.todayIcon);
-    this.todayLabel = addTextObject(20, FOOTER_Y + 2, "", TextStyle.WINDOW, { maxLines: 2 }).setOrigin(0);
+    this.todayLabel = addTextObject(20, FOOTER_Y + 5, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
     this.calendarContainer.add(this.todayLabel);
 
     this.tomorrowIcon = globalScene.add
-      .sprite(globalScene.scaledCanvas.width / 2 + 10, FOOTER_Y + 13, "pokemon_icons_0")
+      .sprite(globalScene.scaledCanvas.width / 2 + 10, FOOTER_Y + 9, "pokemon_icons_0")
       .setScale(0.5);
     this.calendarContainer.add(this.tomorrowIcon);
-    this.tomorrowLabel = addTextObject(globalScene.scaledCanvas.width / 2 + 20, FOOTER_Y + 2, "", TextStyle.WINDOW, {
-      maxLines: 2,
+    this.tomorrowLabel = addTextObject(globalScene.scaledCanvas.width / 2 + 20, FOOTER_Y + 5, "", TextStyle.WINDOW, {
+      maxLines: 1,
     }).setOrigin(0);
     this.calendarContainer.add(this.tomorrowLabel);
-
-    this.hintText = addTextObject(
-      0,
-      HINT_Y,
-      "Left/Right: Change day   Cycle Shiny/Form: Change month   Cancel: Back",
-      TextStyle.WINDOW_ALT,
-      { maxLines: 1 },
-    ).setOrigin(0);
-    this.calendarContainer.add(this.hintText);
   }
 
   override show(args: any[]): boolean {
@@ -256,10 +243,10 @@ export class GachaCalendarUiHandler extends UiHandler {
     const todaySpecies = getPokemonSpecies(getLegendaryGachaSpeciesForTimestamp(todayTimestamp));
     const tomorrowSpecies = getPokemonSpecies(getLegendaryGachaSpeciesForTimestamp(tomorrowTimestamp));
 
-    this.todayLabel.setText(`Today's Legendary:\n${todaySpecies.getName()}`);
+    this.todayLabel.setText(`Today: ${todaySpecies.getName()}`);
     this.todayIcon.setTexture(todaySpecies.getIconAtlasKey(), todaySpecies.getIconId(false));
 
-    this.tomorrowLabel.setText(`Tomorrow's Legendary:\n${tomorrowSpecies.getName()}`);
+    this.tomorrowLabel.setText(`Tomorrow: ${tomorrowSpecies.getName()}`);
     this.tomorrowIcon.setTexture(tomorrowSpecies.getIconAtlasKey(), tomorrowSpecies.getIconId(false));
   }
 
