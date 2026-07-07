@@ -28,6 +28,7 @@ apply_patch "update-title-labels.js"  all
 #apply_patch "add-import-data-from-url.js"  all
 
 apply_patch "app-settings-menu.js" all
+apply_patch "gacha-calendar.js"    all
 
 # apply_patch "seeded-classic-run.js"   all #Disable seeded classic
 
