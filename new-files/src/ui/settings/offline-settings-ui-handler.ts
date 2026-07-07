@@ -54,6 +54,14 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
    */
   private restoreComplete = false;
 
+  /**
+   * True while a Connect press is in flight (or within the 1s post-settle
+   * debounce window below) — prevents a double-tap from firing a second
+   * SocialLogin.login() call and spawning a second native account-chooser
+   * on top of the first.
+   */
+  private connectInProgress = false;
+
   constructor(mode: UiMode | null = null) {
     super(SettingType.APP, mode);
     this.title = "Offline";
@@ -204,9 +212,14 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   }
 
   private handleConnectPress(): void {
-    if (offlineBackup.isSignedIn()) {
+    if (offlineBackup.isSignedIn() || this.connectInProgress) {
       return;
     }
+    this.connectInProgress = true;
+    // Enforce a hard minimum lock on top of connectInProgress, so a fast
+    // rejection can't be immediately re-tapped into spawning a second
+    // account-chooser before the UI's had a chance to settle.
+    const unlockAt = Date.now() + 1000;
     this.setRowText(SettingKeys.Offline_Google_Connect, "Connecting…");
     offlineBackup
       .signIn()
@@ -218,6 +231,16 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
         console.error("Google sign-in failed:", err);
         this.showText("Google sign-in failed. Check the console for details.", 0, () => this.showText("", 0), 1500);
         this.refreshDisplay();
+      })
+      .finally(() => {
+        const remaining = unlockAt - Date.now();
+        if (remaining > 0) {
+          setTimeout(() => {
+            this.connectInProgress = false;
+          }, remaining);
+        } else {
+          this.connectInProgress = false;
+        }
       });
   }
 
