@@ -44,9 +44,22 @@ const MONTH_LABELS = [
 const COLUMNS = 7;
 const ROWS = 6;
 const CELL_W = 44;
-const CELL_H = 24;
+const CELL_H = 18;
 const GRID_X = 4;
-const GRID_Y = 20;
+
+// Layout budget against the real 320x180 canvas (see scene-base.ts
+// scaledCanvas). Each section gets its own fixed band so nothing overlaps:
+//   Header (title):     0-14
+//   Weekday row:        15-25
+//   Day grid:           26-134  (6 rows x 18px)
+//   Footer (today/tmrw):136-162
+//   Hint text:          164-172
+const HEADER_H = 14;
+const WEEKDAY_Y = HEADER_H + 1;
+const GRID_Y = 26;
+const FOOTER_Y = GRID_Y + ROWS * CELL_H + 2;
+const FOOTER_H = 26;
+const HINT_Y = FOOTER_Y + FOOTER_H + 2;
 
 interface DayCell {
   container: Phaser.GameObjects.Container;
@@ -107,16 +120,16 @@ export class GachaCalendarUiHandler extends UiHandler {
     this.calendarContainer.add(bgColor);
 
     // Header window with title text (month/year, filled in on show/navigate)
-    const headerWindow = addWindow(0, 0, globalScene.scaledCanvas.width, 16).setOrigin(0);
+    const headerWindow = addWindow(0, 0, globalScene.scaledCanvas.width, HEADER_H).setOrigin(0);
     this.calendarContainer.add(headerWindow);
 
-    this.titleText = addTextObject(0, 2, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
+    this.titleText = addTextObject(2, 1, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
     this.calendarContainer.add(this.titleText);
 
-    // Weekday header row
+    // Weekday header row - sits below the header window, not on top of it.
     this.weekdayTexts = [];
     for (let c = 0; c < COLUMNS; c++) {
-      const t = addTextObject(GRID_X + c * CELL_W, GRID_Y - 10, WEEKDAY_LABELS[c], TextStyle.WINDOW_ALT, {
+      const t = addTextObject(GRID_X + c * CELL_W, WEEKDAY_Y, WEEKDAY_LABELS[c], TextStyle.WINDOW_ALT, {
         maxLines: 1,
       }).setOrigin(0);
       this.calendarContainer.add(t);
@@ -138,7 +151,9 @@ export class GachaCalendarUiHandler extends UiHandler {
         const dateText = addTextObject(2, 1, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
         cellContainer.add(dateText);
 
-        const icon = globalScene.add.sprite(CELL_W - 14, CELL_H - 14, "pokemon_icons_0").setScale(0.5).setOrigin(0.5);
+        // Icon anchored toward the bottom-right, clear of the date number
+        // in the top-left corner even at this smaller cell height.
+        const icon = globalScene.add.sprite(34, 9, "pokemon_icons_0").setScale(0.4).setOrigin(0.5);
         cellContainer.add(icon);
 
         this.calendarContainer.add(cellContainer);
@@ -151,27 +166,26 @@ export class GachaCalendarUiHandler extends UiHandler {
     this.calendarContainer.add(this.cursorObj);
 
     // Today / tomorrow summary footer
-    const footerY = GRID_Y + ROWS * CELL_H + 4;
-    const footerWindow = addWindow(0, footerY, globalScene.scaledCanvas.width, 30).setOrigin(0);
+    const footerWindow = addWindow(0, FOOTER_Y, globalScene.scaledCanvas.width, FOOTER_H).setOrigin(0);
     this.calendarContainer.add(footerWindow);
 
-    this.todayIcon = globalScene.add.sprite(10, footerY + 15, "pokemon_icons_0").setScale(0.6);
+    this.todayIcon = globalScene.add.sprite(10, FOOTER_Y + 13, "pokemon_icons_0").setScale(0.5);
     this.calendarContainer.add(this.todayIcon);
-    this.todayLabel = addTextObject(20, footerY + 3, "", TextStyle.WINDOW, { maxLines: 2 }).setOrigin(0);
+    this.todayLabel = addTextObject(20, FOOTER_Y + 2, "", TextStyle.WINDOW, { maxLines: 2 }).setOrigin(0);
     this.calendarContainer.add(this.todayLabel);
 
     this.tomorrowIcon = globalScene.add
-      .sprite(globalScene.scaledCanvas.width / 2 + 10, footerY + 15, "pokemon_icons_0")
-      .setScale(0.6);
+      .sprite(globalScene.scaledCanvas.width / 2 + 10, FOOTER_Y + 13, "pokemon_icons_0")
+      .setScale(0.5);
     this.calendarContainer.add(this.tomorrowIcon);
-    this.tomorrowLabel = addTextObject(globalScene.scaledCanvas.width / 2 + 20, footerY + 3, "", TextStyle.WINDOW, {
+    this.tomorrowLabel = addTextObject(globalScene.scaledCanvas.width / 2 + 20, FOOTER_Y + 2, "", TextStyle.WINDOW, {
       maxLines: 2,
     }).setOrigin(0);
     this.calendarContainer.add(this.tomorrowLabel);
 
     this.hintText = addTextObject(
       0,
-      footerY + 32,
+      HINT_Y,
       "Left/Right: Change day   Cycle Shiny/Form: Change month   Cancel: Back",
       TextStyle.WINDOW_ALT,
       { maxLines: 1 },
