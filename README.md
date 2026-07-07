@@ -21,16 +21,15 @@ paths in the `pokerogue-offline` repo root.
 
 ## Before this actually works — placeholders and secrets
 
-**Fill in directly (safe to commit, not secret):**
-- `configs/android/capacitor/capacitor.config.json` → `REPLACE_WITH_WEB_CLIENT_ID`
-- `configs/ios/capacitor/capacitor.config.json` → `REPLACE_WITH_IOS_CLIENT_ID` and `REPLACE_WITH_WEB_CLIENT_ID`
-- `new-files/src/system/offline/google-drive-backup.ts` → the same `REPLACE_WITH_WEB_CLIENT_ID` placeholder (currently duplicated in two places — worth factoring into one shared constant later)
+**Already filled in (safe to commit, not secret):**
+- `configs/android/capacitor/capacitor.config.json`, `configs/ios/capacitor/capacitor.config.json`, and `new-files/src/system/offline/google-drive-backup.ts` all carry this project's real client IDs now — no placeholders left to fill in here.
+- The web client ID is still duplicated across three call sites though (`capacitor.config.json` ×2 and `google-drive-backup.ts`) — worth factoring into one shared constant later.
 
 **Add as GitHub Actions Secrets (repo Settings → Secrets and variables → Actions):**
 - `GOOGLE_DESKTOP_CLIENT_ID`
 - `GOOGLE_DESKTOP_CLIENT_SECRET`
 - `GOOGLE_IOS_REVERSED_CLIENT_ID` (the `com.googleusercontent.apps.XXXX` string Google shows for the iOS client)
-- `ANDROID_DEBUG_KEYSTORE_B64` (base64 of the pinned debug keystore — generated separately; **not included in this patch set**, add the restore-keystore step to `build-android.yml` yourself before `assembleDebug` runs, since it wasn't added to the copy of the workflow in here)
+- `ANDROID_DEBUG_KEYSTORE_B64` (base64 of the pinned debug keystore, generated separately) — the restore-keystore step is already wired into `build-android.yml`, running right before `assembleDebug`.
 
 ## What's been verified vs. what hasn't
 
