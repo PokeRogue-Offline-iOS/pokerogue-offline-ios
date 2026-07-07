@@ -189,9 +189,17 @@ jobs:
       - name: DEBUG - print restored keystore SHA-1
         run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
 
+      - name: DEBUG - print android-related env vars
+        run: env | grep -i android || true
+
       - name: Build release APK
         working-directory: pokerogue-src/android
-        run: ./gradlew assembleDebug
+        run: |
+          ./gradlew assembleDebug \
+            -Pandroid.injected.signing.store.file=$HOME/.android/debug.keystore \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
 
       - name: Rename resulting APK
         run: |
