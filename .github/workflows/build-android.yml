@@ -64,13 +64,14 @@ jobs:
             sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           fi
 
-      # Only wired up for prod: the dev Capacitor config has no SocialLogin
-      # plugin block (Drive backup untested on Android as of this handoff),
-      # so there's no placeholder to fill and no reason to pull the plugin in.
       - name: Inject Google iOS Client ID
-        if: ${{ inputs.dev != true }}
         run: |
-          sed -i "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-ejrsdp1qu750amcjupo943593vmeje1k.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            sed -i "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-qinbf8pl0ljqi5mdbj88l9omhohde10s.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
+          else
+            sed -i "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-ejrsdp1qu750amcjupo943593vmeje1k.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
+          fi
+
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
@@ -79,11 +80,7 @@ jobs:
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
-          if [ "${{ inputs.dev }}" = "true" ]; then
-            pnpm add @capacitor/core@8.3.4 @capacitor/cli@8.3.4 @capacitor/android@8.3.4 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2
-          else
             pnpm add @capacitor/core@8.3.4 @capacitor/cli@8.3.4 @capacitor/android@8.3.4 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2 @capgo/capacitor-social-login@8.3.33
-          fi
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
