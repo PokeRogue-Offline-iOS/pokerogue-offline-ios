@@ -1,55 +1,120 @@
-# App Settings Menu + Google Drive Backup — Patch Set
+# PokeRogueOffline
 
-Applies to branch `qualityOfLifeLove`. Drop these files into the matching
-paths in the `pokerogue-offline` repo root.
+A fully offline wrapper for PokéRogue, available on iOS, Android, Windows, and Linux. Play fully offline with local saves, or import your save from [pokerogue.net](https://pokerogue.net).
 
-## How to apply
+## Features
 
-1. Copy `patches/all/node/app-settings-menu.js` → `patches/all/node/`
-2. Copy `new-files/` contents → repo root as `new-files/` (the patch script
-   reads from here at build time; the two files under it get written into
-   `pokerogue-src` when the patch runs — they are NOT meant to be committed
-   into `pokerogue-src` directly, since that's a fresh clone each build)
-3. Copy `configs/` contents over the existing `configs/` — these **overwrite**
-   `capacitor.config.json` (both platforms), `MainActivity.java`,
-   `main.cjs`, and both `electron-builder.*.json` files, and **add**
-   `preload.cjs` (new)
-4. Copy `.github/workflows/*.yml` over the existing four workflow files
-5. Add `patches/all/node/app-settings-menu.js` to the "All platforms"
-   section of `scripts/apply-patches.sh` (one line, same as the other
-   `apply_patch` calls in that file)
+- Fully offline — no internet required after install
+  - Exception: Starting a daily run will *attempt* to connect to this repo, but is not required.
+- Local saves that persist between sessions
+- Import saves from your online account
+- Based on the latest `main` branch of [pagefaultgames / pokerogue](https://github.com/pagefaultgames/pokerogue/)
 
-## Before this actually works — placeholders and secrets
+## What's New
 
-**Already filled in (safe to commit, not secret):**
-- `configs/android/capacitor/capacitor.config.json`, `configs/ios/capacitor/capacitor.config.json`, and `new-files/src/system/offline/google-drive-backup.ts` all carry this project's real client IDs now — no placeholders left to fill in here.
-- The web client ID is still duplicated across three call sites though (`capacitor.config.json` ×2 and `google-drive-backup.ts`) — worth factoring into one shared constant later.
+### New Features
+- Added an **Unlock Everything** option in Manage Data — this instantly unlocks all starters, forms, and progression without needing to import a save manually.
+- Added an **Reset Everything** option in Manage Data — this deletes all current data. **USE WITH CAUTION**.
+- This is the **only** offline client that loads the actual server daily seed. Useful when there are special event daily runs.
+- Includes the build number in the banner for support reasons.
 
-**Add as GitHub Actions Secrets (repo Settings → Secrets and variables → Actions):**
-- `GOOGLE_DESKTOP_CLIENT_ID`
-- `GOOGLE_DESKTOP_CLIENT_SECRET`
-- `GOOGLE_IOS_REVERSED_CLIENT_ID` (the `com.googleusercontent.apps.XXXX` string Google shows for the iOS client)
-- `ANDROID_DEBUG_KEYSTORE_B64` (base64 of the pinned debug keystore, generated separately) — the restore-keystore step is already wired into `build-android.yml`, running right before `assembleDebug`.
+### Changes to How the App is Built
+The app pulls directly from the official PokéRogue source and applies a small set of targeted fixes on top of it. This means the app will always be up to date with whatever the official game ships, with no manual syncing required.
 
-## What's been verified vs. what hasn't
+Two of those fixes are improvements submitted to the PokéRogue team for inclusion in the main game. Once they're accepted, the app will automatically stop applying them and just use the official versions. The pending changes are:
 
-**Verified (ran for real against a fresh clone of pagefaultgames/pokerogue):**
-- All 6 sub-patches in `app-settings-menu.js` applied cleanly, anchors matched exactly
-- All new/modified `.ts` files pass TypeScript syntax checking
-- Both Electron `.cjs` files pass `node --check`
-- The plugin swap from the archived `@codetrix-studio/capacitor-google-auth` to the maintained `@capgo/capacitor-social-login@8.3.33` (peer dep confirmed against Capacitor 8 on the npm registry)
-- Both `electron-builder.*.json` files needed `preload.cjs` added to their `files` allowlist — caught and fixed (would've been a silent runtime break otherwise)
-- `MainActivity.java`'s `notifyGoogleActivityResult(...)` call — confirmed against the plugin's actual setup docs and migration guide; method name/signature/dispatch pattern match exactly
-- `app-settings-ui-handler.ts`'s live label refresh (calling `show()` again from inside a button handler) — confirmed working in a real build
-- The Drive API v3 multipart upload request shape in `google-drive-backup.ts` and the OAuth loopback flow in `main.cjs` — confirmed working end-to-end: save on iOS, restore on the AppImage build using the same Google account
+- [#7222](https://github.com/pagefaultgames/pokerogue/pull/7222) — A fix for the file import screen on iOS
+- [#7223](https://github.com/pagefaultgames/pokerogue/pull/7223) — A fix to stop the screen from accidentally zooming in when tapping quickly
 
-**NOT verified — needs your attention before this ships:**
-- The Scooom icon badge — deliberately left out of v1 rather than guessing at Phaser's dynamic texture-loading API blind. Maroon background tint is in; the icon is a follow-up once the game's actual loader-scene pattern can be confirmed.
+---
 
-## Suggested test order once secrets are in place
+# iOS
 
-1. Desktop build first (`build-exe.yml`) — fastest feedback loop, no APK/keystore complexity
-2. Confirm the pause menu entry appears under "Game Settings" and the screen opens
-3. Confirm sign-in round-trips to an access token
-4. Confirm "Backup Save" actually creates a file in Drive's hidden app-data folder (visible via [Google's OAuth Playground](https://developers.google.com/oauthplayground) or a small test script, not the regular Drive UI)
-5. Only then move to Android/iOS
+## Getting the IPA
+
+Go to the [Releases](https://github.com/PokeRogue-Offline/pokerogue-offline/releases) and download `PokeRogueOffline.ipa` from the latest release.
+
+## Installing the IPA
+
+### Option 1: LiveContainer + SideStore (Recommended — unlimited apps)
+
+LiveContainer lets you run IPAs inside a container without using up your sideloading slots.
+
+**First-time setup:**
+1. Install **iLoader** on your PC/Mac from [GitHub](https://github.com/nab138/iloader)
+2. Connect your iPhone via USB and open iLoader
+3. Sign in with your Apple ID
+4. Select **LiveContainer + SideStore** and install it
+5. Open LiveContainer on your device and complete the setup (import certificate from SideStore)
+
+**Installing PokeRogueOffline:**
+1. Download `PokeRogueOffline.ipa` to your iPhone (via Safari or Files)
+2. Open LiveContainer and tap the **+** button in the top right
+3. Select the IPA file
+4. Tap the app to launch it
+
+> **Note:** LiveContainer signs the app with your SideStore certificate automatically — no manual signing needed.
+
+---
+
+### Option 2: SideStore (without LiveContainer)
+
+SideStore lets you sideload up to 3 apps and refresh them wirelessly without a PC after setup.
+
+1. Install SideStore using iLoader or AltServer
+2. Open SideStore and tap **+** in My Apps
+3. Select `PokeRogueOffline.ipa`
+4. Apps must be refreshed every 7 days (can be automated with a Shortcuts automation)
+
+---
+
+### Option 3: Feather / Sideloadly
+
+If you already use Feather or Sideloadly, just sign and install the IPA as you normally would.
+
+---
+
+# Android
+
+Go to the [Releases](https://github.com/PokeRogue-Offline/pokerogue-offline/releases) and download `PokeRogueOffline.apk` from the latest release.
+
+- Enable "Install from Unknown Sources" in Settings
+- Download and install the APK
+- Note: APK is debug-signed, you may need to allow installation
+
+---
+
+# Windows
+
+Go to the [Releases](https://github.com/PokeRogue-Offline/pokerogue-offline/releases) and download `PokeRogueOffline.exe` from the latest release.
+
+- Run the EXE directly — no installation required
+- **Requires WebView2**, which ships with Windows 11 and is installed automatically on Windows 10 via Windows Update. If you get an error on launch, download it from [Microsoft](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
+
+---
+
+# Linux
+
+Go to the [Releases](https://github.com/PokeRogue-Offline/pokerogue-offline/releases) and download `PokeRogueOffline.AppImage` from the latest release.
+
+- Make the file executable: `chmod +x PokeRogueOffline.AppImage`
+- Run it: `./PokeRogueOffline.AppImage`
+- **Requires WebKitGTK**. Most desktop Linux distributions (Ubuntu 24.04+, Fedora 40+, etc.) include this by default. If the app fails to launch, install it with:
+  - Ubuntu/Debian: `sudo apt install libwebkit2gtk-4.1`
+  - Fedora: `sudo dnf install webkitgtk6.0`
+  - Arch: `sudo pacman -S webkit2gtk-4.1`
+
+---
+
+## Importing your save
+
+1. Go to [pokerogue.net](https://pokerogue.net) on a browser and log in
+2. Navigate to **Pause → Manage Data → Export Save**
+3. Open PokeRogueOffline and navigate to **Pause → Manage Data → Import Save**
+4. Select the exported file
+
+## Notes
+
+- This app is for personal use only
+- Saves are stored locally and are not synced to any server
+- This is an unofficial fan project and is not affiliated with the PokéRogue team
