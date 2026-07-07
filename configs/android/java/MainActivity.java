@@ -32,17 +32,21 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
             }
             Plugin plugin = pluginHandle.getInstance();
             if (plugin instanceof SocialLoginPlugin) {
-                // TODO — VERIFY BEFORE SHIPPING: the exact dispatch call from here
-                // into the plugin's GoogleProvider was not fully visible in the
-                // plugin's published docs/migration guide at the time this was
-                // written (the guide's Android setup snippet was truncated right
-                // around this point). Confirm the correct method against the
-                // plugin's actual source before relying on this:
-                // https://github.com/Cap-go/capacitor-social-login/blob/main/docs/setup_google.md
-                ((SocialLoginPlugin) plugin).notifyGoogleActivityResult(requestCode, resultCode, data);
+                ((SocialLoginPlugin) plugin).handleGoogleLoginIntent(requestCode, data);
             }
         }
     }
+
+    // Required by the ModifiedMainActivityForSocialLoginPlugin interface.
+    // Never actually called by the plugin - its presence is just how the
+    // plugin confirms at compile time that MainActivity has been modified
+    // for use with it. Confirmed against the plugin's real interface source
+    // (ee/forgr/capacitor/social/login/ModifiedMainActivityForSocialLoginPlugin.java
+    // in @capgo/capacitor-social-login@8.3.33): it declares exactly this one
+    // abstract method with no default implementation, so omitting this
+    // override does not compile.
+    @Override
+    public void IHaveModifiedTheMainActivityForTheUseWithSocialLoginPlugin() {}
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
