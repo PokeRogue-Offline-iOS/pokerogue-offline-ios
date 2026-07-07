@@ -44,20 +44,20 @@ const MONTH_LABELS = [
 const COLUMNS = 7;
 const ROWS = 6;
 const CELL_W = 44;
-const CELL_H = 22;
+const CELL_H = 20;
 const GRID_X = 4;
 
 // Layout budget against the real 320x180 canvas (see scene-base.ts
 // scaledCanvas). Each section gets its own fixed band so nothing overlaps:
-//   Header (title):     0-14
-//   Weekday row:        15-25
-//   Day grid:           26-158  (6 rows x 22px)
-//   Footer (today/tmrw):160-178 (single line each, side by side)
-const HEADER_H = 14;
+//   Header (title):     0-22   (tall enough for WINDOW-style text + shadow)
+//   Weekday row:        23-33
+//   Day grid:           34-153 (6 rows x 20px)
+//   Footer (today/tmrw):156-178 (single line each, side by side)
+const HEADER_H = 22;
 const WEEKDAY_Y = HEADER_H + 1;
-const GRID_Y = 26;
+const GRID_Y = WEEKDAY_Y + 11;
 const FOOTER_Y = GRID_Y + ROWS * CELL_H + 2;
-const FOOTER_H = 18;
+const FOOTER_H = 22;
 
 interface DayCell {
   container: Phaser.GameObjects.Container;
@@ -119,7 +119,7 @@ export class GachaCalendarUiHandler extends UiHandler {
     const headerWindow = addWindow(0, 0, globalScene.scaledCanvas.width, HEADER_H).setOrigin(0);
     this.calendarContainer.add(headerWindow);
 
-    this.titleText = addTextObject(2, 1, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
+    this.titleText = addTextObject(2, 3, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
     this.calendarContainer.add(this.titleText);
 
     // Weekday header row - sits below the header window, not on top of it.
@@ -149,7 +149,7 @@ export class GachaCalendarUiHandler extends UiHandler {
 
         // Icon anchored toward the bottom-right, clear of the date number
         // in the top-left corner.
-        const icon = globalScene.add.sprite(34, 12, "pokemon_icons_0").setScale(0.45).setOrigin(0.5);
+        const icon = globalScene.add.sprite(34, 10, "pokemon_icons_0").setScale(0.45).setOrigin(0.5);
         cellContainer.add(icon);
 
         this.calendarContainer.add(cellContainer);
@@ -165,16 +165,16 @@ export class GachaCalendarUiHandler extends UiHandler {
     const footerWindow = addWindow(0, FOOTER_Y, globalScene.scaledCanvas.width, FOOTER_H).setOrigin(0);
     this.calendarContainer.add(footerWindow);
 
-    this.todayIcon = globalScene.add.sprite(10, FOOTER_Y + 9, "pokemon_icons_0").setScale(0.5);
+    this.todayIcon = globalScene.add.sprite(10, FOOTER_Y + 11, "pokemon_icons_0").setScale(0.5);
     this.calendarContainer.add(this.todayIcon);
-    this.todayLabel = addTextObject(20, FOOTER_Y + 5, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
+    this.todayLabel = addTextObject(20, FOOTER_Y + 3, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
     this.calendarContainer.add(this.todayLabel);
 
     this.tomorrowIcon = globalScene.add
-      .sprite(globalScene.scaledCanvas.width / 2 + 10, FOOTER_Y + 9, "pokemon_icons_0")
+      .sprite(globalScene.scaledCanvas.width / 2 + 10, FOOTER_Y + 11, "pokemon_icons_0")
       .setScale(0.5);
     this.calendarContainer.add(this.tomorrowIcon);
-    this.tomorrowLabel = addTextObject(globalScene.scaledCanvas.width / 2 + 20, FOOTER_Y + 5, "", TextStyle.WINDOW, {
+    this.tomorrowLabel = addTextObject(globalScene.scaledCanvas.width / 2 + 20, FOOTER_Y + 3, "", TextStyle.WINDOW, {
       maxLines: 1,
     }).setOrigin(0);
     this.calendarContainer.add(this.tomorrowLabel);
