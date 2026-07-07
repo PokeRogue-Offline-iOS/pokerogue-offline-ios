@@ -186,6 +186,9 @@ jobs:
           mkdir -p ~/.android
           echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > ~/.android/debug.keystore
 
+      - name: DEBUG - print restored keystore SHA-1
+        run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
+
       - name: Build release APK
         working-directory: pokerogue-src/android
         run: ./gradlew assembleDebug
