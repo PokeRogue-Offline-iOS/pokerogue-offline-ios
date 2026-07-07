@@ -7,6 +7,16 @@ on:
         description: 'Build number (leave blank to use this workflow run number)'
         required: false
         type: string
+      dev:
+        description: 'Dev build (banner marker + -dev naming)'
+        required: false
+        type: boolean
+        default: false
+      branch:
+        description: 'PokeRogue branch to build from'
+        required: false
+        type: string
+        default: 'main'
 
 permissions:
   contents: write
@@ -31,7 +41,7 @@ jobs:
         run: git config --global core.autocrlf false
 
       - name: Clone PokeRogue fork
-        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+        run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
       - name: Get PokeRogue version
         id: pokerogue_version
@@ -56,7 +66,11 @@ jobs:
         shell: bash
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          else
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
@@ -145,13 +159,17 @@ jobs:
         shell: bash
         run: |
           FILE=$(find -type f -name "PokeRogue*Offline*.exe" | head -n1)
-          OUTPUT="./PokeRogueOffline.exe"
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            OUTPUT="./PokeRogueOffline-dev.exe"
+          else
+            OUTPUT="./PokeRogueOffline.exe"
+          fi
           mv "$FILE" "$OUTPUT"
           echo "exe=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PokeRogueOffline-Windows
+          name: PokeRogueOffline-Windows${{ inputs.dev && '-dev' || '' }}
           path: ${{ steps.exe_path.outputs.exe }}
           retention-days: 30

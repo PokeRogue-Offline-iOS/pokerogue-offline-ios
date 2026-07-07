@@ -7,6 +7,16 @@ on:
         description: 'Build number (leave blank to use this workflow run number)'
         required: false
         type: string
+      dev:
+        description: 'Dev build (dev OAuth config/icon/app id, no Drive backup wiring)'
+        required: false
+        type: boolean
+        default: false
+      branch:
+        description: 'PokeRogue branch to build from'
+        required: false
+        type: string
+        default: 'main'
 
 permissions:
   contents: write
@@ -34,7 +44,7 @@ jobs:
         run: npm install -g pnpm
 
       - name: Clone PokeRogue
-        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+        run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
       - name: Get PokeRogue version
         id: pokerogue_version
@@ -48,9 +58,17 @@ jobs:
       - name: Inject build number into banner
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          else
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
 
+      # Only wired up for prod: the dev Capacitor config has no SocialLogin
+      # plugin block (Drive backup untested on Android as of this handoff),
+      # so there's no placeholder to fill and no reason to pull the plugin in.
       - name: Inject Google iOS Client ID
+        if: ${{ inputs.dev != true }}
         run: |
           sed -i "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-ejrsdp1qu750amcjupo943593vmeje1k.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
 
@@ -61,11 +79,20 @@ jobs:
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
-          pnpm add @capacitor/core@8.3.4 @capacitor/cli@8.3.4 @capacitor/android@8.3.4 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2 @capgo/capacitor-social-login@8.3.33
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            pnpm add @capacitor/core@8.3.4 @capacitor/cli@8.3.4 @capacitor/android@8.3.4 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2
+          else
+            pnpm add @capacitor/core@8.3.4 @capacitor/cli@8.3.4 @capacitor/android@8.3.4 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2 @capgo/capacitor-social-login@8.3.33
+          fi
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
-        run: cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config.json capacitor.config.json
+        run: |
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config-dev.json capacitor.config.json
+          else
+            cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config.json capacitor.config.json
+          fi
 
       - name: Build PokeRogue
         working-directory: pokerogue-src
@@ -88,7 +115,11 @@ jobs:
         working-directory: pokerogue-src
         run: |
           DEST=$(find android/app/src/main/java -name "MainActivity.java" | head -n 1)
-          cp ${{ github.workspace }}/configs/android/java/MainActivity.java "$DEST"
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            cp ${{ github.workspace }}/configs/android/java/MainActivity-dev.java "$DEST"
+          else
+            cp ${{ github.workspace }}/configs/android/java/MainActivity.java "$DEST"
+          fi
 
       - name: Patch AndroidManifest to prevent keyboard resize
         working-directory: pokerogue-src
@@ -108,7 +139,11 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y imagemagick
 
-          ICON_SRC="${{ github.workspace }}/docs/appIcon.png"
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            ICON_SRC="${{ github.workspace }}/docs/appIcon-dev.png"
+          else
+            ICON_SRC="${{ github.workspace }}/docs/appIcon.png"
+          fi
           ICON_ADAPTIVE="${{ github.workspace }}/docs/appIcon-adaptive.png"
           RES_DIR="pokerogue-src/android/app/src/main/res"
 
@@ -165,12 +200,17 @@ jobs:
       - name: Rename resulting APK
         run: |
           UNSIGNED="pokerogue-src/android/app/build/outputs/apk/debug/app-debug.apk"
-          SIGNED="PokeRogueOffline.apk"
-          cp -v $UNSIGNED $SIGNED
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            OUTPUT="PokeRogueOffline-dev.apk"
+          else
+            OUTPUT="PokeRogueOffline.apk"
+          fi
+          cp -v $UNSIGNED $OUTPUT
+          echo "APK_NAME=$OUTPUT" >> $GITHUB_ENV
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PokeRogueOffline-Android
-          path: PokeRogueOffline.apk
+          name: PokeRogueOffline-Android${{ inputs.dev && '-dev' || '' }}
+          path: ${{ env.APK_NAME }}
           retention-days: 30
