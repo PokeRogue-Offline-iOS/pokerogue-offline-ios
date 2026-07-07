@@ -1,0 +1,55 @@
+PRIVACY POLICY — PokeRogue-Offline (Google Verification)
+Last updated: 2026-07-07
+
+PokeRogue-Offline is an unofficial, offline-capable wrapper for the game
+PokeRogue, distributed for desktop (Electron) and sideloaded mobile builds
+(Capacitor). This document describes how the app handles data in
+connection with Google Sign-In / Google Drive access.
+
+1. WHAT WE ACCESS
+   The app requests the Google Drive "appdata" scope
+   (https://www.googleapis.com/auth/drive.appdata) only. This scope grants
+   access exclusively to a hidden, application-specific folder in the
+   user's Google Drive. It does NOT grant access to:
+     - Any other files or folders in the user's Drive
+     - The user's Drive file listing
+     - Any other Google account data (contacts, mail, calendar, etc.)
+
+2. WHAT WE USE IT FOR
+   The sole purpose of this access is to back up and restore the user's
+   local game save file. When the user chooses to back up, the save file
+   is uploaded to their own hidden app-data folder. When the user chooses
+   to restore, the save file is downloaded from that same folder.
+
+3. WHAT WE DO NOT DO
+   - We do not operate any backend server. There is no PokeRogue-Offline
+     server that receives, stores, or processes user data.
+   - We do not share, sell, or transmit any data to third parties.
+   - We do not use the data for analytics, tracking, advertising, or
+     profiling of any kind.
+   - We do not read or store the contents of the user's save data outside
+     of the user's own device and their own Google Drive appdata folder.
+
+4. WHERE CREDENTIALS ARE STORED
+   OAuth tokens are stored locally on the user's device (using OS-level
+   secure storage on desktop, and platform-appropriate secure storage on
+   mobile). Tokens are never transmitted to or stored on any server
+   operated by us.
+
+5. DATA RETENTION AND DELETION
+   Save data placed in the Drive appdata folder remains under the user's
+   Google account and is subject to Google's own retention policies. The
+   user can revoke this app's access at any time via their Google Account
+   permissions page (https://myaccount.google.com/permissions), which
+   also removes the app's ability to read or write to that folder.
+   Revoking access does not delete the folder's existing contents
+   automatically; the user may need to remove it separately if desired.
+
+6. CHANGES TO THIS POLICY
+   Any future changes to what data is accessed or how it is used will be
+   reflected in this file, versioned alongside the source code at:
+   https://github.com/PokeRogue-Offline/pokerogue-offline
+
+7. CONTACT
+   Questions about this policy or data handling: contact "scooom" on
+   Discord.
