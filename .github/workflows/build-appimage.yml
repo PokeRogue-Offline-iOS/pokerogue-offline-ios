@@ -7,6 +7,16 @@ on:
         description: 'Build number (leave blank to use this workflow run number)'
         required: false
         type: string
+      dev:
+        description: 'Dev build (banner marker + -dev naming)'
+        required: false
+        type: boolean
+        default: false
+      branch:
+        description: 'PokeRogue branch to build from'
+        required: false
+        type: string
+        default: 'main'
 
 permissions:
   contents: write
@@ -28,7 +38,7 @@ jobs:
         run: npm install -g pnpm
 
       - name: Clone PokeRogue fork
-        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+        run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
       - name: Get PokeRogue version
         id: pokerogue_version
@@ -48,7 +58,11 @@ jobs:
       - name: Inject build number into banner
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          else
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
@@ -57,6 +71,16 @@ jobs:
       - name: Install Electron dependencies
         working-directory: pokerogue-src
         run: pnpm add -D electron electron-builder
+
+      - name: Install Capacitor plugin stub for shared code resolution
+        working-directory: pokerogue-src
+        # google-drive-backup.ts dynamically imports @capgo/capacitor-social-login,
+        # gated behind an isCapacitor() runtime check that's always false on
+        # Electron — but Vite/Rolldown still needs the package resolvable at
+        # BUILD time to code-split it, even though the chunk never actually
+        # loads here. Without this, the build fails with an unresolved-import
+        # error even on a platform that will never execute that branch.
+        run: pnpm add @capacitor/core@8.3.4 @capgo/capacitor-social-login@8.3.33
 
       - name: Build PokeRogue
         working-directory: pokerogue-src
@@ -70,9 +94,15 @@ jobs:
       - name: Copy Electron config files into place
         run: |
           cp ${{ github.workspace }}/configs/desktop/electron/main.cjs pokerogue-src/main.cjs
+          cp ${{ github.workspace }}/configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
           cp ${{ github.workspace }}/configs/desktop/electron/electron-builder.appimage.json pokerogue-src/electron-builder.json
           cp ${{ github.workspace }}/docs/appIcon.png pokerogue-src/appIcon.png
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Inject Google OAuth credentials into main.cjs
+        run: |
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}/g" pokerogue-src/main.cjs
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}/g" pokerogue-src/main.cjs
 
       - name: Set electron main in package.json
         working-directory: pokerogue-src
@@ -106,13 +136,17 @@ jobs:
         id: appimage_path
         run: |
           FILE=$(find -type f -name "*.AppImage")
-          OUTPUT="./PokeRogueOffline.AppImage"
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            OUTPUT="./PokeRogueOffline-dev.AppImage"
+          else
+            OUTPUT="./PokeRogueOffline.AppImage"
+          fi
           mv "$FILE" "$OUTPUT"
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PokeRogueOffline-AppImage
+          name: PokeRogueOffline-AppImage${{ inputs.dev && '-dev' || '' }}
           path: ${{ steps.appimage_path.outputs.AppImage }}
           retention-days: 30

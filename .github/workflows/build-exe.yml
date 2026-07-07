@@ -7,6 +7,16 @@ on:
         description: 'Build number (leave blank to use this workflow run number)'
         required: false
         type: string
+      dev:
+        description: 'Dev build (banner marker + -dev naming)'
+        required: false
+        type: boolean
+        default: false
+      branch:
+        description: 'PokeRogue branch to build from'
+        required: false
+        type: string
+        default: 'main'
 
 permissions:
   contents: write
@@ -31,7 +41,7 @@ jobs:
         run: git config --global core.autocrlf false
 
       - name: Clone PokeRogue fork
-        run: git clone --recurse-submodules --depth 1 --branch main https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+        run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
       - name: Get PokeRogue version
         id: pokerogue_version
@@ -56,7 +66,11 @@ jobs:
         shell: bash
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          else
+            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
 
       - name: Install PokeRogue dependencies
         working-directory: pokerogue-src
@@ -65,6 +79,15 @@ jobs:
       - name: Install Electron dependencies
         working-directory: pokerogue-src
         run: pnpm add -D electron electron-builder
+
+      - name: Install Capacitor plugin stub for shared code resolution
+        working-directory: pokerogue-src
+        shell: bash
+        # See the identical step in build-appimage.yml — google-drive-backup.ts
+        # dynamically imports @capgo/capacitor-social-login behind an
+        # isCapacitor() check that's always false here, but Vite/Rolldown
+        # still needs the package resolvable at build time.
+        run: pnpm add @capacitor/core@8.3.4 @capgo/capacitor-social-login@8.3.33
 
       - name: Convert app icon to ICO
         shell: pwsh
@@ -88,9 +111,16 @@ jobs:
         shell: bash
         run: |
           cp configs/desktop/electron/main.cjs pokerogue-src/main.cjs
+          cp configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
           cp configs/desktop/electron/electron-builder.windows.json pokerogue-src/electron-builder.json
           cp docs/appIcon.ico pokerogue-src/appIcon.ico
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Inject Google OAuth credentials into main.cjs
+        shell: bash
+        run: |
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}/g" pokerogue-src/main.cjs
+          sed -i "s/GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}/g" pokerogue-src/main.cjs
 
       - name: Set electron main in package.json
         working-directory: pokerogue-src
@@ -129,13 +159,17 @@ jobs:
         shell: bash
         run: |
           FILE=$(find -type f -name "PokeRogue*Offline*.exe" | head -n1)
-          OUTPUT="./PokeRogueOffline.exe"
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            OUTPUT="./PokeRogueOffline-dev.exe"
+          else
+            OUTPUT="./PokeRogueOffline.exe"
+          fi
           mv "$FILE" "$OUTPUT"
           echo "exe=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PokeRogueOffline-Windows
+          name: PokeRogueOffline-Windows${{ inputs.dev && '-dev' || '' }}
           path: ${{ steps.exe_path.outputs.exe }}
           retention-days: 30

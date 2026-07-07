@@ -15,6 +15,19 @@
       "overlaysWebView": true,
       "style": "DARK",
       "backgroundColor": "#000000"
+    },
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      },
+      "google": {
+        "iOSClientId": "856587427302-k9ns6u546mgn6vjv1mcks32mn76u1v01.apps.googleusercontent.com",
+        "iOSServerClientId": "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
+        "mode": "online"
+      }
     }
   }
 }

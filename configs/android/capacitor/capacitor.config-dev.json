@@ -13,6 +13,18 @@
       "overlaysWebView": true,
       "style": "DARK",
       "backgroundColor": "#000000"
+    },
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      },
+      "google": {
+        "webClientId": "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
+        "mode": "online"
+      }
     }
   }
 }

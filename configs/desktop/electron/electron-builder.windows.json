@@ -10,6 +10,7 @@
   "files": [
     "dist/**/*",
     "main.cjs",
+    "preload.cjs",
     "appIcon.ico",
     "full_unlocks.prsv",
     "node_modules/**/*"

@@ -9,6 +9,7 @@
   "files": [
     "dist/**/*",
     "main.cjs",
+    "preload.cjs",
     "appIcon.png",
     "full_unlocks.prsv",
     "node_modules/**/*"

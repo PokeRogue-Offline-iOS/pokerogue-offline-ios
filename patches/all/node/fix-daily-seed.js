@@ -12,6 +12,8 @@
  *   Intercept the Daily Run option handler (before save slot selection) to
  *   fetch the seed from GitHub Pages. The seed is cached in localStorage
  *   keyed by UTC date so subsequent attempts that day skip the fetch.
+ *   The fetch time is also cached (daily_seed_fetched_at, epoch ms) purely
+ *   for display in the Offline settings screen — not read by this patch.
  *
  *   On fetch failure, show a confirm dialog. The user is still on the title
  *   screen at this point so No simply closes the overlay cleanly.
@@ -80,6 +82,7 @@ ${h2}      .then(fetchedSeed => {
 ${h2}        const seed = fetchedSeed.trim();
 ${h2}        localStorage.setItem("daily_seed_date", todayUtc);
 ${h2}        localStorage.setItem("daily_seed", seed);
+${h2}        localStorage.setItem("daily_seed_fetched_at", Date.now().toString());
 ${h2}        globalScene.ui.clearText();
 ${h2}        this.initDailyRun();
 ${h2}      })
