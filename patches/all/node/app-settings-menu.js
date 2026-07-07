@@ -51,10 +51,12 @@
  *        makes it show up as a 6th tab in the real Settings screen.
  *
  *   6. src/system/settings/settings.ts
- *        Append SettingType.APP; append 6 SettingKeys entries; append 6
+ *        Append SettingType.APP; append 9 SettingKeys entries; append 9
  *        Setting entries (grouped: 3 locked action/toggle rows, 1 read-only
- *        info row, 1 always-on action row) to the shared Setting[] array,
- *        all type: APP so they only ever show up on our tab.
+ *        info row, 1 always-on action row, then 1 always-on action row +
+ *        2 always-on read-only info rows for Force Daily Seed) to the
+ *        shared Setting[] array, all type: APP so they only ever show up
+ *        on our tab.
  *
  *   7. src/ui/settings/base-settings-ui-handler.ts
  *        Widen `settingLabels`, `optionValueLabels`, `optionCursors`, and
@@ -235,6 +237,9 @@ if (settingsSrc.includes("SettingType.APP")) {
   Offline_Include_Current_Run: "OFFLINE_INCLUDE_CURRENT_RUN",
   Offline_Drive_Last_Played: "OFFLINE_DRIVE_LAST_PLAYED",
   Offline_Clear_Data: "OFFLINE_CLEAR_DATA",
+  Offline_Force_Daily_Seed: "OFFLINE_FORCE_DAILY_SEED",
+  Offline_Daily_Seed_Value: "OFFLINE_DAILY_SEED_VALUE",
+  Offline_Daily_Seed_Info: "OFFLINE_DAILY_SEED_INFO",
 };`,
   );
 
@@ -305,6 +310,28 @@ if (settingsSrc.includes("SettingType.APP")) {
     default: 0,
     type: SettingType.APP,
     activatable: true,
+  },
+  {
+    key: SettingKeys.Offline_Force_Daily_Seed,
+    label: "Force Daily Seed",
+    options: [{ value: "0", label: "Update" }],
+    default: 0,
+    type: SettingType.APP,
+    activatable: true,
+  },
+  {
+    key: SettingKeys.Offline_Daily_Seed_Value,
+    label: "Daily Seed Value",
+    options: [{ value: "0", label: "None" }],
+    default: 0,
+    type: SettingType.APP,
+  },
+  {
+    key: SettingKeys.Offline_Daily_Seed_Info,
+    label: "Daily Seed Info",
+    options: [{ value: "0", label: "—" }],
+    default: 0,
+    type: SettingType.APP,
   },
 ];`,
   );
