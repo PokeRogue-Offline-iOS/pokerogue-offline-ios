@@ -1,0 +1,176 @@
+name: Build PokeRogueOffline macOS DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number (leave blank to use this workflow run number)'
+        required: false
+        type: string
+      dev:
+        description: 'Dev build (banner marker + -dev naming)'
+        required: false
+        type: boolean
+        default: false
+      branch:
+        description: 'PokeRogue branch to build from'
+        required: false
+        type: string
+        default: 'main'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Clone PokeRogue fork
+        run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          echo "version=$VERSION.$BUILD_NUM" >> $GITHUB_OUTPUT
+
+      - name: Download full unlocks save file
+        run: |
+          curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
+            -o pokerogue-src/full_unlocks.prsv
+
+      - name: Apply patches
+        run: bash ${{ github.workspace }}/scripts/apply-patches.sh macos
+
+      - name: Inject build number into banner
+        run: |
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          else
+            sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
+
+      - name: Install PokeRogue dependencies
+        working-directory: pokerogue-src
+        run: pnpm install
+
+      - name: Install Electron dependencies
+        working-directory: pokerogue-src
+        run: pnpm add -D electron electron-builder
+
+      - name: Install Capacitor plugin stub for shared code resolution
+        working-directory: pokerogue-src
+        # google-drive-backup.ts dynamically imports @capgo/capacitor-social-login,
+        # gated behind an isCapacitor() runtime check that's always false on
+        # Electron — but Vite/Rolldown still needs the package resolvable at
+        # BUILD time to code-split it, even though the chunk never actually
+        # loads here. Without this, the build fails with an unresolved-import
+        # error even on a platform that will never execute that branch.
+        run: pnpm add @capacitor/core@8.3.4 @capgo/capacitor-social-login@8.3.33
+
+      - name: Build PokeRogue
+        working-directory: pokerogue-src
+        env:
+          VITE_BYPASS_LOGIN: '1'
+        run: pnpm build --mode app
+
+      - name: Apply post-build patches
+        run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh macos
+
+      - name: Convert app icon to ICNS
+        run: |
+          ICONSET="${{ github.workspace }}/appIcon.iconset"
+          mkdir -p "$ICONSET"
+          SRC="${{ github.workspace }}/docs/appIcon.png"
+
+          sips -z 16 16     "$SRC" --out "$ICONSET/icon_16x16.png"
+          sips -z 32 32     "$SRC" --out "$ICONSET/icon_16x16@2x.png"
+          sips -z 32 32     "$SRC" --out "$ICONSET/icon_32x32.png"
+          sips -z 64 64     "$SRC" --out "$ICONSET/icon_32x32@2x.png"
+          sips -z 128 128   "$SRC" --out "$ICONSET/icon_128x128.png"
+          sips -z 256 256   "$SRC" --out "$ICONSET/icon_128x128@2x.png"
+          sips -z 256 256   "$SRC" --out "$ICONSET/icon_256x256.png"
+          sips -z 512 512   "$SRC" --out "$ICONSET/icon_256x256@2x.png"
+          sips -z 512 512   "$SRC" --out "$ICONSET/icon_512x512.png"
+          sips -z 1024 1024 "$SRC" --out "$ICONSET/icon_512x512@2x.png"
+
+          iconutil -c icns "$ICONSET" -o "${{ github.workspace }}/docs/appIcon.icns"
+          echo "ICNS created at ${{ github.workspace }}/docs/appIcon.icns"
+
+      - name: Copy Electron config files into place
+        run: |
+          cp ${{ github.workspace }}/configs/desktop/electron/main.cjs pokerogue-src/main.cjs
+          cp ${{ github.workspace }}/configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
+          cp ${{ github.workspace }}/configs/desktop/electron/electron-builder.macos.json pokerogue-src/electron-builder.json
+          cp ${{ github.workspace }}/docs/appIcon.icns pokerogue-src/appIcon.icns
+          cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
+
+      - name: Inject Google OAuth credentials into main.cjs
+        run: |
+          sed -i '' "s/GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}/g" pokerogue-src/main.cjs
+          sed -i '' "s/GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}/g" pokerogue-src/main.cjs
+
+      - name: Set electron main in package.json
+        working-directory: pokerogue-src
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            if (!pkg.description) pkg.description = 'PokeRogue Offline';
+            if (!pkg.author) pkg.author = 'Scooom';
+            pkg.main = 'main.cjs';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
+          "
+
+      - name: Get 3 Num Version
+        id: old_ver
+        working-directory: pokerogue-src
+        shell: bash
+        run: |
+          sed -i '' -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1-\2"/' package.json
+          VERSION=$(jq -r '.version | sub("(?<v>[0-9]+\\.[0-9]+\\.[0-9]+)\\-(?<h>[0-9]+)"; .v + .h)' package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected Version: '$VERSION'"
+
+      - name: Generate macOS DMG
+        working-directory: pokerogue-src
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm electron-builder --mac dmg --${{ matrix.arch }} --config electron-builder.json --config.extraMetadata.version=${{ steps.old_ver.outputs.version }}
+
+      - name: Rename and save DMG
+        id: dmg_path
+        run: |
+          FILE=$(find . -type f -name "*.dmg" | head -n1)
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            OUTPUT="./PokeRogueOffline-dev-${{ matrix.arch }}.dmg"
+          else
+            OUTPUT="./PokeRogueOffline-${{ matrix.arch }}.dmg"
+          fi
+          mv "$FILE" "$OUTPUT"
+          echo "dmg=$OUTPUT" >> $GITHUB_OUTPUT
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PokeRogueOffline-macOS-${{ matrix.arch }}${{ inputs.dev && '-dev' || '' }}
+          path: ${{ steps.dmg_path.outputs.dmg }}
+          retention-days: 30

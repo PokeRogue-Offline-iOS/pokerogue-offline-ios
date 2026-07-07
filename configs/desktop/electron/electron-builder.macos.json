@@ -1,0 +1,19 @@
+{
+  "appId": "xyz.scooom.pkr",
+  "productName": "PokeRogue Offline",
+  "mac": {
+    "target": ["dmg"],
+    "icon": "appIcon.icns",
+    "identity": null,
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false
+  },
+  "files": [
+    "dist/**/*",
+    "main.cjs",
+    "preload.cjs",
+    "appIcon.icns",
+    "full_unlocks.prsv",
+    "node_modules/**/*"
+  ]
+}
