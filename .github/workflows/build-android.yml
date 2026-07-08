@@ -71,7 +71,7 @@ jobs:
       - name: Install Capacitor
         working-directory: pokerogue-src
         run: |
-            pnpm add @capacitor/core@8.3.4 @capacitor/cli@8.3.4 @capacitor/android@8.3.4 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2 @capgo/capacitor-social-login@8.3.33
+            pnpm add @capacitor/core@8.4.1 @capacitor/cli@8.4.1 @capacitor/android@8.4.1 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2 @capgo/capacitor-social-login@8.3.33
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
@@ -103,10 +103,9 @@ jobs:
         working-directory: pokerogue-src
         run: |
           DEST=$(find android/app/src/main/java -name "MainActivity.java" | head -n 1)
+          cp ${{ github.workspace }}/configs/android/java/MainActivity.java "$DEST"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            cp ${{ github.workspace }}/configs/android/java/MainActivity-dev.java "$DEST"
-          else
-            cp ${{ github.workspace }}/configs/android/java/MainActivity.java "$DEST"
+            sed -i "s/^package xyz.scooom.pkr;/package xyz.scooom.pkrdev;/" "$DEST"
           fi
 
       - name: Patch AndroidManifest to prevent keyboard resize
@@ -185,12 +184,6 @@ jobs:
         run: |
           mkdir -p ~/.android
           echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > ~/.android/debug.keystore
-
-      - name: DEBUG - print restored keystore SHA-1
-        run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
-
-      - name: DEBUG - print android-related env vars
-        run: env | grep -i android || true
 
       - name: Build release APK
         working-directory: pokerogue-src/android

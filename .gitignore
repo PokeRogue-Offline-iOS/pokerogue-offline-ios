@@ -1,0 +1,46 @@
+# ── Node / pnpm ──────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ── PokeRogue source clone / build output ───────────────────────────────────
+# CI always clones pokerogue-src fresh; nothing under it should ever be committed.
+pokerogue-src/
+dist/
+build/
+out/
+
+# ── Electron ─────────────────────────────────────────────────────────────────
+*.dmg
+*.exe
+*.AppImage
+release/
+
+# ── Capacitor / Android ─────────────────────────────────────────────────────
+android/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# ── Capacitor / iOS ──────────────────────────────────────────────────────────
+ios/
+*.ipa
+*.mobileprovision
+*.p12
+*.p8
+*.cer
+
+# ── Local secrets / env ──────────────────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+
+# ── Editor / OS cruft ────────────────────────────────────────────────────────
+.DS_Store
+.vscode/
+.idea/
+*.swp
+Thumbs.db

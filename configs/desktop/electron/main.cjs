@@ -126,24 +126,29 @@ function makePkcePair() {
   return { verifier, challenge };
 }
 
-/** Starts a one-shot loopback HTTP server, resolves with the ?code= from the redirect. */
-function waitForAuthCode(port) {
+/** Starts a one-shot loopback HTTP server, resolves with the ?code= from the redirect.
+ * Rejects if the returned ?state= doesn't match the one this flow generated —
+ * defense-in-depth against a stray/forged callback hitting the loopback port. */
+function waitForAuthCode(port, expectedState) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, `http://127.0.0.1:${port}`);
       const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
 
       res.setHeader('Content-Type', 'text/html');
-      if (code) {
+      if (code && state === expectedState) {
         res.end('<html><body>Signed in — you can close this tab and return to PokeRogue Offline.</body></html>');
       } else {
         res.end('<html><body>Sign-in failed or was cancelled. You can close this tab.</body></html>');
       }
 
       server.close();
-      if (code) {
+      if (code && state === expectedState) {
         resolve(code);
+      } else if (code && state !== expectedState) {
+        reject(new Error('OAuth state mismatch — ignoring callback.'));
       } else {
         reject(new Error(error || 'No authorization code received.'));
       }
@@ -224,6 +229,7 @@ async function interactiveSignIn() {
   const port = await getFreePort();
   const redirectUri = `http://127.0.0.1:${port}`;
   const { verifier, challenge } = makePkcePair();
+  const state = base64UrlEncode(crypto.randomBytes(16));
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
@@ -234,8 +240,9 @@ async function interactiveSignIn() {
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set('access_type', 'offline');
   authUrl.searchParams.set('prompt', 'consent');
+  authUrl.searchParams.set('state', state);
 
-  const codePromise = waitForAuthCode(port);
+  const codePromise = waitForAuthCode(port, state);
   await shell.openExternal(authUrl.toString());
   const code = await codePromise;
 

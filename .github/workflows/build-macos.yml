@@ -44,13 +44,6 @@ jobs:
       - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
-      - name: Get PokeRogue version
-        id: pokerogue_version
-        run: |
-          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
-          BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          echo "version=$VERSION.$BUILD_NUM" >> $GITHUB_OUTPUT
-
       - name: Download full unlocks save file
         run: |
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
@@ -74,7 +67,7 @@ jobs:
 
       - name: Install Electron dependencies
         working-directory: pokerogue-src
-        run: pnpm add -D electron electron-builder
+        run: pnpm add -D electron@43.0.0 electron-builder@26.15.3
 
       - name: Install Capacitor plugin stub for shared code resolution
         working-directory: pokerogue-src
@@ -84,7 +77,7 @@ jobs:
         # BUILD time to code-split it, even though the chunk never actually
         # loads here. Without this, the build fails with an unresolved-import
         # error even on a platform that will never execute that branch.
-        run: pnpm add @capacitor/core@8.3.4 @capgo/capacitor-social-login@8.3.33
+        run: pnpm add @capacitor/core@8.4.1 @capgo/capacitor-social-login@8.3.33
 
       - name: Build PokeRogue
         working-directory: pokerogue-src
