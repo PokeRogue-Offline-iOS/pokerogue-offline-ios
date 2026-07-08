@@ -69,6 +69,18 @@
  *        own activatable-row cases without editing the base class's switch
  *        statement directly.
  *
+ *   8. src/ui/settings/settings-ui-handler.ts
+ *        Adds a show() override to the General tab (always the entry point
+ *        when Settings is opened) that fires offlineBackup.tryRestoreSession()
+ *        fire-and-forget. Prewarms the connection state so that if/when the
+ *        player tabs over to Offline, the row already reflects "Connected"
+ *        instead of a "Checking connection…" flash — all handler instances
+ *        exist from boot (Ui.setup() constructs and calls setup() on every
+ *        registered handler up front), so updating the Offline tab's state
+ *        from here is safe even though it isn't the active tab. The Offline
+ *        tab's own show() still does the same check independently, so this
+ *        is purely a latency optimization, not a correctness dependency.
+ *
  * NOTE ON TESTING: all sub-patches have been checked against a fresh clone
  * of pagefaultgames/pokerogue and the anchors are confirmed present at the
  * time this was written. The new UI handler's runtime behavior (reaching
@@ -377,6 +389,49 @@ if (baseHandlerSrc.includes("protected optionValueLabels")) {
   baseHandlerSrc = baseHandlerSrc.replace(METHOD_ANCHOR, `protected activateSetting(setting: Setting): boolean {`);
 
   writeFile(BASE_HANDLER_PATH, baseHandlerSrc);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-patch 8: src/ui/settings/settings-ui-handler.ts  →  prewarm connection on open
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GENERAL_TAB_PATH = path.join("pokerogue-src", "src", "ui", "settings", "settings-ui-handler.ts");
+let generalTabSrc = readFile(GENERAL_TAB_PATH);
+
+if (generalTabSrc.includes("app-settings-menu: prewarm")) {
+  console.log("SKIP settings-ui-handler.ts — prewarm already present");
+} else {
+  const IMPORT_ANCHOR = `import { SettingType } from "#system/settings";`;
+  requireAnchor(generalTabSrc, IMPORT_ANCHOR, "SettingType import in settings-ui-handler.ts");
+  generalTabSrc = generalTabSrc.replace(
+    IMPORT_ANCHOR,
+    `${IMPORT_ANCHOR}\nimport * as offlineBackup from "#system/offline/google-drive-backup";`,
+  );
+
+  const CLASS_END_ANCHOR = `    this.title = "General";\n    this.localStorageKey = "settings";\n  }\n}`;
+  requireAnchor(generalTabSrc, CLASS_END_ANCHOR, "constructor/class end in settings-ui-handler.ts");
+  const CLASS_END_REPLACEMENT =
+    `    this.title = "General";\n` +
+    `    this.localStorageKey = "settings";\n` +
+    `  }\n\n` +
+    `  // app-settings-menu: prewarm the Google Drive connection state whenever\n` +
+    `  // the Settings screen is opened (General is always the entry tab), so\n` +
+    `  // the Offline tab's row already reflects the resolved state instead of\n` +
+    `  // a "Checking…" flash if/when the player tabs over to it. No-op if\n` +
+    `  // already signed in this session.\n` +
+    `  override show(args: any[]): boolean {\n` +
+    `    const result = super.show(args);\n` +
+    `    if (!offlineBackup.isSignedIn()) {\n` +
+    `      offlineBackup.tryRestoreSession().catch(err => {\n` +
+    `        console.warn("Silent session restore failed:", err);\n` +
+    `      });\n` +
+    `    }\n` +
+    `    return result;\n` +
+    `  }\n` +
+    `}`;
+  generalTabSrc = generalTabSrc.replace(CLASS_END_ANCHOR, CLASS_END_REPLACEMENT);
+
+  writeFile(GENERAL_TAB_PATH, generalTabSrc);
 }
 
 console.log("\napp-settings-menu patch applied successfully.");
