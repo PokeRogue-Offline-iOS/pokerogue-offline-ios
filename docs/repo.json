@@ -17,6 +17,15 @@
       "category": "games",
       "versions": [
         {
+          "version": "1.12.0.5.207",
+          "buildVersion": "207",
+          "date": "2026-07-08",
+          "localizedDescription": "PokéRogue Offline 1.12.0.5 — based on the latest PokéRogue main branch.",
+          "downloadURL": "https://github.com/PokeRogue-Offline/pokerogue-offline/releases/download/v1.12.0.5-207/PokeRogueOffline.ipa",
+          "size": 532472729,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.12.0.5.205",
           "buildVersion": "205",
           "date": "2026-07-07",
@@ -50,15 +59,6 @@
           "localizedDescription": "PokéRogue Offline 1.12.0.2 — based on the latest PokéRogue main branch.",
           "downloadURL": "https://github.com/PokeRogue-Offline/pokerogue-offline/releases/download/v1.12.0.2-196/PokeRogueOffline.ipa",
           "size": 527461034,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "1.12.0.1.195",
-          "buildVersion": "195",
-          "date": "2026-06-25",
-          "localizedDescription": "PokéRogue Offline 1.12.0.1 — based on the latest PokéRogue main branch.",
-          "downloadURL": "https://github.com/PokeRogue-Offline/pokerogue-offline/releases/download/v1.12.0.1-195/PokeRogueOffline.ipa",
-          "size": 527353160,
           "minOSVersion": "15.0"
         }
       ]
