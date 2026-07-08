@@ -6,7 +6,9 @@
  * API. If a newer build is available, shows the existing ALERT_MODAL Phaser
  * UI (same overlay used for egg-compensation / save-validation messages)
  * with the current and new version/build. Any input (Confirm or Back)
- * dismisses it — no closeDelay is passed, so it's dismissible immediately.
+ * dismisses it once the 1000ms closeDelay elapses (AlertModalUiHandler's
+ * allowClosing flag never flips true without a closeDelay arg, which is
+ * why an earlier version of this patch shipped with an unclosable modal).
  *
  * Depends on offline-banner.js having already run (this patch anchors on
  * the appVersionText.setText(...) line that patch produces, and relies on
@@ -93,7 +95,8 @@ const CONSTANTS_BLOCK =
   `\n` +
   `    globalScene.ui.setOverlayMode(\n` +
   `      UiMode.ALERT_MODAL,\n` +
-  `      \`Update available!\\nCurrent: v\${version}-\${OFFLINE_BUILD_NUMBER}\\nNew: \${tagName}\\n\\nGrab it from GitHub Releases.\`\n` +
+  `      \`Update available!\\nCurrent: v\${version}-\${OFFLINE_BUILD_NUMBER}\\nNew: \${tagName}\\n\\nGrab it from GitHub Releases.\`,\n` +
+  `      1000\n` +
   `    );\n` +
   `  } catch {\n` +
   `    // Offline or GitHub API unreachable — fail silently.\n` +
