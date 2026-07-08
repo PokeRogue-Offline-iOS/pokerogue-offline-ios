@@ -7,7 +7,7 @@ PATCHES_DIR="$SCRIPT_DIR/../patches"
 TARGET_DIR="pokerogue-src"
 
 # apply_patch <file> <category>
-#   <file>     — filename only, e.g. "fix-daily-seed.js" or "noLearnMove.patch"
+#   <file>     — filename only, e.g. "fix-daily-seed.js" (node) or "some-fix.patch" (git patch)
 #   <category> — subdirectory under patches/, e.g. "all", "mobile", "android"
 apply_patch() {
   local file="$1"

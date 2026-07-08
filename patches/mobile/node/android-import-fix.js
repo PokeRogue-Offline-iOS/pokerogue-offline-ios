@@ -3,7 +3,7 @@
  * Patch: android-import-overlay.js
  *
  * Extends the iOS import overlay to also show on Android.
- * iosImport.patch only shows the overlay when isIOS() is true; Android falls
+ * Upstream's iOS import overlay (isIOS()) only shows on iOS; Android falls
  * through to saveFile.click() directly which doesn't work reliably.
  *
  * Changes isIos() checks to isNative() (Capacitor.isNativePlatform()) so the
