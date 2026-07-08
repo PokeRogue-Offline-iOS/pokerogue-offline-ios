@@ -23,6 +23,7 @@ apply_patch "fix-daily-seed.js"       all
 #apply_patch "inject-unlock-all.js"    all
 #apply_patch "cheated-banner.js"       all
 apply_patch "offline-banner.js"       all
+apply_patch "update-check.js"         all
 apply_patch "update-title-labels.js"  all
 #apply_patch "randomizer_locales.js"   all
 #apply_patch "add-import-data-from-url.js"  all
