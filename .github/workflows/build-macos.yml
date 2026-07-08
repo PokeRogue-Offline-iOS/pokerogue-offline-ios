@@ -167,3 +167,36 @@ jobs:
           name: PokeRogueOffline-macOS-${{ matrix.arch }}${{ inputs.dev && '-dev' || '' }}
           path: ${{ steps.dmg_path.outputs.dmg }}
           retention-days: 30
+
+  # -----------------------------------------------------------------------
+  # Notifies on completion of any run of this workflow that did NOT come
+  # from create-release.yaml. create-release.yaml triggers builds via
+  # `gh workflow run` using the default GITHUB_TOKEN, which shows up as
+  # `github-actions[bot]` on the resulting run's `github.triggering_actor`.
+  # Anything else (manual workflow_dispatch from the UI, a PAT, etc.) gets
+  # a completion notification, mirroring create-release.yaml's own notify
+  # job (needs + if: always() + branch on .result).
+  # -----------------------------------------------------------------------
+  notify-unexpected-trigger:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ always() && github.triggering_actor != 'github-actions[bot]' }}
+    steps:
+      - name: Send ntfy notification
+        env:
+          STATUS: ${{ needs.build.result }}
+        run: |
+          if [ "$STATUS" == "success" ]; then
+            TITLE="Build Complete ✅"
+            TAGS="white_check_mark"
+          else
+            TITLE="Build Failed ❌"
+            TAGS="warning,skull"
+          fi
+          MSG="**${{ github.workflow }}** finished with status \`$STATUS\` — triggered by **${{ github.triggering_actor }}**, not by \`create-release.yaml\`."
+          curl -H "Title: $TITLE" \
+               -H "Tags: $TAGS" \
+               -H "Markdown: yes" \
+               -H "Click: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               -d "$MSG" \
+               ${{ secrets.NTFY_URL }}
