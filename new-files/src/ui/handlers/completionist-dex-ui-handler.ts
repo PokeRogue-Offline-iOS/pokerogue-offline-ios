@@ -1,18 +1,24 @@
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { signatureSpecies } from "#balance/signature-species";
+import { allBiomes } from "#data/data-lists";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
+import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { Passive as PassiveAttr } from "#enums/passive";
+import { PokemonType } from "#enums/pokemon-type";
 import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { getVariantIcon, getVariantTint } from "#sprites/variant";
 import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
 import { getVoucherTypeIcon, vouchers } from "#system/voucher";
+import { trainerConfigs } from "#trainers/trainer-config";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ScrollBar } from "#ui/scroll-bar";
 import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { getBiomeName, getLocalizedSpriteKey } from "#utils/common";
 import { getAvailableRibbons, getRibbonKey, orderedRibbons } from "#utils/ribbon-utils";
 
 /**
@@ -287,7 +293,126 @@ function ribbonDisplayName(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-const LEVEL0_COLS = 9;
+/**
+ * Elite Four members' real wave assignment(s), transcribed from
+ * `fixed-battle-configs.ts`'s `classicFixedBattles` (ELITE_FOUR_1..4).
+ * That file only exposes these as randomizer closures
+ * (`getRandomTrainerFunc(...)`), not as an inspectable array, so this is a
+ * manual, static copy of the same pool data - NOT derived by calling into
+ * the real randomizer (which needs live battle-seed state we don't have on
+ * a menu screen). Needs revisiting if that file's pools ever change.
+ * Paired [A, B] region-variant entries are flattened - only membership
+ * matters here, not which specific entry a given run would pick.
+ */
+const ELITE_FOUR_WAVE_POOLS: { wave: number; trainers: TrainerType[] }[] = [
+  {
+    wave: ClassicFixedBossWaves.ELITE_FOUR_1,
+    trainers: [
+      TrainerType.LORELEI,
+      TrainerType.WILL,
+      TrainerType.SIDNEY,
+      TrainerType.AARON,
+      TrainerType.SHAUNTAL,
+      TrainerType.MALVA,
+      TrainerType.HALA,
+      TrainerType.MOLAYNE,
+      TrainerType.MARNIE_ELITE,
+      TrainerType.BEDE_ELITE,
+      TrainerType.RIKA,
+      TrainerType.CRISPIN,
+    ],
+  },
+  {
+    wave: ClassicFixedBossWaves.ELITE_FOUR_2,
+    trainers: [
+      TrainerType.BRUNO,
+      TrainerType.KOGA,
+      TrainerType.PHOEBE,
+      TrainerType.BERTHA,
+      TrainerType.MARSHAL,
+      TrainerType.SIEBOLD,
+      TrainerType.OLIVIA,
+      TrainerType.NESSA_ELITE,
+      TrainerType.POPPY,
+      TrainerType.AMARYS,
+    ],
+  },
+  {
+    wave: ClassicFixedBossWaves.ELITE_FOUR_3,
+    trainers: [
+      TrainerType.AGATHA,
+      TrainerType.BRUNO,
+      TrainerType.GLACIA,
+      TrainerType.FLINT,
+      TrainerType.GRIMSLEY,
+      TrainerType.WIKSTROM,
+      TrainerType.ACEROLA,
+      TrainerType.BEA_ELITE,
+      TrainerType.ALLISTER_ELITE,
+      TrainerType.LARRY_ELITE,
+      TrainerType.LACEY,
+    ],
+  },
+  {
+    wave: ClassicFixedBossWaves.ELITE_FOUR_4,
+    trainers: [
+      TrainerType.LANCE,
+      TrainerType.KAREN,
+      TrainerType.DRAKE,
+      TrainerType.LUCIAN,
+      TrainerType.CAITLIN,
+      TrainerType.DRASNA,
+      TrainerType.KAHILI,
+      TrainerType.RAIHAN_ELITE,
+      TrainerType.HASSEL,
+      TrainerType.DRAYTON,
+    ],
+  },
+];
+
+/** Every wave slot a given Elite Four member can appear in (usually one, occasionally two). */
+function getEliteFourWaves(trainerType: TrainerType): number[] {
+  return ELITE_FOUR_WAVE_POOLS.filter(p => p.trainers.includes(trainerType)).map(p => p.wave);
+}
+
+/** The one biome a Gym Leader's TrainerType shows up in, scanning every biome's real `trainerPool` (all tiers, though gym leaders only ever live in BOSS in practice). */
+function getGymLeaderBiome(trainerType: TrainerType): string | null {
+  for (const biome of allBiomes.values()) {
+    const allTrainersInBiome = Object.values(biome.trainerPool).flat();
+    if (allTrainersInBiome.includes(trainerType)) {
+      return getBiomeName(biome.biomeId);
+    }
+  }
+  return null;
+}
+
+/**
+ * Human-readable spawn info for a trainer voucher's detail page, per
+ * TrainerType band (same bands used to sort vouchers into their
+ * sub-categories in `computeCategories()`):
+ *   - Gym Leader  -> their one associated biome
+ *   - Evil Team   -> always both fixed boss waves (115, 165), regardless of
+ *                    which team - matches how ClassicFixedBossWaves.EVIL_BOSS_1/2
+ *                    work for every evil team equally
+ *   - Elite Four  -> their real wave assignment(s) via getEliteFourWaves()
+ *   - Champion    -> always wave 190
+ */
+function getTrainerSpawnInfo(trainerType: TrainerType): string {
+  if (trainerType >= TrainerType.BROCK && trainerType < TrainerType.LORELEI) {
+    const biomeName = getGymLeaderBiome(trainerType);
+    return biomeName ? `Biome: ${biomeName}` : "Biome: Unknown";
+  }
+  if (trainerType >= TrainerType.LORELEI && trainerType < TrainerType.BLUE) {
+    const waves = getEliteFourWaves(trainerType);
+    return waves.length > 0 ? `Wave ${waves.join(", ")}` : "Wave: Unknown";
+  }
+  if (trainerType >= TrainerType.BLUE && trainerType < TrainerType.RIVAL) {
+    return "Wave 190";
+  }
+  return `Wave ${ClassicFixedBossWaves.EVIL_BOSS_1}, Wave ${ClassicFixedBossWaves.EVIL_BOSS_2}`;
+}
+
+const LEVEL0_COLS = 8;
 const LEVEL0_ROWS = 2;
 const LEVEL1_COLS = 18;
 const LEVEL1_ROWS = 4;
@@ -330,6 +455,18 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   private currentLeaf: LeafCategory | null = null;
   /** Within a drilldown: false = showing "have", true = showing "missing". */
   private showingMissing = false;
+
+  // Trainer detail view - a static info card, not part of the icon-grid
+  // navigation. Opened via ACTION on a voucher item in a drilldown.
+  private trainerDetailContainer: Phaser.GameObjects.Container;
+  private trainerSprite: Phaser.GameObjects.Sprite;
+  private trainerRowIcons: Phaser.GameObjects.Sprite[] = [];
+  private trainerRowTexts: Phaser.GameObjects.Text[] = [];
+  private trainerTypeIcon: Phaser.GameObjects.Sprite;
+  private trainerTypeLabelText: Phaser.GameObjects.Text;
+  private trainerInfoText: Phaser.GameObjects.Text;
+  private inTrainerDetail = false;
+  private currentTrainerKey: string | null = null;
 
   constructor(mode: UiMode | null = null) {
     super(mode);
@@ -396,6 +533,52 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
     ui.add(this.mainContainer);
     this.mainContainer.setVisible(false);
+
+    // ── Trainer detail view (static info card, opened via ACTION on a
+    // voucher item) ─────────────────────────────────────────────────────
+    this.trainerDetailContainer = globalScene.add.container(1, -HEIGHT + 1).setVisible(false);
+    const detailTop = this.headerBg.height;
+    const detailBg = addWindow(0, detailTop, WIDTH - 2, HEIGHT - detailTop - 1).setOrigin(0);
+
+    // Sprite, top-left. Scale is a starting guess - trainer battle sprites
+    // are much bigger than UI icons, this has not been visually verified.
+    this.trainerSprite = globalScene.add.sprite(40, detailTop + 46, "items", "unknown").setScale(0.4).setOrigin(0.5, 1);
+
+    // 6 team-slot rows, right of the sprite. Real signature slots get a
+    // species icon (or the first pool member's icon, for a pool slot);
+    // anything beyond this trainer's actual signature-slot count gets the
+    // trainer's specialty-type icon instead, per "show the type icon in
+    // the filler spots".
+    const ROW_COUNT = 6;
+    const ROW_Y_START = detailTop + 6;
+    const ROW_H = 14;
+    const ROW_ICON_X = 82;
+    const ROW_TEXT_X = 96;
+    for (let i = 0; i < ROW_COUNT; i++) {
+      const y = ROW_Y_START + i * ROW_H;
+      const icon = globalScene.add.sprite(ROW_ICON_X, y, "items", "unknown").setOrigin(0).setScale(0.5);
+      const text = addTextObject(ROW_TEXT_X, y, "", TextStyle.WINDOW, { fontSize: "72px" }).setOrigin(0);
+      this.trainerRowIcons.push(icon);
+      this.trainerRowTexts.push(text);
+      this.trainerDetailContainer.add([icon, text]);
+    }
+
+    // Info box under the sprite/rows - specialty/tera type + spawn info.
+    const infoY = ROW_Y_START + ROW_COUNT * ROW_H + 6;
+    this.trainerTypeIcon = globalScene.add.sprite(8, infoY, getLocalizedSpriteKey("types"), "unknown").setOrigin(0);
+    this.trainerTypeLabelText = addTextObject(30, infoY, "", TextStyle.WINDOW, { fontSize: "72px" }).setOrigin(0);
+    this.trainerInfoText = addTextObject(8, infoY + 16, "", TextStyle.WINDOW, { fontSize: "72px", maxLines: 2 })
+      .setWordWrapWidth(1870)
+      .setOrigin(0);
+
+    this.trainerDetailContainer.add([
+      detailBg,
+      this.trainerSprite,
+      this.trainerTypeIcon,
+      this.trainerTypeLabelText,
+      this.trainerInfoText,
+    ]);
+    ui.add(this.trainerDetailContainer);
   }
 
   override show(args: any[]): boolean {
@@ -406,6 +589,9 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     this.inDrilldown = false;
     this.currentLeaf = null;
     this.showingMissing = false;
+    this.inTrainerDetail = false;
+    this.currentTrainerKey = null;
+    this.trainerDetailContainer.setVisible(false);
 
     this.loadCurrentFrame();
 
@@ -992,6 +1178,79 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     return true;
   }
 
+  /** ACTION on a voucher item in a drilldown opens the trainer detail card. No-op for species items (those use the Pokedex, not this). */
+  private openTrainerDetailForCursor(): boolean {
+    const leaf = this.currentLeaf;
+    if (!leaf || leaf.kind !== "voucher") {
+      return false;
+    }
+    const list = this.showingMissing ? leaf.missingIds : leaf.haveIds;
+    const item = list[this.cursor + this.scrollCursor * LEVEL1_COLS];
+    if (item === undefined) {
+      return false;
+    }
+    this.showTrainerDetail(item as string);
+    return true;
+  }
+
+  private showTrainerDetail(trainerKey: string): void {
+    const trainerConfig = trainerConfigs[TrainerType[trainerKey as keyof typeof TrainerType]];
+    if (!trainerConfig) {
+      return;
+    }
+
+    this.currentTrainerKey = trainerKey;
+    this.inTrainerDetail = true;
+
+    this.trainerSprite.setTexture(trainerConfig.getSpriteKey(false, false));
+
+    const pool = signatureSpecies[trainerKey] ?? [];
+    const specialtyType: PokemonType | undefined = trainerConfig.specialtyType;
+
+    for (let i = 0; i < this.trainerRowIcons.length; i++) {
+      const icon = this.trainerRowIcons[i];
+      const text = this.trainerRowTexts[i];
+      icon.clearTint();
+
+      if (i < pool.length) {
+        const slot = pool[i];
+        const slotSpeciesIds = Array.isArray(slot) ? slot : [slot];
+        const primarySpecies = speciesDataRegistry.getSpecies(slotSpeciesIds[0]);
+        icon.setTexture(primarySpecies.getIconAtlasKey(0, false, 0), primarySpecies.getIconId(false, 0, false, 0));
+        text.setText(slotSpeciesIds.map(id => speciesDataRegistry.getSpecies(id).getName()).join(" / "));
+      } else if (specialtyType !== undefined) {
+        icon.setTexture(getLocalizedSpriteKey("types"), PokemonType[specialtyType].toLowerCase());
+        text.setText(`Any ${PokemonType[specialtyType]} type`);
+      } else {
+        icon.setVisible(false);
+        text.setText("");
+      }
+    }
+
+    if (specialtyType !== undefined) {
+      this.trainerTypeIcon.setTexture(getLocalizedSpriteKey("types"), PokemonType[specialtyType].toLowerCase());
+      this.trainerTypeLabelText.setText(`${PokemonType[specialtyType]} specialist`);
+    } else {
+      this.trainerTypeIcon.setVisible(false);
+      this.trainerTypeLabelText.setText("No specialty type");
+    }
+
+    const trainerType = TrainerType[trainerKey as keyof typeof TrainerType];
+    this.trainerInfoText.setText(getTrainerSpawnInfo(trainerType));
+
+    this.mainContainer.setVisible(false);
+    this.trainerDetailContainer.setVisible(true);
+    this.getUi().moveTo(this.trainerDetailContainer, this.getUi().length - 1);
+  }
+
+  private exitTrainerDetail(): void {
+    this.inTrainerDetail = false;
+    this.currentTrainerKey = null;
+    this.trainerDetailContainer.setVisible(false);
+    this.mainContainer.setVisible(true);
+    this.getUi().moveTo(this.mainContainer, this.getUi().length - 1);
+  }
+
   // #region Input Processing
 
   processInput(button: Button): boolean {
@@ -999,6 +1258,10 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
     switch (button) {
       case Button.ACTION:
+        if (this.inTrainerDetail) {
+          // Static info card - nothing to act on.
+          break;
+        }
         if (!this.inDrilldown) {
           const tile = this.currentFrame.items[this.cursor + this.scrollCursor * LEVEL0_COLS];
           if (tile) {
@@ -1009,30 +1272,36 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
             }
             success = true;
           }
+        } else if (this.currentLeaf?.kind === "voucher") {
+          success = this.openTrainerDetailForCursor();
         } else {
           success = this.openPokedexEntryForCursor();
         }
         break;
       case Button.CANCEL:
-        this.goBack();
+        if (this.inTrainerDetail) {
+          this.exitTrainerDetail();
+        } else {
+          this.goBack();
+        }
         success = true;
         break;
       case Button.STATS:
-        if (this.inDrilldown) {
+        if (this.inDrilldown && !this.inTrainerDetail) {
           success = this.toggleMissing();
         }
         break;
       case Button.UP:
-        success = this.processUpInput();
+        success = !this.inTrainerDetail && this.processUpInput();
         break;
       case Button.DOWN:
-        success = this.processDownInput();
+        success = !this.inTrainerDetail && this.processDownInput();
         break;
       case Button.LEFT:
-        success = this.processLeftInput();
+        success = !this.inTrainerDetail && this.processLeftInput();
         break;
       case Button.RIGHT:
-        success = this.processRightInput();
+        success = !this.inTrainerDetail && this.processRightInput();
         break;
       default:
         break;
@@ -1162,7 +1431,10 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     this.menuStack = [];
     this.inDrilldown = false;
     this.currentLeaf = null;
+    this.inTrainerDetail = false;
+    this.currentTrainerKey = null;
     this.mainContainer.setVisible(false);
+    this.trainerDetailContainer.setVisible(false);
     this.eraseCursor();
   }
 
