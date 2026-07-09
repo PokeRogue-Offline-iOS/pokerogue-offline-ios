@@ -33,6 +33,9 @@
       --windows-cyan: #4ec9e0;
       --windows-cyan-dim: rgba(78,201,224,0.10);
       --windows-cyan-border: rgba(78,201,224,0.28);
+      --macos-silver: #c0c0d0;
+      --macos-silver-dim: rgba(192,192,208,0.10);
+      --macos-silver-border: rgba(192,192,208,0.28);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -397,6 +400,7 @@
     .platform-tab.active-android { background: var(--android-green-dim); color: var(--android-green); }
     .platform-tab.active-linux { background: var(--linux-blue-dim); color: var(--linux-blue); }
     .platform-tab.active-windows { background: var(--windows-cyan-dim); color: var(--windows-cyan); }
+    .platform-tab.active-macos { background: var(--macos-silver-dim); color: var(--macos-silver); }
     .platform-panel { display: none; }
     .platform-panel.active { display: block; }
 
@@ -436,6 +440,8 @@
     }
     .install-card.windows-card::before { background: linear-gradient(to right, transparent, var(--windows-cyan), transparent); }
     .install-card.windows-card:hover { border-color: rgba(78,201,224,0.5); box-shadow: 0 4px 30px rgba(78,201,224,0.07); }
+    .install-card.macos-card { border-color: var(--macos-silver-border); }
+    .install-card.macos-card:hover { border-color: rgba(192,192,208,0.5); box-shadow: 0 4px 30px rgba(192,192,208,0.07); }
 
     .card-header {
       display: flex; align-items: flex-start; justify-content: space-between;
@@ -501,6 +507,11 @@
       background: var(--windows-cyan-dim);
       border-color: var(--windows-cyan-border);
     }
+    .macos-card .steps .step-n {
+      color: var(--macos-silver);
+      background: var(--macos-silver-dim);
+      border-color: var(--macos-silver-border);
+    }
     .steps a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(201,168,76,0.3); transition: all 0.2s; }
     .steps a:hover { color: var(--cream); border-color: var(--cream); }
 
@@ -517,6 +528,7 @@
     .card-note.android-note { background: rgba(61,220,132,0.04); border-left-color: rgba(61,220,132,0.4); }
     .card-note.linux-note { background: rgba(122,162,247,0.04); border-left-color: rgba(122,162,247,0.4); }
     .card-note.windows-note { background: rgba(78,201,224,0.04); border-left-color: rgba(78,201,224,0.4); }
+    .card-note.macos-note { background: rgba(192,192,208,0.04); border-left-color: rgba(192,192,208,0.4); }
 
     .steps-sub { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(201,168,76,0.1); }
     .steps-sub-title {
@@ -605,6 +617,15 @@
       border: 1px solid rgba(201,168,76,0.15);
     }
 
+    .version-badge {
+      margin-top: 1.25rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+    }
+    .version-badge strong { color: var(--gold); font-weight: 600; }
+
     .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
     .reveal.visible { opacity: 1; transform: translateY(0); }
 
@@ -662,11 +683,13 @@
       <span class="platform-badge android">🤖 Android</span>
       <span class="platform-badge linux">🐧 Linux</span>
       <span class="platform-badge windows">🪟 Windows</span>
+      <span class="platform-badge macos">🖥️ macOS</span>
     </div>
     <div class="hero-cta">
       <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" class="btn btn-primary">↓ Download</a>
       <a href="https://github.com/PokeRogue-Offline/pokerogue-offline" class="btn btn-secondary">View on GitHub</a>
     </div>
+    <p id="version-badge" class="version-badge" style="display:none;"></p>
   </div>
 
   <div class="divider"><span class="divider-icon">✦</span></div>
@@ -762,6 +785,7 @@
       <button class="platform-tab" id="tab-android" onclick="switchTab('android')">🤖 Android</button>
       <button class="platform-tab" id="tab-linux" onclick="switchTab('linux')">🐧 Linux</button>
       <button class="platform-tab" id="tab-windows" onclick="switchTab('windows')">🪟 Windows</button>
+      <button class="platform-tab" id="tab-macos" onclick="switchTab('macos')">🖥️ macOS</button>
     </div>
 
     <!-- iOS Panel -->
@@ -947,6 +971,53 @@ sudo apparmor_parser -r /etc/apparmor.d/pokerogue-offline</code>
       </div>
     </div>
 
+    <!-- macOS Panel -->
+    <div class="platform-panel" id="panel-macos">
+      <div class="install-grid">
+        <div class="install-card macos-card reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num" style="color:var(--macos-silver);opacity:0.7;">macOS</p>
+              <h3 class="card-title">Apple Silicon (arm64)</h3>
+            </div>
+            <span class="badge" style="background:var(--macos-silver-dim);color:var(--macos-silver);border:1px solid var(--macos-silver-border);">M1/M2/M3/M4</span>
+          </div>
+          <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+            For Macs with Apple Silicon chips.
+          </p>
+          <div class="steps">
+            <div class="step-row"><span class="step-n">1</span><span>Go to the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank">latest release</a> and download <code>PokeRogueOffline-arm64.dmg</code></span></div>
+            <div class="step-row"><span class="step-n">2</span><span>Open the DMG and drag the app into <strong>Applications</strong></span></div>
+            <div class="step-row"><span class="step-n">3</span><span>On first launch, right-click (or Control-click) the app and choose <strong>Open</strong> to bypass Gatekeeper</span></div>
+          </div>
+          <div class="card-note macos-note">
+            The app is unsigned and not notarized. If macOS still refuses to open it after right-click → Open, run <code>xattr -cr /Applications/PokeRogueOffline.app</code> in Terminal, then try again.
+          </div>
+        </div>
+
+        <div class="install-card macos-card reveal">
+          <div class="card-header">
+            <div>
+              <p class="card-num" style="color:var(--macos-silver);opacity:0.7;">macOS</p>
+              <h3 class="card-title">Intel (x64)</h3>
+            </div>
+            <span class="badge" style="background:var(--macos-silver-dim);color:var(--macos-silver);border:1px solid var(--macos-silver-border);">Intel Macs</span>
+          </div>
+          <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+            For Macs with Intel chips.
+          </p>
+          <div class="steps">
+            <div class="step-row"><span class="step-n">1</span><span>Go to the <a href="https://github.com/PokeRogue-Offline/pokerogue-offline/releases/latest" target="_blank">latest release</a> and download <code>PokeRogueOffline-x64.dmg</code></span></div>
+            <div class="step-row"><span class="step-n">2</span><span>Open the DMG and drag the app into <strong>Applications</strong></span></div>
+            <div class="step-row"><span class="step-n">3</span><span>On first launch, right-click (or Control-click) the app and choose <strong>Open</strong> to bypass Gatekeeper</span></div>
+          </div>
+          <div class="card-note macos-note">
+            The app is unsigned and not notarized. If macOS still refuses to open it after right-click → Open, run <code>xattr -cr /Applications/PokeRogueOffline.app</code> in Terminal, then try again.
+          </div>
+        </div>
+      </div>
+    </div>
+
   </section>
 
   <div class="divider"><span class="divider-icon">✦</span></div>
@@ -1052,7 +1123,7 @@ sudo apparmor_parser -r /etc/apparmor.d/pokerogue-offline</code>
     }
 
     function switchTab(platform) {
-      const tabs = ['ios', 'android', 'linux', 'windows'];
+      const tabs = ['ios', 'android', 'linux', 'windows', 'macos'];
       tabs.forEach(p => {
         const tab = document.getElementById(`tab-${p}`);
         const panel = document.getElementById(`panel-${p}`);
@@ -1068,7 +1139,23 @@ sudo apparmor_parser -r /etc/apparmor.d/pokerogue-offline</code>
     }
 
     const hash = window.location.hash.replace('#', '');
-    if (['android', 'linux', 'windows'].includes(hash)) switchTab(hash);
+    if (['android', 'linux', 'windows', 'macos'].includes(hash)) switchTab(hash);
+
+    fetch('repo.json')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        const v = data && data.apps && data.apps[0] && data.apps[0].versions && data.apps[0].versions[0];
+        if (!v || !v.version) return;
+        const badge = document.getElementById('version-badge');
+        let dateStr = '';
+        if (v.date) {
+          const d = new Date(v.date);
+          if (!isNaN(d)) dateStr = ' · ' + d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+        badge.innerHTML = `Latest release: <strong>v${v.version}</strong>${v.buildVersion ? ` (build ${v.buildVersion})` : ''}${dateStr}`;
+        badge.style.display = 'block';
+      })
+      .catch(() => {});
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((e, i) => {
