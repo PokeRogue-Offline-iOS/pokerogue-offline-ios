@@ -66,6 +66,11 @@
  *        Pokedex/Starter Select screens already show their "C" hint on -
  *        no new touch button, just an extra allowed UiMode.
  *
+ *   6. src/ui-inputs.ts
+ *        Adds CompletionistDexUiHandler to the buttonGoToFilter() whitelist
+ *        so Button.STATS (C/Shift) actually reaches our processInput()
+ *        instead of being swallowed by the unrelated battle-info toggle.
+ *
  * NOTE ON TESTING: anchors below were confirmed against pokerogue-offline's
  * completionistDex branch working tree, post gacha-calendar.js, at the
  * time this was written. TS/CSS syntax-checked and byte-diff verified per
@@ -263,6 +268,42 @@ if (cssSrc.includes('[data-ui-mode="COMPLETIONIST_DEX"]')) {
   #apadOpenFilters,`,
   );
   writeFile(CSS_PATH, cssSrc);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-patch 6: src/ui-inputs.ts  →  let Button.STATS actually reach our handler
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Button.STATS (keyboard C/Shift) doesn't reach UiHandler.processInput()
+// generically - it's intercepted by UiInputs.buttonGoToFilter(), which only
+// forwards it to globalScene.ui.processInput() for a hardcoded whitelist of
+// handler classes (StarterSelectUiHandler, PokedexUiHandler,
+// PokedexPageUiHandler). Anything else just calls the unrelated battle-info
+// buttonStats() toggle instead, which does nothing visible on our screen.
+// Confirmed via real testing (C did nothing on this screen) before writing
+// this patch - not a guess.
+
+const UI_INPUTS_PATH = path.join("pokerogue-src", "src", "ui-inputs.ts");
+let uiInputsSrc = readFile(UI_INPUTS_PATH);
+
+if (uiInputsSrc.includes("CompletionistDexUiHandler")) {
+  console.log("SKIP ui-inputs.ts — CompletionistDexUiHandler already present");
+} else {
+  const IMPORT_ANCHOR = `import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";`;
+  requireAnchor(uiInputsSrc, IMPORT_ANCHOR, "PokedexPageUiHandler import in ui-inputs.ts");
+  uiInputsSrc = uiInputsSrc.replace(
+    IMPORT_ANCHOR,
+    `${IMPORT_ANCHOR}\nimport { CompletionistDexUiHandler } from "#ui/completionist-dex-ui-handler";`,
+  );
+
+  const WHITELIST_ANCHOR = `const whitelist = [StarterSelectUiHandler, PokedexUiHandler, PokedexPageUiHandler];`;
+  requireAnchor(uiInputsSrc, WHITELIST_ANCHOR, "buttonGoToFilter whitelist in ui-inputs.ts");
+  uiInputsSrc = uiInputsSrc.replace(
+    WHITELIST_ANCHOR,
+    `const whitelist = [StarterSelectUiHandler, PokedexUiHandler, PokedexPageUiHandler, CompletionistDexUiHandler];`,
+  );
+
+  writeFile(UI_INPUTS_PATH, uiInputsSrc);
 }
 
 console.log("\ncompletionist-dex patch applied successfully.");

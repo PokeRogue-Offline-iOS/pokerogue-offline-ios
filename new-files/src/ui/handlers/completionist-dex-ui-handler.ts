@@ -6,7 +6,6 @@ import { Passive as PassiveAttr } from "#enums/passive";
 import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import type { UiMode } from "#enums/ui-mode";
-import { getVariantIcon, getVariantTint } from "#sprites/variant";
 import { getVoucherTypeIcon, vouchers } from "#system/voucher";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ScrollBar } from "#ui/scroll-bar";
@@ -33,7 +32,7 @@ import { addWindow } from "#ui/ui-theme";
  *
  * Category definitions (all derived from real, already-persisted save
  * fields - nothing new is stored by this screen):
- *   - Starters Unlocked -> starters where `caughtCount > 0`
+ *   - Starters Unlocked -> starters where `caughtAttr !== 0n`
  *   - Shiny Starters     -> starters where `caughtAttr & DexAttr.SHINY`
  *   - Species Fought     -> all species where `seenCount > 0` (this is what
  *                           the game internally calls "Encountered")
@@ -41,7 +40,18 @@ import { addWindow } from "#ui/ui-theme";
  *                           (approximates the real `isSeen()`, doesn't chase
  *                           the base-starter fallback for evolved/hatched-
  *                           without-encounter edge cases)
- *   - Species Caught     -> all species where `caughtCount > 0`
+ *   - Species Caught     -> all species where `caughtAttr !== 0n`. NOTE:
+ *                           this was originally `caughtCount > 0`, which was
+ *                           wrong - `caughtCount` only increments on a
+ *                           direct wild/trainer catch (see
+ *                           `GameData.setPokemonSpeciesCaught`), NOT on
+ *                           hatching or evolving into a species. `caughtAttr`
+ *                           is set unconditionally regardless of how the
+ *                           species was obtained, and is what the real
+ *                           Pokedex screen itself checks (`!!dexEntry.caughtAttr`
+ *                           in `pokedex-ui-handler.ts`). Caught this via a
+ *                           real save mismatch during testing (927/1084
+ *                           shown vs the true 1084/1084) - not a guess.
  *   - Gym Leader Vouchers -> the `vouchers` registry, filtered to keys whose
  *                           `TrainerType` falls in the Gym Leader band
  *                           (`BROCK`..`GRUSHA`, i.e. `>= 200 && < 300`).
@@ -74,7 +84,7 @@ interface CategoryDef {
   missingIds: (number | string)[];
 }
 
-const LEVEL0_COLS = 4;
+const LEVEL0_COLS = 9;
 const LEVEL0_ROWS = 2;
 const LEVEL1_COLS = 18;
 const LEVEL1_ROWS = 4;
@@ -216,7 +226,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
     for (const id of speciesIds) {
       const entry = dexData[id];
-      (entry.caughtCount > 0 ? caughtHave : caughtMissing).push(id);
+      (entry.caughtAttr !== 0n ? caughtHave : caughtMissing).push(id);
       (entry.seenCount > 0 ? foughtHave : foughtMissing).push(id);
       (entry.seenAttr !== 0n || entry.caughtAttr !== 0n ? seenHave : seenMissing).push(id);
     }
@@ -230,7 +240,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
     for (const id of starterIds) {
       const entry = dexData[id];
-      (entry.caughtCount > 0 ? startersHave : startersMissing).push(id);
+      (entry.caughtAttr !== 0n ? startersHave : startersMissing).push(id);
       (entry.caughtAttr & DexAttr.SHINY ? shinyHave : shinyMissing).push(id);
 
       const sd = gameData.starterData[id];
@@ -263,9 +273,13 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       {
         label: "Shiny Starters",
         kind: "species",
-        iconTexture: "shiny_icons",
-        iconFrame: getVariantIcon(2),
-        iconTint: getVariantTint(2),
+        // Deliberately NOT one of the shiny_icons variant-tier sparkles -
+        // those are reserved for an upcoming submenu that uses all three.
+        // golden_egg is a real, distinct item icon that reads as "special/
+        // rare" without touching that asset set. Easy one-line swap if a
+        // different icon is preferred.
+        iconTexture: "items",
+        iconFrame: "golden_egg",
         haveIds: shinyHave,
         missingIds: shinyMissing,
       },
@@ -357,6 +371,10 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
   private currentCols(): number {
     return this.level === Level.CATEGORY_MENU ? LEVEL0_COLS : LEVEL1_COLS;
+  }
+
+  private currentRows(): number {
+    return this.level === Level.CATEGORY_MENU ? LEVEL0_ROWS : LEVEL1_ROWS;
   }
 
   private refreshCategoryMenuIcons(): void {
@@ -488,27 +506,49 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
   private processUpInput(): boolean {
     const cols = this.currentCols();
-    if (this.cursor - cols < 0) {
-      if (this.scrollCursor > 0) {
-        return this.setScrollCursor(this.scrollCursor - 1);
-      }
-      return false;
+    if (this.cursor - cols >= 0) {
+      return this.setCursor(this.cursor - cols);
     }
-    return this.setCursor(this.cursor - cols);
+    if (this.scrollCursor > 0) {
+      return this.setScrollCursor(this.scrollCursor - 1);
+    }
+    // Already at the very top row - loop to the bottom.
+    return this.wrapToEdge(false);
   }
 
   private processDownInput(): boolean {
     const cols = this.currentCols();
-    const rows = this.level === Level.CATEGORY_MENU ? LEVEL0_ROWS : LEVEL1_ROWS;
+    const rows = this.currentRows();
     const itemOffset = this.scrollCursor * cols;
-    if (this.cursor + cols >= rows * cols || this.cursor + cols + itemOffset >= this.currentTotal) {
-      const maxScrollCursor = Math.max(0, Math.ceil(this.currentTotal / cols) - rows);
-      if (this.scrollCursor < maxScrollCursor) {
-        return this.setScrollCursor(this.scrollCursor + 1);
-      }
-      return false;
+    if (this.cursor + cols < rows * cols && this.cursor + cols + itemOffset < this.currentTotal) {
+      return this.setCursor(this.cursor + cols);
     }
-    return this.setCursor(this.cursor + cols);
+    const maxScrollCursor = Math.max(0, Math.ceil(this.currentTotal / cols) - rows);
+    if (this.scrollCursor < maxScrollCursor) {
+      return this.setScrollCursor(this.scrollCursor + 1);
+    }
+    // Already at the very bottom row - loop to the top.
+    return this.wrapToEdge(true);
+  }
+
+  /** Loops UP↔DOWN navigation across the top/bottom edge of the current grid, preserving column where possible. */
+  private wrapToEdge(toTop: boolean): boolean {
+    const cols = this.currentCols();
+    const rows = this.currentRows();
+    const col = this.cursor % cols;
+
+    if (toTop) {
+      this.setScrollCursor(0);
+      return this.setCursor(Math.min(col, this.currentTotal - 1));
+    }
+
+    const totalRows = Math.max(1, Math.ceil(this.currentTotal / cols));
+    const lastRow = totalRows - 1;
+    const lastRowItemCount = this.currentTotal - lastRow * cols;
+    const targetCol = Math.min(col, lastRowItemCount - 1);
+    const newScrollCursor = Math.max(0, lastRow - (rows - 1));
+    this.setScrollCursor(newScrollCursor);
+    return this.setCursor((lastRow - newScrollCursor) * cols + targetCol);
   }
 
   private processLeftInput(): boolean {
