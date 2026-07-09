@@ -1,7 +1,9 @@
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { signatureSpecies } from "#balance/signature-species";
 import { allBiomes } from "#data/data-lists";
+import { AbilityAttr } from "#enums/ability-attr";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
@@ -11,7 +13,7 @@ import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
-import { getVariantIcon, getVariantTint } from "#sprites/variant";
+import { getVariantIcon, getVariantTint, variantData } from "#sprites/variant";
 import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
 import { getVoucherTypeIcon, vouchers } from "#system/voucher";
 import { trainerConfigs } from "#trainers/trainer-config";
@@ -48,6 +50,11 @@ import { getAvailableRibbons, getRibbonKey, orderedRibbons } from "#utils/ribbon
  *   shiny/variant state the icon was actually rendered as (see
  *   `variantMode` below) - not always the plain default view. No-op on
  *   voucher items.
+ *
+ *   Button.STATS is intentionally a no-op everywhere else - browsing pages
+ *   (the category tile lists) and the trainer detail card. Have/missing
+ *   toggling only makes sense against a concrete species/voucher list, not
+ *   a list of categories or a single trainer's static info.
  *
  * The header bar is a breadcrumb built from the menu stack's frame labels,
  * plus the current leaf's label while drilled down, e.g.
@@ -89,12 +96,57 @@ import { getAvailableRibbons, getRibbonKey, orderedRibbons } from "#utils/ribbon
  *                         into a species. `caughtAttr` is set unconditionally
  *                         regardless of how the species was obtained, and is
  *                         what the real Pokedex screen itself checks.
- *     - Pokemon Forms  -> species with more than one form: "have" = every
- *                         form bit on `caughtAttr` (bits 7..7+n, matching
- *                         `GameData.getFormAttr()`'s encoding) is set,
- *                         "missing" = at least one isn't. Species with only
- *                         one form are excluded entirely, not counted
- *                         either way.
+ *     - Pokemon Forms  -> `kind: "form"` (NOT "species" - a plain species ID
+ *                         can't distinguish "Charizard" from "Charizard
+ *                         (Mega Y)"; haveIds/missingIds instead hold
+ *                         "speciesId|formIndex" composite keys, parsed via
+ *                         `parseFormKey()`). One entry PER FORM, not per
+ *                         species: species with more than one form get each
+ *                         individual form bit on `caughtAttr` (bits 7..7+n,
+ *                         matching `GameData.getFormAttr()`'s encoding)
+ *                         checked separately - "Mega Charizard Y" and
+ *                         "Charizard" show as distinct drilldown tiles with
+ *                         their own icons, not collapsed into one
+ *                         "Charizard" tile keyed off "were all forms
+ *                         caught". (Real bug caught via testing: originally
+ *                         WAS one entry per species with that collapsed
+ *                         all-or-nothing check, AND every icon/Pokedex-open
+ *                         hardcoded formIndex 0 regardless, so even the
+ *                         "collapsed" tile always rendered as the base
+ *                         form.) Species with only one form are excluded
+ *                         entirely, not counted either way.
+ *     - 100% Status    -> starters (over the same `starterIds` population as
+ *                         Shiny Starters/Passives/Reductions, not every
+ *                         individual dex entry/form) meeting ALL of:
+ *                           - every egg move bit set (`starterData.eggMoves`
+ *                             vs `speciesEggMoves[id]`'s length) - vacuously
+ *                             true for species with no egg moves defined
+ *                           - every *available* shiny variant tier per the
+ *                             real `variantData` (not every species has
+ *                             distinct colors for all 3 tiers) AND the
+ *                             SHINY bit, same tier-vs-shininess distinction
+ *                             as the Shiny Starters category above
+ *                           - every `isStarterSelectable` form's bit set -
+ *                             vacuously true for <=1 selectable form
+ *                           - `valueReduction === 2` (reuses Candy's "Two
+ *                             Reductions" definition)
+ *                           - `passiveAttr & PassiveAttr.UNLOCKED` (reuses
+ *                             Candy's "Passives" definition)
+ *                           - `abilityAttr` covers ABILITY_1/ABILITY_2, plus
+ *                             ABILITY_HIDDEN if `species.getAbilityCount()`
+ *                             is 3 - NOT a check against raw `ability2 !==
+ *                             NONE`, since `PokemonSpecies` silently
+ *                             defaults `ability2` to a duplicate of
+ *                             `ability1` when a species has no distinct
+ *                             second ability, which would make that check
+ *                             always true and thus meaningless
+ *                           - `dexData[id].ivs` (dex-tracked best-ever IVs,
+ *                             not any single caught Pokemon's IVs) all 31
+ *                         Nature is deliberately NOT part of this - see
+ *                         TODO history. No species is excluded from either
+ *                         list; every sub-criterion above degrades to
+ *                         vacuously-true rather than excluding the species,
+ *                         unlike Pokemon Forms' single-form exclusion.
  *
  *   Vouchers (group) - the `vouchers` registry, split by TrainerType band:
  *     - Gym Leaders -> >= BROCK    && < LORELEI
@@ -143,7 +195,7 @@ import { getAvailableRibbons, getRibbonKey, orderedRibbons } from "#utils/ribbon
  *     `getRibbonKey()` value itself via `ribbonDisplayName()`.
  */
 
-type CategoryKind = "species" | "voucher";
+type CategoryKind = "species" | "voucher" | "form";
 
 /**
  * How a species-kind leaf's "have"-list icons should render in the
@@ -156,6 +208,19 @@ type CategoryKind = "species" | "voucher";
  */
 type VariantMode = "highest" | 0 | 1 | 2;
 
+/**
+ * Composite key used by `kind: "form"` leaves - a plain species ID can't
+ * distinguish "Charizard" from "Charizard (Mega Y)", so form-kind
+ * haveIds/missingIds store `"speciesId|formIndex"` strings instead. Split
+ * on `|`, parse both halves as numbers (formIndex is always a small plain
+ * int, never bigint, since it's a JS array index into `species.forms`, not
+ * a bit position).
+ */
+function parseFormKey(key: string): { speciesId: number; formIndex: number } {
+  const [speciesId, formIndex] = key.split("|").map(Number);
+  return { speciesId, formIndex };
+}
+
 interface LeafCategory {
   label: string;
   kind: CategoryKind;
@@ -163,9 +228,9 @@ interface LeafCategory {
   iconFrame: string | number;
   iconTint?: number;
   variantMode?: VariantMode;
-  /** Species IDs or voucher keys the player already has. */
+  /** Species IDs, voucher keys, or (for `kind: "form"`) "speciesId|formIndex" strings the player already has. */
   haveIds: (number | string)[];
-  /** Species IDs or voucher keys the player is missing. */
+  /** Species IDs, voucher keys, or (for `kind: "form"`) "speciesId|formIndex" strings the player is missing. */
   missingIds: (number | string)[];
 }
 
@@ -643,8 +708,8 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     const foughtMissing: number[] = [];
     const seenHave: number[] = [];
     const seenMissing: number[] = [];
-    const formsHave: number[] = [];
-    const formsMissing: number[] = [];
+    const formsHave: string[] = [];
+    const formsMissing: string[] = [];
 
     // Keyed by RibbonFlag (bigint) rather than a Map, since bigint keys
     // work fine as Map keys but not as plain object keys - a Map avoids
@@ -665,15 +730,15 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       const species = speciesDataRegistry.getSpecies(id);
       const forms = species.forms ?? [];
       if (forms.length > 1) {
-        let allFormsCaught = true;
+        // One entry PER FORM, not per species - "have"/"missing" for each
+        // form's own bit individually, so the drilldown shows e.g. "Mega
+        // Charizard Y" as its own tile instead of collapsing every form
+        // into a single "Charizard" tile keyed off "were all forms caught".
         for (let f = 0; f < forms.length; f++) {
           const bit = 1n << BigInt(7 + f);
-          if (!(entry.caughtAttr & bit)) {
-            allFormsCaught = false;
-            break;
-          }
+          const key = `${id}|${f}`;
+          (entry.caughtAttr & bit ? formsHave : formsMissing).push(key);
         }
-        (allFormsCaught ? formsHave : formsMissing).push(id);
       }
 
       // Ribbons - scoped by real eligibility (getAvailableRibbons), not
@@ -703,6 +768,8 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     const reducedOneMissing: number[] = [];
     const reducedTwoHave: number[] = [];
     const reducedTwoMissing: number[] = [];
+    const perfectHave: number[] = [];
+    const perfectMissing: number[] = [];
 
     for (const id of starterIds) {
       const entry = dexData[id];
@@ -727,6 +794,54 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       (valueReduction >= 1 ? reducedAnyHave : reducedAnyMissing).push(id);
       (valueReduction === 1 ? reducedOneHave : reducedOneMissing).push(id);
       (valueReduction === 2 ? reducedTwoHave : reducedTwoMissing).push(id);
+
+      // "100% Status" - all 7 criteria below must pass. Each one degrades
+      // to vacuously-true when it doesn't apply to this species (no egg
+      // moves defined, no extra variant colors, <=1 starter-selectable
+      // form), same "if any" treatment as the existing Forms category.
+      const species = speciesDataRegistry.getSpecies(id);
+
+      const eggMoveList = speciesEggMoves[id];
+      const eggMoveMask = eggMoveList ? (1 << eggMoveList.length) - 1 : 0;
+      const eggMovesOk = eggMoveMask === 0 || ((sd?.eggMoves ?? 0) & eggMoveMask) === eggMoveMask;
+
+      // "Available" per the game's own variantData - not every species has
+      // distinct colors defined for all 3 tiers. Tier 0 (DEFAULT_VARIANT)
+      // is universal in practice, so this also enforces "must be shiny" for
+      // virtually every starter, same as real variant-tier gameplay.
+      const variantInfo = variantData[species.getVariantDataIndex()];
+      const isShinyCaught = !!(entry.caughtAttr & DexAttr.SHINY);
+      const variantBits = [DexAttr.DEFAULT_VARIANT, DexAttr.VARIANT_2, DexAttr.VARIANT_3];
+      let variantsOk = true;
+      for (let v = 0; v < 3; v++) {
+        if (variantInfo?.[v] === 1 && (!isShinyCaught || !(entry.caughtAttr & variantBits[v]))) {
+          variantsOk = false;
+          break;
+        }
+      }
+
+      const selectableForms = (species.forms ?? [])
+        .map((form, formIndex) => ({ form, formIndex }))
+        .filter(x => x.form.isStarterSelectable);
+      let formsOk = true;
+      if (selectableForms.length > 1) {
+        for (const { formIndex } of selectableForms) {
+          if (!(entry.caughtAttr & (1n << BigInt(7 + formIndex)))) {
+            formsOk = false;
+            break;
+          }
+        }
+      }
+
+      const requiredAbilityMask =
+        AbilityAttr.ABILITY_1 | AbilityAttr.ABILITY_2 | (species.getAbilityCount() === 3 ? AbilityAttr.ABILITY_HIDDEN : 0);
+      const abilitiesOk = ((sd?.abilityAttr ?? 0) & requiredAbilityMask) === requiredAbilityMask;
+
+      const ivsOk = entry.ivs?.length === 6 && entry.ivs.every(iv => iv === 31);
+
+      const perfect =
+        eggMovesOk && variantsOk && formsOk && valueReduction === 2 && passiveUnlocked && abilitiesOk && ivsOk;
+      (perfect ? perfectHave : perfectMissing).push(id);
     }
 
     // Vouchers - split the shared registry by TrainerType band. See
@@ -849,11 +964,19 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
         },
         {
           label: "Pokemon Forms",
-          kind: "species",
+          kind: "form",
           iconTexture: "items",
           iconFrame: "shell_bell",
           haveIds: formsHave,
           missingIds: formsMissing,
+        },
+        {
+          label: "100% Status",
+          kind: "species",
+          iconTexture: "items",
+          iconFrame: "shiny_charm",
+          haveIds: perfectHave,
+          missingIds: perfectMissing,
         },
       ],
     };
@@ -1139,6 +1262,13 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
           variant = leaf.variantMode === "highest" ? this.highestCaughtVariant(speciesId) : leaf.variantMode;
         }
         icon.setTexture(species.getIconAtlasKey(0, shiny, variant), species.getIconId(false, 0, shiny, variant));
+      } else if (leaf.kind === "form") {
+        const { speciesId, formIndex } = parseFormKey(item as string);
+        const species = speciesDataRegistry.getSpecies(speciesId);
+        icon.setTexture(
+          species.getIconAtlasKey(formIndex, false, 0),
+          species.getIconId(false, formIndex, false, 0),
+        );
       } else {
         icon.setTexture("items", getVoucherTypeIcon(vouchers[item as string].voucherType));
       }
@@ -1181,6 +1311,12 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       const name = speciesDataRegistry.getSpecies(item as number).getName();
       this.titleText.setText(`${name} - ${leaf.label} (${modeLabel})`);
       this.showText("Press ACTION to view its Pokedex entry.");
+    } else if (leaf.kind === "form") {
+      const { speciesId, formIndex } = parseFormKey(item as string);
+      const species = speciesDataRegistry.getSpecies(speciesId);
+      const formName = species.forms?.[formIndex]?.formName ?? "Unknown Form";
+      this.titleText.setText(`${species.getName()} (${formName}) - ${leaf.label} (${modeLabel})`);
+      this.showText("Press ACTION to view its Pokedex entry.");
     } else {
       const voucher = vouchers[item as string];
       this.titleText.setText(`${leaf.label} (${modeLabel})`);
@@ -1188,16 +1324,28 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     }
   }
 
-  /** ACTION on a species icon while drilled down opens that species' real Pokedex entry, matching whatever shiny/variant state was rendered. No-op for voucher items. */
+  /** ACTION on a species/form icon while drilled down opens that species' real Pokedex entry, matching whatever shiny/variant/form state was rendered. No-op for voucher items. */
   private openPokedexEntryForCursor(): boolean {
     const leaf = this.currentLeaf;
-    if (!leaf || leaf.kind !== "species") {
+    if (!leaf || leaf.kind === "voucher") {
       return false;
     }
     const list = this.showingMissing ? leaf.missingIds : leaf.haveIds;
     const item = list[this.cursor + this.scrollCursor * LEVEL1_COLS];
     if (item === undefined) {
       return false;
+    }
+
+    if (leaf.kind === "form") {
+      const { speciesId, formIndex } = parseFormKey(item as string);
+      const species = speciesDataRegistry.getSpecies(speciesId);
+      globalScene.ui.setOverlayMode(UiMode.POKEDEX_PAGE, species, {
+        shiny: false,
+        female: true,
+        variant: 0,
+        form: formIndex,
+      });
+      return true;
     }
 
     const speciesId = item as number;
@@ -1341,6 +1489,9 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
         success = true;
         break;
       case Button.STATS:
+        // Intentional no-op on browsing pages and the trainer detail card -
+        // see file-header doc. Only the drilldown grid's have/missing
+        // toggle makes sense for this button.
         if (this.inDrilldown && !this.inTrainerDetail) {
           success = this.toggleMissing();
         }
