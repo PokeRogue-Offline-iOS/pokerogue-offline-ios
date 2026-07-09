@@ -413,8 +413,6 @@ function getTrainerSpawnInfo(trainerType: TrainerType): string {
   return `Wave ${ClassicFixedBossWaves.EVIL_BOSS_1}, Wave ${ClassicFixedBossWaves.EVIL_BOSS_2}`;
 }
 
-const LEVEL0_COLS = 8;
-const LEVEL0_ROWS = 2;
 const LEVEL1_COLS = 18;
 const LEVEL1_ROWS = 4;
 // Icon pool is sized for the largest grid; smaller ones just use the first
@@ -445,7 +443,6 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   private titleText: Phaser.GameObjects.Text;
 
   private scrollBar: ScrollBar;
-  private browseScrollBar: ScrollBar;
   private scrollCursor: number;
   private cursorObj: Phaser.GameObjects.NineSlice | null;
 
@@ -499,17 +496,6 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       this.iconsBg.height - yOffset * 2,
       LEVEL1_ROWS,
     );
-    // Browsing pages only ever show LEVEL0_ROWS on screen at once - a
-    // separate instance since ScrollBar's maxRows (used for handle sizing)
-    // is fixed at construction and can't be shared correctly with the
-    // drilldown grid's LEVEL1_ROWS.
-    this.browseScrollBar = new ScrollBar(
-      this.iconsBg.width - 9,
-      this.iconsBg.y + yOffset,
-      4,
-      this.iconsBg.height - yOffset * 2,
-      LEVEL0_ROWS,
-    );
 
     this.iconsContainer = globalScene.add.container(5, this.headerBg.height + 8);
 
@@ -537,7 +523,6 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       this.headerText,
       this.iconsBg,
       this.scrollBar,
-      this.browseScrollBar,
       this.iconsContainer,
       this.titleBg,
       this.titleText,
@@ -995,8 +980,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     this.inDrilldown = true;
     this.currentLeaf = leaf;
     this.showingMissing = false;
-    this.browseScrollBar.setVisible(false);
-    this.layoutGrid(LEVEL1_COLS);
+    this.layoutGrid();
     this.currentTotal = 0;
     this.scrollCursor = 0;
     this.updateHeaderText();
@@ -1022,12 +1006,11 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   /** Displays whatever's on top of the menu stack, restoring its saved cursor/scroll position. */
   private loadCurrentFrame(): void {
     const frame = this.currentFrame;
-    this.scrollBar.setVisible(false);
-    this.layoutGrid(LEVEL0_COLS);
+    this.layoutGrid();
     this.currentTotal = frame.items.length;
     this.scrollCursor = frame.scrollCursor;
-    this.browseScrollBar.setTotalRows(Math.ceil(this.currentTotal / LEVEL0_COLS));
-    this.browseScrollBar.setScrollCursor(this.scrollCursor);
+    this.scrollBar.setTotalRows(Math.ceil(this.currentTotal / LEVEL1_COLS));
+    this.scrollBar.setScrollCursor(this.scrollCursor);
     this.refreshTileIcons(frame.items);
     this.updateHeaderText();
     this.setCursor(frame.cursor, true);
@@ -1078,30 +1061,29 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
   // #endregion Navigation
 
-  /** Repositions the shared icon pool for the given column count and hides any slots beyond `rows * cols`. */
-  private layoutGrid(cols: number): void {
-    const rows = cols === LEVEL1_COLS ? LEVEL1_ROWS : LEVEL0_ROWS;
+  /** Repositions the shared icon pool for the (now single, shared) LEVEL1 grid and hides any slots beyond it. */
+  private layoutGrid(): void {
     for (let a = 0; a < this.icons.length; a++) {
-      if (a >= rows * cols) {
+      if (a >= LEVEL1_ROWS * LEVEL1_COLS) {
         this.icons[a].setVisible(false);
         continue;
       }
-      this.icons[a].setPosition((a % cols) * ICON_SPACING_X, Math.floor(a / cols) * ICON_SPACING_Y);
+      this.icons[a].setPosition((a % LEVEL1_COLS) * ICON_SPACING_X, Math.floor(a / LEVEL1_COLS) * ICON_SPACING_Y);
     }
   }
 
   private currentCols(): number {
-    return this.inDrilldown ? LEVEL1_COLS : LEVEL0_COLS;
+    return LEVEL1_COLS;
   }
 
   private currentRows(): number {
-    return this.inDrilldown ? LEVEL1_ROWS : LEVEL0_ROWS;
+    return LEVEL1_ROWS;
   }
 
-  /** Windowed by scrollCursor, same idea as refreshDrilldownIcons - fixes phantom/misplaced icons for groups with more than one page of tiles (e.g. Ribbons' 39 leaves). */
+  /** Windowed by scrollCursor, same idea as refreshDrilldownIcons - fixes phantom/misplaced icons for groups with more than one page of tiles. */
   private refreshTileIcons(tiles: TopCategory[]): void {
-    const itemOffset = this.scrollCursor * LEVEL0_COLS;
-    const itemLimit = LEVEL0_ROWS * LEVEL0_COLS;
+    const itemOffset = this.scrollCursor * LEVEL1_COLS;
+    const itemLimit = LEVEL1_ROWS * LEVEL1_COLS;
     const itemRange = tiles.slice(itemOffset, itemOffset + itemLimit);
 
     itemRange.forEach((tile, i) => {
@@ -1113,10 +1095,10 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       }
       icon.setVisible(true);
     });
-    // Hide the *entire* remaining pool, not just up to LEVEL0_ROWS*LEVEL0_COLS -
-    // the pool is shared with the drilldown grid (up to LEVEL1_ROWS*LEVEL1_COLS
-    // slots), and leftover icons from a previous drilldown visit would
-    // otherwise keep their stale positions and reappear here.
+    // Hide every unused pool slot beyond this page's item count - relevant
+    // now that browsing and drilldown share the same full LEVEL1_ROWS *
+    // LEVEL1_COLS pool, so a page with fewer tiles than that must clear
+    // whatever the last drilldown/browsing visit left visible.
     for (let i = itemRange.length; i < this.icons.length; i++) {
       this.icons[i].setVisible(false);
     }
@@ -1171,7 +1153,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   /** Updates the title bar + description panel for whatever's currently under the cursor. */
   private updateDetailPanel(): void {
     if (!this.inDrilldown) {
-      const tile = this.currentFrame.items[this.cursor + this.scrollCursor * LEVEL0_COLS];
+      const tile = this.currentFrame.items[this.cursor + this.scrollCursor * LEVEL1_COLS];
       if (!tile) {
         return;
       }
@@ -1335,7 +1317,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
           break;
         }
         if (!this.inDrilldown) {
-          const tile = this.currentFrame.items[this.cursor + this.scrollCursor * LEVEL0_COLS];
+          const tile = this.currentFrame.items[this.cursor + this.scrollCursor * LEVEL1_COLS];
           if (tile) {
             if (isGroup(tile)) {
               this.enterGroup(tile);
@@ -1480,9 +1462,8 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     }
 
     this.scrollCursor = scrollCursor;
-    const activeScrollBar = this.inDrilldown ? this.scrollBar : this.browseScrollBar;
-    activeScrollBar.setTotalRows(Math.ceil(this.currentTotal / this.currentCols()));
-    activeScrollBar.setScrollCursor(this.scrollCursor);
+    this.scrollBar.setTotalRows(Math.ceil(this.currentTotal / this.currentCols()));
+    this.scrollBar.setScrollCursor(this.scrollCursor);
 
     const cols = this.currentCols();
     const maxCursor = Math.min(this.cursor, this.currentTotal - this.scrollCursor * cols - 1);
