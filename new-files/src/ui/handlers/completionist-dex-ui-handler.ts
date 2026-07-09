@@ -5,7 +5,7 @@ import { DexAttr } from "#enums/dex-attr";
 import { Passive as PassiveAttr } from "#enums/passive";
 import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
-import type { UiMode } from "#enums/ui-mode";
+import { UiMode } from "#enums/ui-mode";
 import { getVoucherTypeIcon, vouchers } from "#system/voucher";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ScrollBar } from "#ui/scroll-bar";
@@ -17,21 +17,34 @@ import { addWindow } from "#ui/ui-theme";
  * `globalScene.gameData` - never mutates save data. Recomputed fresh every
  * time the screen is opened, same as the real Achievements/Pokedex screens.
  *
- * Architecture deliberately mirrors `AchvsUiHandler` (header bar / icon
- * grid+scrollbar / single title bar / description panel) rather than the
- * old list-based v1 - two "levels" instead of Achv's two "pages":
+ * Architecture mirrors `AchvsUiHandler` (header bar / icon grid+scrollbar /
+ * single title bar / description panel), extended to three navigable
+ * levels rather than Achv's two flat "pages":
  *
- *   Level 0 (category menu): one icon per tracked category. Hovering shows
- *   the category name in the title bar and its current/total detail in the
- *   description panel. ACTION drills into that category.
+ *   Level 0 (category menu): one icon per top-level category. Two of these
+ *   ("Vouchers", "Candy") are GROUPS that open a submenu instead of a
+ *   drilldown directly - everything else is a plain leaf category.
  *
- *   Level 1 (drilldown): a grid of the actual species (or a list of
- *   vouchers) for the selected category. Defaults to showing what you
- *   already HAVE. Button.STATS (bound to keyboard `C` / `Shift`) toggles to
- *   show what's MISSING instead. CANCEL returns to level 0.
+ *   Level 1 (submenu, groups only): one icon per sub-category within that
+ *   group. Same grid size/behavior as the category menu.
  *
- * Category definitions (all derived from real, already-persisted save
- * fields - nothing new is stored by this screen):
+ *   Level 2 (drilldown): a grid of the actual species (or a list of
+ *   vouchers) for whichever leaf category was selected, whether reached
+ *   directly from level 0 or via a level-1 submenu. Defaults to showing
+ *   what you already HAVE. Button.STATS (keyboard `C` / `Shift`) toggles to
+ *   show what's MISSING instead. ACTION on a species icon opens that
+ *   species' real Pokedex entry (UiMode.POKEDEX_PAGE) - voucher items don't
+ *   have an equivalent target, so ACTION is a no-op for those.
+ *
+ *   CANCEL walks back up one level at a time; from level 0 it exits the
+ *   screen entirely.
+ *
+ * The header bar (top-left text, static "Completionist Dex" in earlier
+ * versions) is now a breadcrumb reflecting the current location, e.g.
+ * "Completionist Dex > Vouchers > Gym Leaders".
+ *
+ * Category/sub-category definitions (all derived from real, already-
+ * persisted save fields - nothing new is stored by this screen):
  *   - Starters Unlocked -> starters where `caughtAttr !== 0n`
  *   - Shiny Starters     -> starters where `caughtAttr & DexAttr.SHINY`
  *   - Species Fought     -> all species where `seenCount > 0` (this is what
@@ -52,44 +65,75 @@ import { addWindow } from "#ui/ui-theme";
  *                           in `pokedex-ui-handler.ts`). Caught this via a
  *                           real save mismatch during testing (927/1084
  *                           shown vs the true 1084/1084) - not a guess.
- *   - Gym Leader Vouchers -> the `vouchers` registry, filtered to keys whose
- *                           `TrainerType` falls in the Gym Leader band
- *                           (`BROCK`..`GRUSHA`, i.e. `>= 200 && < 300`).
- *                           NOTE: `vouchers` also contains Elite Four,
- *                           Champion, and Evil Team Leader entries - those
- *                           are deliberately excluded from this category.
- *   - Passives           -> starters where `passiveAttr & PassiveAttr.UNLOCKED`
+ *   - Vouchers (group)   -> the `vouchers` registry, split by TrainerType
+ *                           band into four sub-categories:
+ *                             Gym Leaders  -> >= BROCK    && < LORELEI
+ *                             Elite Four   -> >= LORELEI  && < BLUE
+ *                             Champion     -> >= BLUE     && < RIVAL
+ *                             Evil Team    -> >= ROCKET_BOSS_GIOVANNI_1 && < BROCK
+ *                           `vouchers` also has a CLASSIC_VICTORY entry
+ *                           that isn't a TrainerType at all - `TrainerType[key]`
+ *                           resolves to `undefined` for it and it's skipped.
+ *                           The Evil Team band technically also spans the
+ *                           generic-grunt and Mystery-Encounter-trainer
+ *                           TrainerType numbers, but neither of those ever
+ *                           has a voucher, so filtering the already-voucher-
+ *                           only `vouchers` registry by that range is safe
+ *                           in practice even though the raw enum range is
+ *                           wider than "just bosses".
+ *   - Candy (group)      -> starters, split into three sub-categories:
+ *                             Passives  -> `passiveAttr & PassiveAttr.UNLOCKED`
+ *   - Candy (group)      -> starters, split into four sub-categories:
+ *                             Passives             -> `passiveAttr & PassiveAttr.UNLOCKED`
+ *                             Any Reduction Amount  -> `starterData.valueReduction >= 1`
+ *                             One Reduction         -> `starterData.valueReduction === 1` (exactly one, not two)
+ *                             Two Reductions        -> `starterData.valueReduction === 2` (max tier)
+ *                           "Any Reduction Amount" is the union of the other
+ *                           two tiers; "One"/"Two" are exact matches, not
+ *                           `>=`, so a fully-maxed starter shows under "Two
+ *                           Reductions" and "Any Reduction Amount" but NOT
+ *                           under "One Reduction".
  *
- * Forms, Ribbons, and the full Vouchers set from the old v1 are dropped
- * from this pass entirely, per explicit scope direction - not silently
- * carried over as dead code.
+ * Forms and Ribbons from the original v1 pass are still dropped entirely -
+ * not silently carried over as dead code.
  *
- * Icon choices (pb / candy / shiny star / voucher frames) are all real,
- * already-used-elsewhere atlas keys, but exact visual balance (spacing,
- * scale) hasn't been eyeballed in an actual build yet - flagged, not
- * guessed at silently.
+ * Icon choices are all real, already-used-elsewhere atlas keys, but exact
+ * visual balance (spacing, scale) hasn't been eyeballed in an actual build
+ * yet - flagged, not guessed at silently.
  */
 
 type CategoryKind = "species" | "voucher";
 
-interface CategoryDef {
+interface LeafCategory {
   label: string;
   kind: CategoryKind;
   iconTexture: string;
   iconFrame: string | number;
-  iconTint?: number;
   /** Species IDs or voucher keys the player already has. */
   haveIds: (number | string)[];
   /** Species IDs or voucher keys the player is missing. */
   missingIds: (number | string)[];
 }
 
+interface GroupCategory {
+  label: string;
+  iconTexture: string;
+  iconFrame: string | number;
+  subCategories: LeafCategory[];
+}
+
+type TopCategory = LeafCategory | GroupCategory;
+
+function isGroup(category: TopCategory): category is GroupCategory {
+  return "subCategories" in category;
+}
+
 const LEVEL0_COLS = 9;
 const LEVEL0_ROWS = 2;
 const LEVEL1_COLS = 18;
 const LEVEL1_ROWS = 4;
-// Icon pool is sized for the larger of the two levels; level 0 just uses
-// the first few slots and hides the rest.
+// Icon pool is sized for the largest level; smaller levels just use the
+// first few slots and hide the rest.
 const MAX_COLS = LEVEL1_COLS;
 const MAX_ROWS = LEVEL1_ROWS;
 const ICON_SPACING_X = 17;
@@ -97,7 +141,8 @@ const ICON_SPACING_Y = 19;
 
 const Level = {
   CATEGORY_MENU: 0,
-  DRILLDOWN: 1,
+  SUBMENU: 1,
+  DRILLDOWN: 2,
 } as const;
 type Level = (typeof Level)[keyof typeof Level];
 
@@ -118,11 +163,12 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   private scrollCursor: number;
   private cursorObj: Phaser.GameObjects.NineSlice | null;
 
-  private categories: CategoryDef[] = [];
+  private categories: TopCategory[] = [];
   private currentTotal: number;
 
   private level: Level = Level.CATEGORY_MENU;
-  private selectedCategoryIndex = 0;
+  private currentGroup: GroupCategory | null = null;
+  private currentLeaf: LeafCategory | null = null;
   /** Within a drilldown: false = showing "have", true = showing "missing". */
   private showingMissing = false;
 
@@ -197,8 +243,6 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     super.show(args);
 
     this.categories = this.computeCategories();
-    this.level = Level.CATEGORY_MENU;
-    this.selectedCategoryIndex = 0;
     this.showingMissing = false;
 
     this.enterCategoryMenu();
@@ -210,8 +254,8 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     return true;
   }
 
-  /** Pulls every category's have/missing lists straight from `globalScene.gameData`. See file-header doc for exact per-category definitions. */
-  private computeCategories(): CategoryDef[] {
+  /** Pulls every category/sub-category's have/missing lists straight from `globalScene.gameData`. See file-header doc for exact definitions. */
+  private computeCategories(): TopCategory[] {
     const gameData = globalScene.gameData;
     const dexData = gameData.dexData;
     const speciesIds = Object.keys(dexData).map(Number);
@@ -237,6 +281,12 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     const shinyMissing: number[] = [];
     const passiveHave: number[] = [];
     const passiveMissing: number[] = [];
+    const reducedAnyHave: number[] = [];
+    const reducedAnyMissing: number[] = [];
+    const reducedOneHave: number[] = [];
+    const reducedOneMissing: number[] = [];
+    const reducedTwoHave: number[] = [];
+    const reducedTwoMissing: number[] = [];
 
     for (const id of starterIds) {
       const entry = dexData[id];
@@ -246,20 +296,125 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       const sd = gameData.starterData[id];
       const passiveUnlocked = !!sd && !!(sd.passiveAttr & PassiveAttr.UNLOCKED);
       (passiveUnlocked ? passiveHave : passiveMissing).push(id);
+
+      const valueReduction = sd?.valueReduction ?? 0;
+      (valueReduction >= 1 ? reducedAnyHave : reducedAnyMissing).push(id);
+      (valueReduction === 1 ? reducedOneHave : reducedOneMissing).push(id);
+      (valueReduction === 2 ? reducedTwoHave : reducedTwoMissing).push(id);
     }
 
-    // Gym Leader Vouchers - filter the shared vouchers registry down to the
-    // Gym Leader TrainerType band. `vouchers` also has Elite Four/Champion/
-    // Evil Team Leader/CLASSIC_VICTORY entries - excluded here on purpose.
-    const gymLeaderVoucherHave: string[] = [];
-    const gymLeaderVoucherMissing: string[] = [];
+    // Vouchers - split the shared registry by TrainerType band. See
+    // file-header doc for the exact bands and the CLASSIC_VICTORY/grunt/ME-
+    // trainer edge cases.
+    const gymLeaderHave: string[] = [];
+    const gymLeaderMissing: string[] = [];
+    const eliteFourHave: string[] = [];
+    const eliteFourMissing: string[] = [];
+    const evilTeamHave: string[] = [];
+    const evilTeamMissing: string[] = [];
+    const championHave: string[] = [];
+    const championMissing: string[] = [];
+
     for (const key of Object.keys(vouchers)) {
       const trainerType = TrainerType[key as keyof typeof TrainerType];
-      if (trainerType === undefined || trainerType < TrainerType.BROCK || trainerType >= TrainerType.LORELEI) {
+      if (trainerType === undefined) {
         continue;
       }
-      (Object.hasOwn(gameData.voucherUnlocks, key) ? gymLeaderVoucherHave : gymLeaderVoucherMissing).push(key);
+      const unlocked = Object.hasOwn(gameData.voucherUnlocks, key);
+
+      if (trainerType >= TrainerType.BROCK && trainerType < TrainerType.LORELEI) {
+        (unlocked ? gymLeaderHave : gymLeaderMissing).push(key);
+      } else if (trainerType >= TrainerType.LORELEI && trainerType < TrainerType.BLUE) {
+        (unlocked ? eliteFourHave : eliteFourMissing).push(key);
+      } else if (trainerType >= TrainerType.BLUE && trainerType < TrainerType.RIVAL) {
+        (unlocked ? championHave : championMissing).push(key);
+      } else if (trainerType >= TrainerType.ROCKET_BOSS_GIOVANNI_1 && trainerType < TrainerType.BROCK) {
+        (unlocked ? evilTeamHave : evilTeamMissing).push(key);
+      }
+      // Anything outside these four bands (shouldn't happen given
+      // `vouchers` is already boss-trainer-only) is silently skipped
+      // rather than risking a miscategorized entry.
     }
+
+    const vouchersGroup: GroupCategory = {
+      label: "Vouchers",
+      iconTexture: "items",
+      iconFrame: "coupon",
+      subCategories: [
+        {
+          label: "Gym Leaders",
+          kind: "voucher",
+          iconTexture: "items",
+          iconFrame: "coupon",
+          haveIds: gymLeaderHave,
+          missingIds: gymLeaderMissing,
+        },
+        {
+          label: "Elite Four",
+          kind: "voucher",
+          iconTexture: "items",
+          iconFrame: "pair_of_tickets",
+          haveIds: eliteFourHave,
+          missingIds: eliteFourMissing,
+        },
+        {
+          label: "Evil Team",
+          kind: "voucher",
+          iconTexture: "items",
+          iconFrame: "mystic_ticket",
+          haveIds: evilTeamHave,
+          missingIds: evilTeamMissing,
+        },
+        {
+          label: "Champion",
+          kind: "voucher",
+          iconTexture: "items",
+          iconFrame: "golden_mystic_ticket",
+          haveIds: championHave,
+          missingIds: championMissing,
+        },
+      ],
+    };
+
+    const candyGroup: GroupCategory = {
+      label: "Candy",
+      iconTexture: "items",
+      iconFrame: "candy",
+      subCategories: [
+        {
+          label: "Passives",
+          kind: "species",
+          iconTexture: "items",
+          iconFrame: "candy",
+          haveIds: passiveHave,
+          missingIds: passiveMissing,
+        },
+        {
+          label: "Any Reduction Amount",
+          kind: "species",
+          iconTexture: "items",
+          iconFrame: "relic_gold",
+          haveIds: reducedAnyHave,
+          missingIds: reducedAnyMissing,
+        },
+        {
+          label: "One Reduction",
+          kind: "species",
+          iconTexture: "items",
+          iconFrame: "nugget",
+          haveIds: reducedOneHave,
+          missingIds: reducedOneMissing,
+        },
+        {
+          label: "Two Reductions",
+          kind: "species",
+          iconTexture: "items",
+          iconFrame: "big_nugget",
+          haveIds: reducedTwoHave,
+          missingIds: reducedTwoMissing,
+        },
+      ],
+    };
 
     return [
       {
@@ -275,9 +430,6 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
         kind: "species",
         // Deliberately NOT one of the shiny_icons variant-tier sparkles -
         // those are reserved for an upcoming submenu that uses all three.
-        // golden_egg is a real, distinct item icon that reads as "special/
-        // rare" without touching that asset set. Easy one-line swap if a
-        // different icon is preferred.
         iconTexture: "items",
         iconFrame: "golden_egg",
         haveIds: shinyHave,
@@ -307,45 +459,50 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
         haveIds: caughtHave,
         missingIds: caughtMissing,
       },
-      {
-        label: "Gym Leader Vouchers",
-        kind: "voucher",
-        iconTexture: "items",
-        iconFrame: "coupon",
-        haveIds: gymLeaderVoucherHave,
-        missingIds: gymLeaderVoucherMissing,
-      },
-      {
-        label: "Passives",
-        kind: "species",
-        iconTexture: "items",
-        iconFrame: "candy",
-        haveIds: passiveHave,
-        missingIds: passiveMissing,
-      },
+      vouchersGroup,
+      candyGroup,
     ];
   }
 
   private enterCategoryMenu(): void {
     this.level = Level.CATEGORY_MENU;
+    this.currentGroup = null;
+    this.currentLeaf = null;
     this.layoutGrid(LEVEL0_COLS);
     this.currentTotal = this.categories.length;
     this.setScrollCursor(0);
-    this.refreshCategoryMenuIcons();
+    this.refreshTileIcons(this.categories);
+    this.updateHeaderText();
     this.setCursor(0, true);
   }
 
-  private enterDrilldown(categoryIndex: number): void {
+  private enterSubmenu(group: GroupCategory): void {
+    this.level = Level.SUBMENU;
+    this.currentGroup = group;
+    this.currentLeaf = null;
+    this.layoutGrid(LEVEL0_COLS);
+    this.currentTotal = group.subCategories.length;
+    this.setScrollCursor(0);
+    this.refreshTileIcons(group.subCategories);
+    this.updateHeaderText();
+    this.setCursor(0, true);
+  }
+
+  private enterDrilldown(leaf: LeafCategory): void {
     this.level = Level.DRILLDOWN;
-    this.selectedCategoryIndex = categoryIndex;
+    this.currentLeaf = leaf;
     this.showingMissing = false;
     this.layoutGrid(LEVEL1_COLS);
+    this.updateHeaderText();
     this.refreshDrilldownState();
   }
 
   private refreshDrilldownState(): void {
-    const category = this.categories[this.selectedCategoryIndex];
-    const list = this.showingMissing ? category.missingIds : category.haveIds;
+    const leaf = this.currentLeaf;
+    if (!leaf) {
+      return;
+    }
+    const list = this.showingMissing ? leaf.missingIds : leaf.haveIds;
     this.currentTotal = list.length;
     this.setScrollCursor(0);
     this.refreshDrilldownIcons();
@@ -357,9 +514,20 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     this.refreshDrilldownState();
   }
 
+  private updateHeaderText(): void {
+    const parts = ["Completionist Dex"];
+    if (this.currentGroup) {
+      parts.push(this.currentGroup.label);
+    }
+    if (this.level === Level.DRILLDOWN && this.currentLeaf) {
+      parts.push(this.currentLeaf.label);
+    }
+    this.headerText.setText(parts.join(" > "));
+  }
+
   /** Repositions the shared icon pool for the given column count and hides any slots beyond `rows * cols`. */
   private layoutGrid(cols: number): void {
-    const rows = cols === LEVEL0_COLS ? LEVEL0_ROWS : LEVEL1_ROWS;
+    const rows = cols === LEVEL1_COLS ? LEVEL1_ROWS : LEVEL0_ROWS;
     for (let a = 0; a < this.icons.length; a++) {
       if (a >= rows * cols) {
         this.icons[a].setVisible(false);
@@ -370,31 +538,31 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   }
 
   private currentCols(): number {
-    return this.level === Level.CATEGORY_MENU ? LEVEL0_COLS : LEVEL1_COLS;
+    return this.level === Level.DRILLDOWN ? LEVEL1_COLS : LEVEL0_COLS;
   }
 
   private currentRows(): number {
-    return this.level === Level.CATEGORY_MENU ? LEVEL0_ROWS : LEVEL1_ROWS;
+    return this.level === Level.DRILLDOWN ? LEVEL1_ROWS : LEVEL0_ROWS;
   }
 
-  private refreshCategoryMenuIcons(): void {
-    this.categories.forEach((category, i) => {
+  private refreshTileIcons(tiles: { iconTexture: string; iconFrame: string | number }[]): void {
+    tiles.forEach((tile, i) => {
       const icon = this.icons[i];
-      icon.setTexture(category.iconTexture, category.iconFrame);
+      icon.setTexture(tile.iconTexture, tile.iconFrame);
       icon.clearTint();
-      if (category.iconTint !== undefined) {
-        icon.setTint(category.iconTint);
-      }
       icon.setVisible(true);
     });
-    for (let i = this.categories.length; i < LEVEL0_ROWS * LEVEL0_COLS; i++) {
+    for (let i = tiles.length; i < LEVEL0_ROWS * LEVEL0_COLS; i++) {
       this.icons[i].setVisible(false);
     }
   }
 
   private refreshDrilldownIcons(): void {
-    const category = this.categories[this.selectedCategoryIndex];
-    const list = this.showingMissing ? category.missingIds : category.haveIds;
+    const leaf = this.currentLeaf;
+    if (!leaf) {
+      return;
+    }
+    const list = this.showingMissing ? leaf.missingIds : leaf.haveIds;
     const itemOffset = this.scrollCursor * LEVEL1_COLS;
     const itemLimit = LEVEL1_ROWS * LEVEL1_COLS;
     const itemRange = list.slice(itemOffset, itemOffset + itemLimit);
@@ -402,7 +570,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     itemRange.forEach((item, i) => {
       const icon = this.icons[i];
       icon.clearTint();
-      if (category.kind === "species") {
+      if (leaf.kind === "species") {
         const species = speciesDataRegistry.getSpecies(item as number);
         icon.setTexture(species.getIconAtlasKey(0, false, 0), species.getIconId(false, 0, false, 0));
       } else {
@@ -419,37 +587,73 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   /** Updates the title bar + description panel for whatever's currently under the cursor. */
   private updateDetailPanel(): void {
     if (this.level === Level.CATEGORY_MENU) {
-      const category = this.categories[this.cursor + this.scrollCursor * LEVEL0_COLS];
-      if (!category) {
+      const tile = this.categories[this.cursor + this.scrollCursor * LEVEL0_COLS];
+      if (!tile) {
         return;
       }
-      this.titleText.setText(category.label);
-      const total = category.haveIds.length + category.missingIds.length;
-      const percent = total > 0 ? Math.round((category.haveIds.length / total) * 1000) / 10 : 0;
-      this.showText(`${category.haveIds.length}/${total} (${percent}%)`);
+      this.titleText.setText(tile.label);
+      if (isGroup(tile)) {
+        const total = tile.subCategories.reduce((sum, c) => sum + c.haveIds.length + c.missingIds.length, 0);
+        const have = tile.subCategories.reduce((sum, c) => sum + c.haveIds.length, 0);
+        this.showText(`${have}/${total} (${pct(have, total)}%)`);
+      } else {
+        const total = tile.haveIds.length + tile.missingIds.length;
+        this.showText(`${tile.haveIds.length}/${total} (${pct(tile.haveIds.length, total)}%)`);
+      }
       return;
     }
 
-    const category = this.categories[this.selectedCategoryIndex];
-    const list = this.showingMissing ? category.missingIds : category.haveIds;
+    if (this.level === Level.SUBMENU) {
+      const leaf = this.currentGroup?.subCategories[this.cursor + this.scrollCursor * LEVEL0_COLS];
+      if (!leaf) {
+        return;
+      }
+      this.titleText.setText(leaf.label);
+      const total = leaf.haveIds.length + leaf.missingIds.length;
+      this.showText(`${leaf.haveIds.length}/${total} (${pct(leaf.haveIds.length, total)}%)`);
+      return;
+    }
+
+    // DRILLDOWN
+    const leaf = this.currentLeaf;
+    if (!leaf) {
+      return;
+    }
+    const list = this.showingMissing ? leaf.missingIds : leaf.haveIds;
     const item = list[this.cursor + this.scrollCursor * LEVEL1_COLS];
     const modeLabel = this.showingMissing ? "Missing" : "Unlocked";
 
     if (item === undefined) {
-      this.titleText.setText(`${category.label} - ${modeLabel}`);
+      this.titleText.setText(`${leaf.label} - ${modeLabel}`);
       this.showText("");
       return;
     }
 
-    if (category.kind === "species") {
+    if (leaf.kind === "species") {
       const name = speciesDataRegistry.getSpecies(item as number).getName();
-      this.titleText.setText(`${name} - ${category.label} (${modeLabel})`);
-      this.showText("");
+      this.titleText.setText(`${name} - ${leaf.label} (${modeLabel})`);
+      this.showText("Press ACTION to view its Pokedex entry.");
     } else {
       const voucher = vouchers[item as string];
-      this.titleText.setText(`${category.label} (${modeLabel})`);
+      this.titleText.setText(`${leaf.label} (${modeLabel})`);
       this.showText(voucher.description);
     }
+  }
+
+  /** ACTION on a species icon while drilled down opens that species' real Pokedex entry. No-op for voucher items. */
+  private openPokedexEntryForCursor(): boolean {
+    const leaf = this.currentLeaf;
+    if (!leaf || leaf.kind !== "species") {
+      return false;
+    }
+    const list = this.showingMissing ? leaf.missingIds : leaf.haveIds;
+    const item = list[this.cursor + this.scrollCursor * LEVEL1_COLS];
+    if (item === undefined) {
+      return false;
+    }
+    const species = speciesDataRegistry.getSpecies(item as number);
+    globalScene.ui.setOverlayMode(UiMode.POKEDEX_PAGE, species);
+    return true;
   }
 
   // #region Input Processing
@@ -460,15 +664,33 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     switch (button) {
       case Button.ACTION:
         if (this.level === Level.CATEGORY_MENU) {
-          const index = this.cursor + this.scrollCursor * LEVEL0_COLS;
-          if (index < this.categories.length) {
-            this.enterDrilldown(index);
+          const tile = this.categories[this.cursor + this.scrollCursor * LEVEL0_COLS];
+          if (tile) {
+            if (isGroup(tile)) {
+              this.enterSubmenu(tile);
+            } else {
+              this.enterDrilldown(tile);
+            }
             success = true;
           }
+        } else if (this.level === Level.SUBMENU) {
+          const leaf = this.currentGroup?.subCategories[this.cursor + this.scrollCursor * LEVEL0_COLS];
+          if (leaf) {
+            this.enterDrilldown(leaf);
+            success = true;
+          }
+        } else {
+          success = this.openPokedexEntryForCursor();
         }
         break;
       case Button.CANCEL:
         if (this.level === Level.DRILLDOWN) {
+          if (this.currentGroup) {
+            this.enterSubmenu(this.currentGroup);
+          } else {
+            this.enterCategoryMenu();
+          }
+        } else if (this.level === Level.SUBMENU) {
           this.enterCategoryMenu();
         } else {
           globalScene.ui.revertMode();
@@ -608,7 +830,9 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     }
 
     if (this.level === Level.CATEGORY_MENU) {
-      this.refreshCategoryMenuIcons();
+      this.refreshTileIcons(this.categories);
+    } else if (this.level === Level.SUBMENU) {
+      this.refreshTileIcons(this.currentGroup?.subCategories ?? []);
     } else {
       this.refreshDrilldownIcons();
     }
@@ -619,6 +843,8 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   override clear(): void {
     super.clear();
     this.level = Level.CATEGORY_MENU;
+    this.currentGroup = null;
+    this.currentLeaf = null;
     this.mainContainer.setVisible(false);
     this.eraseCursor();
   }
@@ -629,4 +855,8 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     }
     this.cursorObj = null;
   }
+}
+
+function pct(current: number, total: number): number {
+  return total > 0 ? Math.round((current / total) * 1000) / 10 : 0;
 }
