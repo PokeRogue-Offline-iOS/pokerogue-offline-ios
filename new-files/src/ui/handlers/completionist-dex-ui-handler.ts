@@ -9,6 +9,7 @@ import { Passive as PassiveAttr } from "#enums/passive";
 import { PokemonType } from "#enums/pokemon-type";
 import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
 import { getVariantIcon, getVariantTint } from "#sprites/variant";
 import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
@@ -444,6 +445,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   private titleText: Phaser.GameObjects.Text;
 
   private scrollBar: ScrollBar;
+  private browseScrollBar: ScrollBar;
   private scrollCursor: number;
   private cursorObj: Phaser.GameObjects.NineSlice | null;
 
@@ -497,6 +499,17 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       this.iconsBg.height - yOffset * 2,
       LEVEL1_ROWS,
     );
+    // Browsing pages only ever show LEVEL0_ROWS on screen at once - a
+    // separate instance since ScrollBar's maxRows (used for handle sizing)
+    // is fixed at construction and can't be shared correctly with the
+    // drilldown grid's LEVEL1_ROWS.
+    this.browseScrollBar = new ScrollBar(
+      this.iconsBg.width - 9,
+      this.iconsBg.y + yOffset,
+      4,
+      this.iconsBg.height - yOffset * 2,
+      LEVEL0_ROWS,
+    );
 
     this.iconsContainer = globalScene.add.container(5, this.headerBg.height + 8);
 
@@ -524,6 +537,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       this.headerText,
       this.iconsBg,
       this.scrollBar,
+      this.browseScrollBar,
       this.iconsContainer,
       this.titleBg,
       this.titleText,
@@ -539,6 +553,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     this.trainerDetailContainer = globalScene.add.container(1, -HEIGHT + 1).setVisible(false);
     const detailTop = this.headerBg.height;
     const detailBg = addWindow(0, detailTop, WIDTH - 2, HEIGHT - detailTop - 1).setOrigin(0);
+    this.trainerDetailContainer.add(detailBg);
 
     // Sprite, top-left. Scale is a starting guess - trainer battle sprites
     // are much bigger than UI icons, this has not been visually verified.
@@ -572,7 +587,6 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       .setOrigin(0);
 
     this.trainerDetailContainer.add([
-      detailBg,
       this.trainerSprite,
       this.trainerTypeIcon,
       this.trainerTypeLabelText,
@@ -952,6 +966,7 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     this.inDrilldown = true;
     this.currentLeaf = leaf;
     this.showingMissing = false;
+    this.browseScrollBar.setVisible(false);
     this.layoutGrid(LEVEL1_COLS);
     this.currentTotal = 0;
     this.scrollCursor = 0;
@@ -978,11 +993,12 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
   /** Displays whatever's on top of the menu stack, restoring its saved cursor/scroll position. */
   private loadCurrentFrame(): void {
     const frame = this.currentFrame;
+    this.scrollBar.setVisible(false);
     this.layoutGrid(LEVEL0_COLS);
     this.currentTotal = frame.items.length;
     this.scrollCursor = frame.scrollCursor;
-    this.scrollBar.setTotalRows(Math.ceil(this.currentTotal / LEVEL0_COLS));
-    this.scrollBar.setScrollCursor(this.scrollCursor);
+    this.browseScrollBar.setTotalRows(Math.ceil(this.currentTotal / LEVEL0_COLS));
+    this.browseScrollBar.setScrollCursor(this.scrollCursor);
     this.refreshTileIcons(frame.items);
     this.updateHeaderText();
     this.setCursor(frame.cursor, true);
@@ -1053,8 +1069,13 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     return this.inDrilldown ? LEVEL1_ROWS : LEVEL0_ROWS;
   }
 
+  /** Windowed by scrollCursor, same idea as refreshDrilldownIcons - fixes phantom/misplaced icons for groups with more than one page of tiles (e.g. Ribbons' 39 leaves). */
   private refreshTileIcons(tiles: TopCategory[]): void {
-    tiles.forEach((tile, i) => {
+    const itemOffset = this.scrollCursor * LEVEL0_COLS;
+    const itemLimit = LEVEL0_ROWS * LEVEL0_COLS;
+    const itemRange = tiles.slice(itemOffset, itemOffset + itemLimit);
+
+    itemRange.forEach((tile, i) => {
       const icon = this.icons[i];
       icon.setTexture(tile.iconTexture, tile.iconFrame);
       icon.clearTint();
@@ -1063,7 +1084,11 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       }
       icon.setVisible(true);
     });
-    for (let i = tiles.length; i < LEVEL0_ROWS * LEVEL0_COLS; i++) {
+    // Hide the *entire* remaining pool, not just up to LEVEL0_ROWS*LEVEL0_COLS -
+    // the pool is shared with the drilldown grid (up to LEVEL1_ROWS*LEVEL1_COLS
+    // slots), and leftover icons from a previous drilldown visit would
+    // otherwise keep their stale positions and reappear here.
+    for (let i = itemRange.length; i < this.icons.length; i++) {
       this.icons[i].setVisible(false);
     }
   }
@@ -1202,7 +1227,17 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     this.currentTrainerKey = trainerKey;
     this.inTrainerDetail = true;
 
-    this.trainerSprite.setTexture(trainerConfig.getSpriteKey(false, false));
+    // Trainer field sprites aren't preloaded at boot - they're loaded on
+    // demand, same as upstream's run-info-ui-handler does for its own
+    // trainer sprite. Without this, the texture key doesn't exist yet and
+    // Phaser renders its default "missing texture" placeholder instead.
+    trainerConfig.loadAssets(TrainerVariant.DEFAULT).then(() => {
+      // Guard against a fast re-open: if the player backed out and opened
+      // a different trainer before this resolved, don't stomp their sprite.
+      if (this.currentTrainerKey === trainerKey) {
+        this.trainerSprite.setTexture(trainerConfig.getSpriteKey(false, false));
+      }
+    });
 
     const pool = signatureSpecies[trainerKey] ?? [];
     const specialtyType: PokemonType | undefined = trainerConfig.specialtyType;
@@ -1408,8 +1443,9 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     }
 
     this.scrollCursor = scrollCursor;
-    this.scrollBar.setTotalRows(Math.ceil(this.currentTotal / this.currentCols()));
-    this.scrollBar.setScrollCursor(this.scrollCursor);
+    const activeScrollBar = this.inDrilldown ? this.scrollBar : this.browseScrollBar;
+    activeScrollBar.setTotalRows(Math.ceil(this.currentTotal / this.currentCols()));
+    activeScrollBar.setScrollCursor(this.scrollCursor);
 
     const cols = this.currentCols();
     const maxCursor = Math.min(this.cursor, this.currentTotal - this.scrollCursor * cols - 1);
