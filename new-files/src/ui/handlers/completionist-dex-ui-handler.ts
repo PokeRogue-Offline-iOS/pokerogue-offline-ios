@@ -550,25 +550,48 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
     // ── Trainer detail view (static info card, opened via ACTION on a
     // voucher item) ─────────────────────────────────────────────────────
+    // Layout: left column (2/5 width) is the trainer sprite, centered.
+    // Right column (3/5 width) is a bordered party panel. Full-width
+    // bordered bar along the bottom holds specialty type + spawn info.
     this.trainerDetailContainer = globalScene.add.container(1, -HEIGHT + 1).setVisible(false);
     const detailTop = this.headerBg.height;
-    const detailBg = addWindow(0, detailTop, WIDTH - 2, HEIGHT - detailTop - 1).setOrigin(0);
+    const CARD_W = WIDTH - 2;
+    const CARD_H = HEIGHT - detailTop - 1;
+    const detailBg = addWindow(0, detailTop, CARD_W, CARD_H).setOrigin(0);
     this.trainerDetailContainer.add(detailBg);
 
-    // Sprite, top-left. Scale is a starting guess - trainer battle sprites
-    // are much bigger than UI icons, this has not been visually verified.
-    this.trainerSprite = globalScene.add.sprite(40, detailTop + 46, "items", "unknown").setScale(0.4).setOrigin(0.5, 1);
+    const LEFT_COL_W = Math.floor(CARD_W * 0.4);
+    const PANEL_GAP = 4;
+    const BOTTOM_BAR_H = 44;
 
-    // 6 team-slot rows, right of the sprite. Real signature slots get a
+    const PARTY_X = LEFT_COL_W + PANEL_GAP;
+    const PARTY_Y = detailTop + 2;
+    const PARTY_W = CARD_W - PARTY_X - 2;
+    const PARTY_H = CARD_H - BOTTOM_BAR_H - PANEL_GAP - 2;
+
+    const BOTTOM_BAR_Y = PARTY_Y + PARTY_H + PANEL_GAP;
+
+    // Sprite, centered in the left column. Scale is a starting guess -
+    // trainer battle sprites are much bigger than UI icons, this has not
+    // been visually verified.
+    this.trainerSprite = globalScene.add
+      .sprite(Math.floor(LEFT_COL_W / 2), detailTop + 46, "items", "unknown")
+      .setScale(0.4)
+      .setOrigin(0.5, 1);
+
+    const partyBg = addWindow(PARTY_X, PARTY_Y, PARTY_W, PARTY_H).setOrigin(0);
+    this.trainerDetailContainer.add(partyBg);
+
+    // 6 team-slot rows inside the party panel. Real signature slots get a
     // species icon (or the first pool member's icon, for a pool slot);
     // anything beyond this trainer's actual signature-slot count gets the
     // trainer's specialty-type icon instead, per "show the type icon in
     // the filler spots".
     const ROW_COUNT = 6;
-    const ROW_Y_START = detailTop + 6;
-    const ROW_H = 14;
-    const ROW_ICON_X = 82;
-    const ROW_TEXT_X = 96;
+    const ROW_Y_START = PARTY_Y + 8;
+    const ROW_H = 16;
+    const ROW_ICON_X = PARTY_X + 6;
+    const ROW_TEXT_X = ROW_ICON_X + 16;
     for (let i = 0; i < ROW_COUNT; i++) {
       const y = ROW_Y_START + i * ROW_H;
       const icon = globalScene.add.sprite(ROW_ICON_X, y, "items", "unknown").setOrigin(0).setScale(0.5);
@@ -578,10 +601,16 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       this.trainerDetailContainer.add([icon, text]);
     }
 
-    // Info box under the sprite/rows - specialty/tera type + spawn info.
-    const infoY = ROW_Y_START + ROW_COUNT * ROW_H + 6;
+    // Bottom bar - specialty/tera type + spawn info, full card width.
+    const bottomBarBg = addWindow(0, BOTTOM_BAR_Y, CARD_W, BOTTOM_BAR_H).setOrigin(0);
+    this.trainerDetailContainer.add(bottomBarBg);
+
+    const infoY = BOTTOM_BAR_Y + 6;
     this.trainerTypeIcon = globalScene.add.sprite(8, infoY, getLocalizedSpriteKey("types"), "unknown").setOrigin(0);
-    this.trainerTypeLabelText = addTextObject(30, infoY, "", TextStyle.WINDOW, { fontSize: "72px" }).setOrigin(0);
+    // x is set dynamically in showTrainerDetail(), after the icon's actual
+    // display width is known - a fixed offset here previously overlapped
+    // the icon's own baked-in type name (e.g. "DRAGDRAGON specialist").
+    this.trainerTypeLabelText = addTextObject(0, infoY, "", TextStyle.WINDOW, { fontSize: "72px" }).setOrigin(0, 0);
     this.trainerInfoText = addTextObject(8, infoY + 16, "", TextStyle.WINDOW, { fontSize: "72px", maxLines: 2 })
       .setWordWrapWidth(1870)
       .setOrigin(0);
@@ -1252,9 +1281,11 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
         const slotSpeciesIds = Array.isArray(slot) ? slot : [slot];
         const primarySpecies = speciesDataRegistry.getSpecies(slotSpeciesIds[0]);
         icon.setTexture(primarySpecies.getIconAtlasKey(0, false, 0), primarySpecies.getIconId(false, 0, false, 0));
+        icon.setVisible(true);
         text.setText(slotSpeciesIds.map(id => speciesDataRegistry.getSpecies(id).getName()).join(" / "));
       } else if (specialtyType !== undefined) {
         icon.setTexture(getLocalizedSpriteKey("types"), PokemonType[specialtyType].toLowerCase());
+        icon.setVisible(true);
         text.setText(`Any ${PokemonType[specialtyType]} type`);
       } else {
         icon.setVisible(false);
@@ -1264,10 +1295,16 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
 
     if (specialtyType !== undefined) {
       this.trainerTypeIcon.setTexture(getLocalizedSpriteKey("types"), PokemonType[specialtyType].toLowerCase());
+      this.trainerTypeIcon.setVisible(true);
       this.trainerTypeLabelText.setText(`${PokemonType[specialtyType]} specialist`);
+      // Fixed offset previously overlapped the icon's own baked-in type
+      // name (e.g. "DRAGDRAGON specialist") - position after its actual
+      // rendered width instead.
+      this.trainerTypeLabelText.setPositionRelative(this.trainerTypeIcon, this.trainerTypeIcon.displayWidth + 4, 0);
     } else {
       this.trainerTypeIcon.setVisible(false);
       this.trainerTypeLabelText.setText("No specialty type");
+      this.trainerTypeLabelText.setPositionRelative(this.trainerTypeIcon, 0, 0);
     }
 
     const trainerType = TrainerType[trainerKey as keyof typeof TrainerType];
