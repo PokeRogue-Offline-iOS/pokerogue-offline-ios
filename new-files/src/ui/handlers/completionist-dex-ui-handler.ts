@@ -7,11 +7,13 @@ import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { getVariantIcon, getVariantTint } from "#sprites/variant";
+import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
 import { getVoucherTypeIcon, vouchers } from "#system/voucher";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ScrollBar } from "#ui/scroll-bar";
 import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
+import { getAvailableRibbons, getRibbonKey, orderedRibbons } from "#utils/ribbon-utils";
 
 /**
  * Offline-only "Completionist Dex" screen. Read-only against
@@ -51,9 +53,17 @@ import { addWindow } from "#ui/ui-theme";
  *     - Starters Unlocked -> starters where `caughtAttr !== 0n`
  *     - Shiny Starters (group, golden_egg icon)
  *         - Any Tier -> starters where `caughtAttr & DexAttr.SHINY`
- *         - Tier 1    -> starters where `caughtAttr & DexAttr.DEFAULT_VARIANT`
- *         - Tier 2    -> starters where `caughtAttr & DexAttr.VARIANT_2`
- *         - Tier 3    -> starters where `caughtAttr & DexAttr.VARIANT_3`
+ *         - Tier 1    -> starters where `caughtAttr & DexAttr.SHINY` AND `caughtAttr & DexAttr.DEFAULT_VARIANT`
+ *         - Tier 2    -> starters where `caughtAttr & DexAttr.SHINY` AND `caughtAttr & DexAttr.VARIANT_2`
+ *         - Tier 3    -> starters where `caughtAttr & DexAttr.SHINY` AND `caughtAttr & DexAttr.VARIANT_3`
+ *         IMPORTANT: DEFAULT_VARIANT/VARIANT_2/VARIANT_3 are NOT shiny-tier
+ *         flags on their own - `Pokemon.getDexAttr()` sets exactly one of
+ *         them on every catch, shiny or not (`this.variant` defaults to 0
+ *         for non-shiny catches too), so DEFAULT_VARIANT alone matches ANY
+ *         caught starter. Shininess is tracked entirely separately via the
+ *         SHINY bit, hence the explicit SHINY guard on every tier. (Real
+ *         bug caught via testing: Tier 1 originally showed 100% completion
+ *         because that guard was missing.)
  *         Non-exclusive - a starter can be in multiple tier lists if each
  *         variant was individually caught. Tier tiles use the real
  *         `shiny_icons` sparkle for that tier (`getVariantIcon`/
@@ -100,8 +110,30 @@ import { addWindow } from "#ui/ui-theme";
  *     exact matches, so a fully-maxed starter shows under "Two Reductions"
  *     and "Any Reduction Amount" but NOT "One Reduction".
  *
- * Ribbons is intentionally still not covered - noted as the next thing to
- * tackle, not silently dropped.
+ *   Ribbons (group) - all 39 flags from the real `orderedRibbons` list (18
+ *   mono-type, 9 mono-gen, 12 challenge-run ribbons like Classic/Nuzlocke/
+ *   Friendship), each its own sub-category. Correctly scoped by real
+ *   eligibility via the base game's own `getAvailableRibbons(species)` -
+ *   NOT "every species not marked". For each ribbon:
+ *     - Have    -> available to that species AND `dexData[id].ribbons.has(flag)`
+ *     - Missing -> available AND not yet earned
+ *     Species the ribbon isn't available to at all (e.g. a pure Water-type
+ *     under Mono Fire) are excluded from both lists entirely.
+ *     `getAvailableRibbons` walks the species' forward evolution chain too,
+ *     since ribbon-awarding cascades DOWN to prevolutions
+ *     (`awardRibbonsToSpeciesLine`) - so a base-form's availability
+ *     correctly includes anything any of its evolutions could earn.
+ *     Icons use the base game's real ribbon sprites where they exist
+ *     (Classic, Friendship, all mono-type/mono-gen); the other 10 challenge
+ *     ribbons (Nuzlocke, Flip Stats, Inverse, Fresh Start, Hardcore,
+ *     Limited Catch, No Heal, No Shop, No Support, Passive Challenge) share
+ *     one generic "ribbon_typeless" icon - that's a real base-game
+ *     limitation (see `ribbonFlagToAssetKey`), not a shortcut taken here.
+ *     Tile labels are NOT the real locale string (`ribbons:${key}`) - that's
+ *     a full sentence description ("It has completed the Fire monotype
+ *     challenge."), used nowhere as a title even in the base game's own
+ *     Ribbon Tray screen. Labels are instead derived from the camelCase
+ *     `getRibbonKey()` value itself via `ribbonDisplayName()`.
  */
 
 type CategoryKind = "species" | "voucher";
@@ -161,6 +193,98 @@ function sumTotals(category: TopCategory): { have: number; total: number } {
 
 function pct(current: number, total: number): number {
   return total > 0 ? Math.round((current / total) * 1000) / 10 : 0;
+}
+
+/**
+ * Frame name (in the "items" atlas) for a given ribbon flag, mirroring the
+ * base game's own `ribbonFlagToAssetKey()` (which returns a rendered
+ * `Image` game object, so isn't reusable directly against our pooled icon
+ * sprites - this is a pure string-returning equivalent, same frame names).
+ * Only Classic, Friendship, and the 27 mono-type/mono-gen ribbons have
+ * dedicated art in the base game - every other challenge ribbon (Nuzlocke,
+ * Flip Stats, Inverse, Fresh Start, Hardcore, Limited Catch, No Heal, No
+ * Shop, No Support, Passive Challenge) falls back to the shared
+ * "ribbon_typeless" frame, same as it does in the real Achievements/Ribbon
+ * Tray screens - not a corner cut here, that's genuinely all the art that
+ * exists upstream.
+ */
+function ribbonFrame(flag: RibbonFlag): string {
+  switch (flag) {
+    case RibbonData.CLASSIC:
+      return "classic_ribbon_default";
+    case RibbonData.FRIENDSHIP:
+      return "ribbon_friendship";
+    case RibbonData.MONO_GEN_1:
+      return "ribbon_gen1";
+    case RibbonData.MONO_GEN_2:
+      return "ribbon_gen2";
+    case RibbonData.MONO_GEN_3:
+      return "ribbon_gen3";
+    case RibbonData.MONO_GEN_4:
+      return "ribbon_gen4";
+    case RibbonData.MONO_GEN_5:
+      return "ribbon_gen5";
+    case RibbonData.MONO_GEN_6:
+      return "ribbon_gen6";
+    case RibbonData.MONO_GEN_7:
+      return "ribbon_gen7";
+    case RibbonData.MONO_GEN_8:
+      return "ribbon_gen8";
+    case RibbonData.MONO_GEN_9:
+      return "ribbon_gen9";
+    case RibbonData.MONO_NORMAL:
+      return "ribbon_normal";
+    case RibbonData.MONO_FIGHTING:
+      return "ribbon_fighting";
+    case RibbonData.MONO_FLYING:
+      return "ribbon_flying";
+    case RibbonData.MONO_POISON:
+      return "ribbon_poison";
+    case RibbonData.MONO_GROUND:
+      return "ribbon_ground";
+    case RibbonData.MONO_ROCK:
+      return "ribbon_rock";
+    case RibbonData.MONO_BUG:
+      return "ribbon_bug";
+    case RibbonData.MONO_GHOST:
+      return "ribbon_ghost";
+    case RibbonData.MONO_STEEL:
+      return "ribbon_steel";
+    case RibbonData.MONO_FIRE:
+      return "ribbon_fire";
+    case RibbonData.MONO_WATER:
+      return "ribbon_water";
+    case RibbonData.MONO_GRASS:
+      return "ribbon_grass";
+    case RibbonData.MONO_ELECTRIC:
+      return "ribbon_electric";
+    case RibbonData.MONO_PSYCHIC:
+      return "ribbon_psychic";
+    case RibbonData.MONO_ICE:
+      return "ribbon_ice";
+    case RibbonData.MONO_DRAGON:
+      return "ribbon_dragon";
+    case RibbonData.MONO_DARK:
+      return "ribbon_dark";
+    case RibbonData.MONO_FAIRY:
+      return "ribbon_fairy";
+    default:
+      return "ribbon_typeless";
+  }
+}
+
+/**
+ * The base game has no short display NAME for ribbons anywhere - only the
+ * full sentence description via `ribbons:${getRibbonKey(flag)}` (e.g. "It
+ * has completed the Fire monotype challenge."), confirmed by checking how
+ * the real Ribbon Tray screen uses it (only ever as description text, via
+ * `showText()`, never as a title). So for the tile label we derive a short
+ * name from the camelCase key itself: "monoFire" -> "Mono Fire",
+ * "monoGen1" -> "Mono Gen 1", "activePassives" -> "Active Passives".
+ */
+function ribbonDisplayName(key: string): string {
+  const spaced = key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Za-z])(\d)/g, "$1 $2");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 const LEVEL0_COLS = 9;
@@ -308,6 +432,16 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     const formsHave: number[] = [];
     const formsMissing: number[] = [];
 
+    // Keyed by RibbonFlag (bigint) rather than a Map, since bigint keys
+    // work fine as Map keys but not as plain object keys - a Map avoids
+    // that footgun entirely.
+    const ribbonHave = new Map<RibbonFlag, number[]>();
+    const ribbonMissing = new Map<RibbonFlag, number[]>();
+    for (const flag of orderedRibbons) {
+      ribbonHave.set(flag, []);
+      ribbonMissing.set(flag, []);
+    }
+
     for (const id of speciesIds) {
       const entry = dexData[id];
       (entry.caughtAttr !== 0n ? caughtHave : caughtMissing).push(id);
@@ -326,6 +460,14 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
           }
         }
         (allFormsCaught ? formsHave : formsMissing).push(id);
+      }
+
+      // Ribbons - scoped by real eligibility (getAvailableRibbons), not
+      // "every species not marked". A species this ribbon isn't available
+      // to at all is excluded from both lists entirely.
+      for (const flag of getAvailableRibbons(species)) {
+        const list = entry.ribbons.has(flag) ? ribbonHave : ribbonMissing;
+        list.get(flag)?.push(id);
       }
     }
 
@@ -352,9 +494,16 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       const entry = dexData[id];
       (entry.caughtAttr !== 0n ? startersHave : startersMissing).push(id);
       (entry.caughtAttr & DexAttr.SHINY ? shinyAnyHave : shinyAnyMissing).push(id);
-      (entry.caughtAttr & DexAttr.DEFAULT_VARIANT ? shinyTier1Have : shinyTier1Missing).push(id);
-      (entry.caughtAttr & DexAttr.VARIANT_2 ? shinyTier2Have : shinyTier2Missing).push(id);
-      (entry.caughtAttr & DexAttr.VARIANT_3 ? shinyTier3Have : shinyTier3Missing).push(id);
+      // DEFAULT_VARIANT/VARIANT_2/VARIANT_3 alone are NOT shiny-tier flags -
+      // Pokemon.getDexAttr() sets exactly one of them on every catch,
+      // shiny or not (`this.variant` defaults to 0 for non-shiny catches
+      // too), so DEFAULT_VARIANT in particular matches ANY caught starter.
+      // Shininess is tracked entirely separately via the SHINY bit. Each
+      // tier needs both bits explicitly.
+      const isShiny = !!(entry.caughtAttr & DexAttr.SHINY);
+      (isShiny && entry.caughtAttr & DexAttr.DEFAULT_VARIANT ? shinyTier1Have : shinyTier1Missing).push(id);
+      (isShiny && entry.caughtAttr & DexAttr.VARIANT_2 ? shinyTier2Have : shinyTier2Missing).push(id);
+      (isShiny && entry.caughtAttr & DexAttr.VARIANT_3 ? shinyTier3Have : shinyTier3Missing).push(id);
 
       const sd = gameData.starterData[id];
       const passiveUnlocked = !!sd && !!(sd.passiveAttr & PassiveAttr.UNLOCKED);
@@ -575,7 +724,23 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
       ],
     };
 
-    return [pokemonGroup, vouchersGroup, candyGroup];
+    const ribbonsGroup: GroupCategory = {
+      label: "Ribbons",
+      iconTexture: "items",
+      iconFrame: "classic_ribbon_default",
+      subCategories: orderedRibbons.map(
+        (flag): LeafCategory => ({
+          label: ribbonDisplayName(getRibbonKey(flag)),
+          kind: "species",
+          iconTexture: "items",
+          iconFrame: ribbonFrame(flag),
+          haveIds: ribbonHave.get(flag) ?? [],
+          missingIds: ribbonMissing.get(flag) ?? [],
+        }),
+      ),
+    };
+
+    return [pokemonGroup, vouchersGroup, candyGroup, ribbonsGroup];
   }
 
   // #region Navigation (menu stack + drilldown)
@@ -674,7 +839,10 @@ export class CompletionistDexUiHandler extends MessageUiHandler {
     if (this.inDrilldown && this.currentLeaf) {
       parts.push(this.currentLeaf.label);
     }
-    this.headerText.setText(parts.join(" > "));
+    // Show only the last 3 parts - the root "Completionist Dex" label (and
+    // anything else beyond 3 levels up) drops off once nesting goes deep
+    // enough, so the breadcrumb doesn't keep growing unbounded.
+    this.headerText.setText(parts.slice(-3).join(" > "));
   }
 
   // #endregion Navigation
