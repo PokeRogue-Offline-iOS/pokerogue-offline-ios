@@ -3,13 +3,25 @@
  * Patch: completionist-dex.js
  *
  * Adds a "Completionist Dex" entry to the pause menu, directly under
- * "Gacha Calendar". Opens a new offline-only summary + drilldown screen
- * showing per-category completion across Caught, Fought (Encountered),
- * Seen, Forms, Shiny Starters, Vouchers, Candy, and Ribbons, plus the
- * lifetime "Pokemon Defeated" stat. See the top-of-file doc comment in
- * completionist-dex-ui-handler.ts for exact per-category definitions and
- * v1 scoping decisions (Shiny is starters-only, Ribbons is a global tally
- * not a full per-species matrix, etc).
+ * "Gacha Calendar". Opens a new offline-only screen, architecturally
+ * mirroring the base game's own Achievements screen (icon grid, single
+ * title bar, description panel) rather than a plain list:
+ *
+ *   Level 0 (category menu): one icon per tracked category - Starters
+ *   Unlocked, Shiny Starters, Species Fought, Species Seen, Species
+ *   Caught, Gym Leader Vouchers, Passives. Hovering shows the category
+ *   name + current/total in the title bar and description panel.
+ *
+ *   Level 1 (drilldown, ACTION): a grid of the actual species (or list of
+ *   vouchers) for that category. Defaults to showing what you already
+ *   HAVE; Button.STATS (keyboard `C` / `Shift`) toggles to show what's
+ *   MISSING. CANCEL returns to level 0.
+ *
+ * See the top-of-file doc comment in completionist-dex-ui-handler.ts for
+ * exact per-category definitions and v1 scoping decisions (Gym Leader
+ * Vouchers is a filtered subset of the vouchers registry, Shiny is
+ * starters-only, etc). Forms, Ribbons, and the full Vouchers set from the
+ * original v1 pass are dropped entirely in this redesign.
  *
  * This is a read-only info screen: it does not touch save data, gameplay
  * mechanics, or any purchase/upgrade flow. Every stat is computed fresh
@@ -46,12 +58,20 @@
  *          lists that already exclude MenuOptions.GACHA_CALENDAR, so it's
  *          only ever offered in the same contexts Gacha Calendar is.
  *
+ *   5. index.css
+ *        Add COMPLETIONIST_DEX to the #apadOpenFilters touch-button
+ *        allowlist, so the on-screen "C" button (bound to Button.STATS,
+ *        used for the have/missing toggle) actually shows up on this
+ *        screen on mobile/touch builds. Reuses the same DOM element the
+ *        Pokedex/Starter Select screens already show their "C" hint on -
+ *        no new touch button, just an extra allowed UiMode.
+ *
  * NOTE ON TESTING: anchors below were confirmed against pokerogue-offline's
  * completionistDex branch working tree, post gacha-calendar.js, at the
- * time this was written. TS syntax-checked and byte-diff verified per
- * standard patch discipline - runtime behavior (row navigation, drilldown
- * scroll) has NOT been verified in an actual build yet, do that before
- * shipping.
+ * time this was written. TS/CSS syntax-checked and byte-diff verified per
+ * standard patch discipline - runtime behavior (grid navigation, drilldown
+ * scroll, have/missing toggle, icon visuals) has NOT been verified in an
+ * actual build yet, do that before shipping.
  */
 
 const fs = require("fs");
@@ -213,6 +233,36 @@ if (menuSrc.includes("COMPLETIONIST_DEX")) {
   );
 
   writeFile(MENU_PATH, menuSrc);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-patch 5: index.css  →  show the #apadOpenFilters "C" touch button on this screen
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CSS_PATH = path.join("pokerogue-src", "index.css");
+let cssSrc = readFile(CSS_PATH);
+
+if (cssSrc.includes('[data-ui-mode="COMPLETIONIST_DEX"]')) {
+  console.log("SKIP index.css — COMPLETIONIST_DEX already present");
+} else {
+  const CSS_ANCHOR = `#touchControls:not(.config-mode):not(
+    [data-ui-mode="STARTER_SELECT"],
+    [data-ui-mode="POKEDEX"],
+    [data-ui-mode="POKEDEX_PAGE"]
+  )
+  #apadOpenFilters,`;
+  requireAnchor(cssSrc, CSS_ANCHOR, "#apadOpenFilters touch-button allowlist in index.css");
+  cssSrc = cssSrc.replace(
+    CSS_ANCHOR,
+    `#touchControls:not(.config-mode):not(
+    [data-ui-mode="STARTER_SELECT"],
+    [data-ui-mode="POKEDEX"],
+    [data-ui-mode="POKEDEX_PAGE"],
+    [data-ui-mode="COMPLETIONIST_DEX"]
+  )
+  #apadOpenFilters,`,
+  );
+  writeFile(CSS_PATH, cssSrc);
 }
 
 console.log("\ncompletionist-dex patch applied successfully.");

@@ -4,483 +4,589 @@ import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { Passive as PassiveAttr } from "#enums/passive";
 import { TextStyle } from "#enums/text-style";
-import { UiMode } from "#enums/ui-mode";
-import { vouchers } from "#system/voucher";
-import { UiHandler } from "#ui/ui-handler";
+import { TrainerType } from "#enums/trainer-type";
+import type { UiMode } from "#enums/ui-mode";
+import { getVariantIcon, getVariantTint } from "#sprites/variant";
+import { getVoucherTypeIcon, vouchers } from "#system/voucher";
+import { MessageUiHandler } from "#ui/message-ui-handler";
+import { ScrollBar } from "#ui/scroll-bar";
 import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
-import { getRibbonKey, orderedRibbons } from "#utils/ribbon-utils";
-import i18next from "i18next";
 
 /**
- * Offline-only "Completionist Dex" screen.
+ * Offline-only "Completionist Dex" screen. Read-only against
+ * `globalScene.gameData` - never mutates save data. Recomputed fresh every
+ * time the screen is opened, same as the real Achievements/Pokedex screens.
  *
- * Purely informational, read-only against `globalScene.gameData` - never
- * mutates save data. Recomputed fresh every time the screen is opened, same
- * as the real Pokedex/Stats screens.
+ * Architecture deliberately mirrors `AchvsUiHandler` (header bar / icon
+ * grid+scrollbar / single title bar / description panel) rather than the
+ * old list-based v1 - two "levels" instead of Achv's two "pages":
  *
- * Every category is derived from real, already-persisted save fields - no
- * new save data is introduced by this screen:
- *   - Caught / Fought / Seen  -> `dexData[id].caughtCount` / `.seenCount` /
- *     `.seenAttr`|`.caughtAttr`. "Fought" is what the base game internally
- *     calls "Encountered" (`seenCount > 0`).
- *   - Forms                   -> `dexData[id].caughtAttr` bits 7..7+n,
- *     matching `GameData.getFormAttr()`'s own encoding, checked against
- *     `species.forms.length` for every species with more than one form.
- *   - Shiny                   -> `caughtAttr & DexAttr.SHINY`, scoped to
- *     starters only (matches the base game's own "Shiny Starters" stat).
- *     Variant (VARIANT_2/VARIANT_3) tracking is NOT included in v1 - which
- *     variants are obtainable varies per species/sprite and isn't reliably
- *     derivable without a per-species obtainable-variant table. Flagged as
- *     a possible v2 addition, not silently guessed at here.
- *   - Vouchers                -> `gameData.voucherUnlocks` vs the real
- *     `vouchers` registry from `#system/voucher`.
- *   - Candy                   -> starters only, "maxed" = passive unlocked
- *     (`starterData[id].passiveAttr & PassiveAttr.UNLOCKED`) AND value
- *     reduction fully upgraded (`starterData[id].valueReduction >= 2`).
- *     Deliberately NOT `candyCount >= MAX_STARTER_CANDY_COUNT` - that
- *     constant is just an overflow ceiling on the banked-candy counter
- *     (see `GameData.addStarterCandy`), not a "fully upgraded" signal;
- *     candy is spent (decremented) on each upgrade purchase.
- *   - Ribbons                 -> v1 scope is a GLOBAL tally: for each flag
- *     in the real `orderedRibbons` list, "owned" means ANY species in the
- *     save has that ribbon. This is not a full species x ribbon matrix -
- *     ribbons are earned per-species via specific challenge-run
- *     conditions, and a full matrix is a meaningfully bigger UI. Flagged
- *     explicitly, not deferred silently.
- *   - Pokemon Defeated         -> `gameData.gameStats.pokemonDefeated`, a
- *     single lifetime counter with no per-species breakdown. Shown as a
- *     stat line only, not a completion %, and not pooled into the blend.
+ *   Level 0 (category menu): one icon per tracked category. Hovering shows
+ *   the category name in the title bar and its current/total detail in the
+ *   description panel. ACTION drills into that category.
  *
- * Blended % pools item counts across every category below marked
- * `countsTowardBlend: true` (total-completed / total-possible, summed
- * across categories) rather than averaging six-ish percentages, so bulk
- * categories aren't diluted by small ones like Vouchers.
+ *   Level 1 (drilldown): a grid of the actual species (or a list of
+ *   vouchers) for the selected category. Defaults to showing what you
+ *   already HAVE. Button.STATS (bound to keyboard `C` / `Shift`) toggles to
+ *   show what's MISSING instead. CANCEL returns to level 0.
+ *
+ * Category definitions (all derived from real, already-persisted save
+ * fields - nothing new is stored by this screen):
+ *   - Starters Unlocked -> starters where `caughtCount > 0`
+ *   - Shiny Starters     -> starters where `caughtAttr & DexAttr.SHINY`
+ *   - Species Fought     -> all species where `seenCount > 0` (this is what
+ *                           the game internally calls "Encountered")
+ *   - Species Seen       -> all species where `seenAttr !== 0n || caughtAttr !== 0n`
+ *                           (approximates the real `isSeen()`, doesn't chase
+ *                           the base-starter fallback for evolved/hatched-
+ *                           without-encounter edge cases)
+ *   - Species Caught     -> all species where `caughtCount > 0`
+ *   - Gym Leader Vouchers -> the `vouchers` registry, filtered to keys whose
+ *                           `TrainerType` falls in the Gym Leader band
+ *                           (`BROCK`..`GRUSHA`, i.e. `>= 200 && < 300`).
+ *                           NOTE: `vouchers` also contains Elite Four,
+ *                           Champion, and Evil Team Leader entries - those
+ *                           are deliberately excluded from this category.
+ *   - Passives           -> starters where `passiveAttr & PassiveAttr.UNLOCKED`
+ *
+ * Forms, Ribbons, and the full Vouchers set from the old v1 are dropped
+ * from this pass entirely, per explicit scope direction - not silently
+ * carried over as dead code.
+ *
+ * Icon choices (pb / candy / shiny star / voucher frames) are all real,
+ * already-used-elsewhere atlas keys, but exact visual balance (spacing,
+ * scale) hasn't been eyeballed in an actual build yet - flagged, not
+ * guessed at silently.
  */
 
-interface CategoryRow {
+type CategoryKind = "species" | "voucher";
+
+interface CategoryDef {
   label: string;
-  current: number;
-  total: number;
-  countsTowardBlend: boolean;
-  missing: string[];
+  kind: CategoryKind;
+  iconTexture: string;
+  iconFrame: string | number;
+  iconTint?: number;
+  /** Species IDs or voucher keys the player already has. */
+  haveIds: (number | string)[];
+  /** Species IDs or voucher keys the player is missing. */
+  missingIds: (number | string)[];
 }
 
-const HEADER_H = 22;
-const ROW_H = 16;
-const ROWS_Y = HEADER_H + 3;
-const ROW_COUNT = 8;
-const FOOTER_Y = ROWS_Y + ROW_COUNT * ROW_H + 2;
-const FOOTER_H = 14;
+const LEVEL0_COLS = 4;
+const LEVEL0_ROWS = 2;
+const LEVEL1_COLS = 18;
+const LEVEL1_ROWS = 4;
+// Icon pool is sized for the larger of the two levels; level 0 just uses
+// the first few slots and hides the rest.
+const MAX_COLS = LEVEL1_COLS;
+const MAX_ROWS = LEVEL1_ROWS;
+const ICON_SPACING_X = 17;
+const ICON_SPACING_Y = 19;
 
-const DRILLDOWN_HEADER_H = 22;
-const DRILLDOWN_LINE_H = 14;
-const DRILLDOWN_LINES_Y = DRILLDOWN_HEADER_H + 3;
-const DRILLDOWN_VISIBLE_LINES = 10;
+const Level = {
+  CATEGORY_MENU: 0,
+  DRILLDOWN: 1,
+} as const;
+type Level = (typeof Level)[keyof typeof Level];
 
-function pct(current: number, total: number): number {
-  return total > 0 ? Math.round((current / total) * 1000) / 10 : 0;
-}
+export class CompletionistDexUiHandler extends MessageUiHandler {
+  private mainContainer: Phaser.GameObjects.Container;
+  private iconsContainer: Phaser.GameObjects.Container;
 
-export class CompletionistDexUiHandler extends UiHandler {
-  // ── Summary view ──────────────────────────────────────────────────────
-  private summaryContainer: Phaser.GameObjects.Container;
+  private headerBg: Phaser.GameObjects.NineSlice;
+  private headerText: Phaser.GameObjects.Text;
+
+  private iconsBg: Phaser.GameObjects.NineSlice;
+  private icons: Phaser.GameObjects.Sprite[];
+
+  private titleBg: Phaser.GameObjects.NineSlice;
   private titleText: Phaser.GameObjects.Text;
-  private rowLabelTexts: Phaser.GameObjects.Text[] = [];
-  private rowStatTexts: Phaser.GameObjects.Text[] = [];
-  private footerText: Phaser.GameObjects.Text;
-  private cursorObj: Phaser.GameObjects.Image;
 
-  // ── Drilldown view ───────────────────────────────────────────────────
-  private drilldownContainer: Phaser.GameObjects.Container;
-  private drilldownTitleText: Phaser.GameObjects.Text;
-  private drilldownLineTexts: Phaser.GameObjects.Text[] = [];
-  private drilldownScrollHint: Phaser.GameObjects.Text;
+  private scrollBar: ScrollBar;
+  private scrollCursor: number;
+  private cursorObj: Phaser.GameObjects.NineSlice | null;
 
-  private rows: CategoryRow[] = [];
-  private rowCursor = 0;
+  private categories: CategoryDef[] = [];
+  private currentTotal: number;
 
-  private viewingDrilldown = false;
-  private drilldownScroll = 0;
+  private level: Level = Level.CATEGORY_MENU;
+  private selectedCategoryIndex = 0;
+  /** Within a drilldown: false = showing "have", true = showing "missing". */
+  private showingMissing = false;
 
-  constructor() {
-    super(UiMode.COMPLETIONIST_DEX);
+  constructor(mode: UiMode | null = null) {
+    super(mode);
+    this.scrollCursor = 0;
   }
 
   setup(): void {
     const ui = this.getUi();
-    const width = globalScene.scaledCanvas.width;
-    const height = globalScene.scaledCanvas.height;
 
-    // ── Summary container ──────────────────────────────────────────────
-    this.summaryContainer = globalScene.add.container(0, -height).setVisible(false);
-    ui.add(this.summaryContainer);
+    const WIDTH = globalScene.scaledCanvas.width;
+    const HEIGHT = globalScene.scaledCanvas.height;
 
-    const bg = globalScene.add.rectangle(0, 0, width, height, 0x006860).setOrigin(0);
-    this.summaryContainer.add(bg);
+    this.mainContainer = globalScene.add.container(1, -HEIGHT + 1);
+    this.mainContainer.setInteractive(new Phaser.Geom.Rectangle(0, 0, WIDTH, HEIGHT), Phaser.Geom.Rectangle.Contains);
 
-    const headerWindow = addWindow(0, 0, width, HEADER_H).setOrigin(0);
-    this.summaryContainer.add(headerWindow);
+    this.headerBg = addWindow(0, 0, WIDTH - 2, 24);
+    this.headerText = addTextObject(0, 0, "Completionist Dex", TextStyle.HEADER_LABEL)
+      .setOrigin(0)
+      .setPositionRelative(this.headerBg, 8, 4);
 
-    this.titleText = addTextObject(2, 3, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
-    this.summaryContainer.add(this.titleText);
+    this.iconsBg = addWindow(0, this.headerBg.height, WIDTH - 2, HEIGHT - this.headerBg.height - 68).setOrigin(0);
 
-    for (let i = 0; i < ROW_COUNT; i++) {
-      const y = ROWS_Y + i * ROW_H;
+    const yOffset = 6;
+    this.scrollBar = new ScrollBar(
+      this.iconsBg.width - 9,
+      this.iconsBg.y + yOffset,
+      4,
+      this.iconsBg.height - yOffset * 2,
+      LEVEL1_ROWS,
+    );
 
-      const rowBg = addWindow(2, y, width - 4, ROW_H - 2).setOrigin(0);
-      this.summaryContainer.add(rowBg);
+    this.iconsContainer = globalScene.add.container(5, this.headerBg.height + 8);
 
-      const labelText = addTextObject(6, y + 1, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
-      this.summaryContainer.add(labelText);
-      this.rowLabelTexts.push(labelText);
-
-      const statText = addTextObject(width - 6, y + 1, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(1, 0);
-      this.summaryContainer.add(statText);
-      this.rowStatTexts.push(statText);
+    this.icons = [];
+    for (let a = 0; a < MAX_ROWS * MAX_COLS; a++) {
+      const icon = globalScene.add.sprite(0, 0, "items", "unknown").setOrigin(0).setScale(0.5);
+      this.icons.push(icon);
+      this.iconsContainer.add(icon);
     }
 
-    this.cursorObj = globalScene.add.image(0, 0, "select_cursor").setOrigin(0);
-    this.summaryContainer.add(this.cursorObj);
+    // Full-width title bar - no score/date boxes, per redesign spec.
+    this.titleBg = addWindow(0, this.headerBg.height + this.iconsBg.height, WIDTH - 2, 24);
+    this.titleText = addTextObject(0, 0, "", TextStyle.WINDOW).setOrigin();
+    this.titleText.setPosition(this.titleBg.x + this.titleBg.width / 2, this.titleBg.y + this.titleBg.height / 2);
 
-    const footerWindow = addWindow(0, FOOTER_Y, width, FOOTER_H).setOrigin(0);
-    this.summaryContainer.add(footerWindow);
+    const descriptionBg = addWindow(0, this.titleBg.y + this.titleBg.height, WIDTH - 2, 42);
+    const descriptionText = addTextObject(0, 0, "", TextStyle.WINDOW, { maxLines: 2 })
+      .setWordWrapWidth(1870)
+      .setOrigin(0)
+      .setPositionRelative(descriptionBg, 8, 4);
+    this.message = descriptionText;
 
-    this.footerText = addTextObject(4, FOOTER_Y + 2, "", TextStyle.WINDOW_ALT, { maxLines: 1 }).setOrigin(0);
-    this.summaryContainer.add(this.footerText);
+    this.mainContainer.add([
+      this.headerBg,
+      this.headerText,
+      this.iconsBg,
+      this.scrollBar,
+      this.iconsContainer,
+      this.titleBg,
+      this.titleText,
+      descriptionBg,
+      descriptionText,
+    ]);
 
-    // ── Drilldown container ────────────────────────────────────────────
-    this.drilldownContainer = globalScene.add.container(0, -height).setVisible(false);
-    ui.add(this.drilldownContainer);
-
-    const drilldownBg = globalScene.add.rectangle(0, 0, width, height, 0x006860).setOrigin(0);
-    this.drilldownContainer.add(drilldownBg);
-
-    const drilldownHeaderWindow = addWindow(0, 0, width, DRILLDOWN_HEADER_H).setOrigin(0);
-    this.drilldownContainer.add(drilldownHeaderWindow);
-
-    this.drilldownTitleText = addTextObject(2, 3, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
-    this.drilldownContainer.add(this.drilldownTitleText);
-
-    for (let i = 0; i < DRILLDOWN_VISIBLE_LINES; i++) {
-      const y = DRILLDOWN_LINES_Y + i * DRILLDOWN_LINE_H;
-      const lineText = addTextObject(4, y, "", TextStyle.WINDOW, { maxLines: 1 }).setOrigin(0);
-      this.drilldownContainer.add(lineText);
-      this.drilldownLineTexts.push(lineText);
-    }
-
-    this.drilldownScrollHint = addTextObject(4, height - 12, "", TextStyle.WINDOW_ALT, { maxLines: 1 }).setOrigin(0);
-    this.drilldownContainer.add(this.drilldownScrollHint);
+    ui.add(this.mainContainer);
+    this.mainContainer.setVisible(false);
   }
 
   override show(args: any[]): boolean {
     super.show(args);
 
-    this.rows = this.computeRows();
-    this.viewingDrilldown = false;
-    this.rowCursor = 0;
-    this.drilldownScroll = 0;
+    this.categories = this.computeCategories();
+    this.level = Level.CATEGORY_MENU;
+    this.selectedCategoryIndex = 0;
+    this.showingMissing = false;
 
-    this.renderSummary();
+    this.enterCategoryMenu();
 
-    this.summaryContainer.setVisible(true);
-    this.drilldownContainer.setVisible(false);
-    this.getUi().bringToTop(this.summaryContainer);
-    this.setCursor(0);
+    this.mainContainer.setVisible(true);
+    this.getUi().moveTo(this.mainContainer, this.getUi().length - 1);
+    this.getUi().hideTooltip();
 
     return true;
   }
 
-  /** Pulls every category's current/total straight from `globalScene.gameData`. See file-header doc for exact definitions. */
-  private computeRows(): CategoryRow[] {
+  /** Pulls every category's have/missing lists straight from `globalScene.gameData`. See file-header doc for exact per-category definitions. */
+  private computeCategories(): CategoryDef[] {
     const gameData = globalScene.gameData;
     const dexData = gameData.dexData;
     const speciesIds = Object.keys(dexData).map(Number);
+    const starterIds = speciesDataRegistry.getAllStarters();
 
-    let caughtCurrent = 0;
-    const caughtMissing: string[] = [];
-    let foughtCurrent = 0;
-    const foughtMissing: string[] = [];
-    let seenCurrent = 0;
-    let formsCurrent = 0;
-    let formsTotal = 0;
-    const formsMissing: string[] = [];
+    const caughtHave: number[] = [];
+    const caughtMissing: number[] = [];
+    const foughtHave: number[] = [];
+    const foughtMissing: number[] = [];
+    const seenHave: number[] = [];
+    const seenMissing: number[] = [];
 
     for (const id of speciesIds) {
       const entry = dexData[id];
-      const species = speciesDataRegistry.getSpecies(id);
-      const name = species.getName();
-
-      if (entry.caughtCount > 0) {
-        caughtCurrent++;
-      } else {
-        caughtMissing.push(name);
-      }
-
-      if (entry.seenCount > 0) {
-        foughtCurrent++;
-      } else {
-        foughtMissing.push(name);
-      }
-
-      // Approximates the base game's `isSeen()`: caught or directly
-      // encountered. Does not chase the base-starter caughtAttr fallback
-      // isSeen() uses for evolved/hatched-without-encounter edge cases -
-      // informational row only, not pooled into the blended %.
-      if (entry.seenAttr !== 0n || entry.caughtAttr !== 0n) {
-        seenCurrent++;
-      }
-
-      const forms = species.forms ?? [];
-      if (forms.length > 1) {
-        for (let f = 0; f < forms.length; f++) {
-          formsTotal++;
-          const bit = 1n << BigInt(7 + f);
-          if (entry.caughtAttr & bit) {
-            formsCurrent++;
-          } else {
-            formsMissing.push(`${name} (${forms[f].formKey || `form ${f}`})`);
-          }
-        }
-      }
+      (entry.caughtCount > 0 ? caughtHave : caughtMissing).push(id);
+      (entry.seenCount > 0 ? foughtHave : foughtMissing).push(id);
+      (entry.seenAttr !== 0n || entry.caughtAttr !== 0n ? seenHave : seenMissing).push(id);
     }
 
-    // Shiny - starters only, matches the base game's own "Shiny Starters" stat.
-    const starterIds = speciesDataRegistry.getAllStarters();
-    let shinyCurrent = 0;
-    const shinyMissing: string[] = [];
+    const startersHave: number[] = [];
+    const startersMissing: number[] = [];
+    const shinyHave: number[] = [];
+    const shinyMissing: number[] = [];
+    const passiveHave: number[] = [];
+    const passiveMissing: number[] = [];
+
     for (const id of starterIds) {
       const entry = dexData[id];
-      const name = speciesDataRegistry.getSpecies(id).getName();
-      if (entry.caughtAttr & DexAttr.SHINY) {
-        shinyCurrent++;
-      } else {
-        shinyMissing.push(name);
-      }
-    }
+      (entry.caughtCount > 0 ? startersHave : startersMissing).push(id);
+      (entry.caughtAttr & DexAttr.SHINY ? shinyHave : shinyMissing).push(id);
 
-    // Vouchers
-    const voucherIds = Object.keys(vouchers);
-    let voucherCurrent = 0;
-    const voucherMissing: string[] = [];
-    for (const vid of voucherIds) {
-      if (Object.hasOwn(gameData.voucherUnlocks, vid)) {
-        voucherCurrent++;
-      } else {
-        voucherMissing.push(vouchers[vid].description);
-      }
-    }
-
-    // Candy - starters only, "maxed" = passive unlocked + value reduction maxed.
-    const VALUE_REDUCTION_MAX = 2;
-    let candyCurrent = 0;
-    const candyMissing: string[] = [];
-    for (const id of starterIds) {
       const sd = gameData.starterData[id];
-      if (!sd) {
+      const passiveUnlocked = !!sd && !!(sd.passiveAttr & PassiveAttr.UNLOCKED);
+      (passiveUnlocked ? passiveHave : passiveMissing).push(id);
+    }
+
+    // Gym Leader Vouchers - filter the shared vouchers registry down to the
+    // Gym Leader TrainerType band. `vouchers` also has Elite Four/Champion/
+    // Evil Team Leader/CLASSIC_VICTORY entries - excluded here on purpose.
+    const gymLeaderVoucherHave: string[] = [];
+    const gymLeaderVoucherMissing: string[] = [];
+    for (const key of Object.keys(vouchers)) {
+      const trainerType = TrainerType[key as keyof typeof TrainerType];
+      if (trainerType === undefined || trainerType < TrainerType.BROCK || trainerType >= TrainerType.LORELEI) {
         continue;
       }
-      const name = speciesDataRegistry.getSpecies(id).getName();
-      const passiveDone = !!(sd.passiveAttr & PassiveAttr.UNLOCKED);
-      const reductionDone = sd.valueReduction >= VALUE_REDUCTION_MAX;
-      if (passiveDone && reductionDone) {
-        candyCurrent++;
-      } else {
-        candyMissing.push(name);
-      }
-    }
-
-    // Ribbons - global tally: owned by ANY species in the save, not a per-species matrix.
-    let ribbonCurrent = 0;
-    const ribbonMissing: string[] = [];
-    for (const flag of orderedRibbons) {
-      const owned = speciesIds.some(id => dexData[id].ribbons.has(flag));
-      if (owned) {
-        ribbonCurrent++;
-      } else {
-        ribbonMissing.push(i18next.t(`ribbons:${getRibbonKey(flag)}`));
-      }
+      (Object.hasOwn(gameData.voucherUnlocks, key) ? gymLeaderVoucherHave : gymLeaderVoucherMissing).push(key);
     }
 
     return [
       {
-        label: "Caught",
-        current: caughtCurrent,
-        total: speciesIds.length,
-        countsTowardBlend: true,
-        missing: caughtMissing,
+        label: "Starters Unlocked",
+        kind: "species",
+        iconTexture: "items",
+        iconFrame: "pb",
+        haveIds: startersHave,
+        missingIds: startersMissing,
       },
-      {
-        label: "Fought",
-        current: foughtCurrent,
-        total: speciesIds.length,
-        countsTowardBlend: true,
-        missing: foughtMissing,
-      },
-      { label: "Seen", current: seenCurrent, total: speciesIds.length, countsTowardBlend: false, missing: [] },
-      { label: "Forms", current: formsCurrent, total: formsTotal, countsTowardBlend: true, missing: formsMissing },
       {
         label: "Shiny Starters",
-        current: shinyCurrent,
-        total: starterIds.length,
-        countsTowardBlend: true,
-        missing: shinyMissing,
+        kind: "species",
+        iconTexture: "shiny_icons",
+        iconFrame: getVariantIcon(2),
+        iconTint: getVariantTint(2),
+        haveIds: shinyHave,
+        missingIds: shinyMissing,
       },
       {
-        label: "Vouchers",
-        current: voucherCurrent,
-        total: voucherIds.length,
-        countsTowardBlend: true,
-        missing: voucherMissing,
+        label: "Species Fought",
+        kind: "species",
+        iconTexture: "items",
+        iconFrame: "expert_belt",
+        haveIds: foughtHave,
+        missingIds: foughtMissing,
       },
       {
-        label: "Candy Maxed",
-        current: candyCurrent,
-        total: starterIds.length,
-        countsTowardBlend: true,
-        missing: candyMissing,
+        label: "Species Seen",
+        kind: "species",
+        iconTexture: "items",
+        iconFrame: "scope_lens",
+        haveIds: seenHave,
+        missingIds: seenMissing,
       },
       {
-        label: "Ribbons",
-        current: ribbonCurrent,
-        total: orderedRibbons.length,
-        countsTowardBlend: true,
-        missing: ribbonMissing,
+        label: "Species Caught",
+        kind: "species",
+        iconTexture: "items",
+        iconFrame: "pb",
+        haveIds: caughtHave,
+        missingIds: caughtMissing,
+      },
+      {
+        label: "Gym Leader Vouchers",
+        kind: "voucher",
+        iconTexture: "items",
+        iconFrame: "coupon",
+        haveIds: gymLeaderVoucherHave,
+        missingIds: gymLeaderVoucherMissing,
+      },
+      {
+        label: "Passives",
+        kind: "species",
+        iconTexture: "items",
+        iconFrame: "candy",
+        haveIds: passiveHave,
+        missingIds: passiveMissing,
       },
     ];
   }
 
-  private computeBlendedPercent(): number {
-    let curSum = 0;
-    let totSum = 0;
-    for (const row of this.rows) {
-      if (row.countsTowardBlend) {
-        curSum += row.current;
-        totSum += row.total;
+  private enterCategoryMenu(): void {
+    this.level = Level.CATEGORY_MENU;
+    this.layoutGrid(LEVEL0_COLS);
+    this.currentTotal = this.categories.length;
+    this.setScrollCursor(0);
+    this.refreshCategoryMenuIcons();
+    this.setCursor(0, true);
+  }
+
+  private enterDrilldown(categoryIndex: number): void {
+    this.level = Level.DRILLDOWN;
+    this.selectedCategoryIndex = categoryIndex;
+    this.showingMissing = false;
+    this.layoutGrid(LEVEL1_COLS);
+    this.refreshDrilldownState();
+  }
+
+  private refreshDrilldownState(): void {
+    const category = this.categories[this.selectedCategoryIndex];
+    const list = this.showingMissing ? category.missingIds : category.haveIds;
+    this.currentTotal = list.length;
+    this.setScrollCursor(0);
+    this.refreshDrilldownIcons();
+    this.setCursor(0, true);
+  }
+
+  private toggleMissing(): void {
+    this.showingMissing = !this.showingMissing;
+    this.refreshDrilldownState();
+  }
+
+  /** Repositions the shared icon pool for the given column count and hides any slots beyond `rows * cols`. */
+  private layoutGrid(cols: number): void {
+    const rows = cols === LEVEL0_COLS ? LEVEL0_ROWS : LEVEL1_ROWS;
+    for (let a = 0; a < this.icons.length; a++) {
+      if (a >= rows * cols) {
+        this.icons[a].setVisible(false);
+        continue;
       }
+      this.icons[a].setPosition((a % cols) * ICON_SPACING_X, Math.floor(a / cols) * ICON_SPACING_Y);
     }
-    return pct(curSum, totSum);
   }
 
-  private renderSummary(): void {
-    this.titleText.setText(`Completionist Dex - ${this.computeBlendedPercent()}%`);
-
-    for (let i = 0; i < this.rows.length; i++) {
-      const row = this.rows[i];
-      this.rowLabelTexts[i].setText(row.label);
-      this.rowStatTexts[i].setText(`${row.current}/${row.total} (${pct(row.current, row.total)}%)`);
-    }
-
-    const defeated = globalScene.gameData.gameStats.pokemonDefeated;
-    this.footerText.setText(`Pokemon Defeated: ${defeated}`);
+  private currentCols(): number {
+    return this.level === Level.CATEGORY_MENU ? LEVEL0_COLS : LEVEL1_COLS;
   }
 
-  private openDrilldown(row: CategoryRow): void {
-    this.viewingDrilldown = true;
-    this.drilldownScroll = 0;
-
-    this.drilldownTitleText.setText(row.label);
-    this.renderDrilldownPage(row);
-
-    this.summaryContainer.setVisible(false);
-    this.drilldownContainer.setVisible(true);
-    this.getUi().bringToTop(this.drilldownContainer);
-  }
-
-  private renderDrilldownPage(row: CategoryRow): void {
-    if (row.missing.length === 0) {
-      this.drilldownLineTexts[0].setText("Nothing missing - fully complete!");
-      for (let i = 1; i < this.drilldownLineTexts.length; i++) {
-        this.drilldownLineTexts[i].setText("");
+  private refreshCategoryMenuIcons(): void {
+    this.categories.forEach((category, i) => {
+      const icon = this.icons[i];
+      icon.setTexture(category.iconTexture, category.iconFrame);
+      icon.clearTint();
+      if (category.iconTint !== undefined) {
+        icon.setTint(category.iconTint);
       }
-      this.drilldownScrollHint.setText("");
+      icon.setVisible(true);
+    });
+    for (let i = this.categories.length; i < LEVEL0_ROWS * LEVEL0_COLS; i++) {
+      this.icons[i].setVisible(false);
+    }
+  }
+
+  private refreshDrilldownIcons(): void {
+    const category = this.categories[this.selectedCategoryIndex];
+    const list = this.showingMissing ? category.missingIds : category.haveIds;
+    const itemOffset = this.scrollCursor * LEVEL1_COLS;
+    const itemLimit = LEVEL1_ROWS * LEVEL1_COLS;
+    const itemRange = list.slice(itemOffset, itemOffset + itemLimit);
+
+    itemRange.forEach((item, i) => {
+      const icon = this.icons[i];
+      icon.clearTint();
+      if (category.kind === "species") {
+        const species = speciesDataRegistry.getSpecies(item as number);
+        icon.setTexture(species.getIconAtlasKey(0, false, 0), species.getIconId(false, 0, false, 0));
+      } else {
+        icon.setTexture("items", getVoucherTypeIcon(vouchers[item as string].voucherType));
+      }
+      icon.setVisible(true);
+    });
+
+    for (let i = itemRange.length; i < LEVEL1_ROWS * LEVEL1_COLS; i++) {
+      this.icons[i].setVisible(false);
+    }
+  }
+
+  /** Updates the title bar + description panel for whatever's currently under the cursor. */
+  private updateDetailPanel(): void {
+    if (this.level === Level.CATEGORY_MENU) {
+      const category = this.categories[this.cursor + this.scrollCursor * LEVEL0_COLS];
+      if (!category) {
+        return;
+      }
+      this.titleText.setText(category.label);
+      const total = category.haveIds.length + category.missingIds.length;
+      const percent = total > 0 ? Math.round((category.haveIds.length / total) * 1000) / 10 : 0;
+      this.showText(`${category.haveIds.length}/${total} (${percent}%)`);
       return;
     }
 
-    for (let i = 0; i < DRILLDOWN_VISIBLE_LINES; i++) {
-      const item = row.missing[this.drilldownScroll + i];
-      this.drilldownLineTexts[i].setText(item ?? "");
+    const category = this.categories[this.selectedCategoryIndex];
+    const list = this.showingMissing ? category.missingIds : category.haveIds;
+    const item = list[this.cursor + this.scrollCursor * LEVEL1_COLS];
+    const modeLabel = this.showingMissing ? "Missing" : "Unlocked";
+
+    if (item === undefined) {
+      this.titleText.setText(`${category.label} - ${modeLabel}`);
+      this.showText("");
+      return;
     }
 
-    const shownEnd = Math.min(this.drilldownScroll + DRILLDOWN_VISIBLE_LINES, row.missing.length);
-    this.drilldownScrollHint.setText(`${this.drilldownScroll + 1}-${shownEnd} of ${row.missing.length} missing`);
+    if (category.kind === "species") {
+      const name = speciesDataRegistry.getSpecies(item as number).getName();
+      this.titleText.setText(`${name} - ${category.label} (${modeLabel})`);
+      this.showText("");
+    } else {
+      const voucher = vouchers[item as string];
+      this.titleText.setText(`${category.label} (${modeLabel})`);
+      this.showText(voucher.description);
+    }
   }
 
+  // #region Input Processing
+
   processInput(button: Button): boolean {
-    const ui = this.getUi();
     let success = false;
 
-    if (this.viewingDrilldown) {
-      const row = this.rows[this.rowCursor];
-      switch (button) {
-        case Button.CANCEL:
-          this.viewingDrilldown = false;
-          this.drilldownContainer.setVisible(false);
-          this.summaryContainer.setVisible(true);
-          this.getUi().bringToTop(this.summaryContainer);
-          success = true;
-          break;
-        case Button.UP:
-          if (this.drilldownScroll > 0) {
-            this.drilldownScroll--;
-            this.renderDrilldownPage(row);
+    switch (button) {
+      case Button.ACTION:
+        if (this.level === Level.CATEGORY_MENU) {
+          const index = this.cursor + this.scrollCursor * LEVEL0_COLS;
+          if (index < this.categories.length) {
+            this.enterDrilldown(index);
             success = true;
           }
-          break;
-        case Button.DOWN:
-          if (this.drilldownScroll + DRILLDOWN_VISIBLE_LINES < row.missing.length) {
-            this.drilldownScroll++;
-            this.renderDrilldownPage(row);
-            success = true;
-          }
-          break;
-        default:
-          break;
-      }
-    } else {
-      switch (button) {
-        case Button.CANCEL:
-          ui.revertMode();
+        }
+        break;
+      case Button.CANCEL:
+        if (this.level === Level.DRILLDOWN) {
+          this.enterCategoryMenu();
+        } else {
+          globalScene.ui.revertMode();
+        }
+        success = true;
+        break;
+      case Button.STATS:
+        if (this.level === Level.DRILLDOWN) {
+          this.toggleMissing();
           success = true;
-          break;
-        case Button.UP:
-          success = this.moveCursor(-1);
-          break;
-        case Button.DOWN:
-          success = this.moveCursor(1);
-          break;
-        case Button.ACTION:
-          this.openDrilldown(this.rows[this.rowCursor]);
-          success = true;
-          break;
-        default:
-          break;
-      }
+        }
+        break;
+      case Button.UP:
+        success = this.processUpInput();
+        break;
+      case Button.DOWN:
+        success = this.processDownInput();
+        break;
+      case Button.LEFT:
+        success = this.processLeftInput();
+        break;
+      case Button.RIGHT:
+        success = this.processRightInput();
+        break;
+      default:
+        break;
     }
 
     if (success) {
-      ui.playSelect();
+      this.getUi().playSelect();
     }
 
     return success;
   }
 
-  private moveCursor(delta: number): boolean {
-    const next = (this.rowCursor + delta + this.rows.length) % this.rows.length;
-    this.rowCursor = next;
-    this.setCursor(this.rowCursor);
-    return true;
+  private processUpInput(): boolean {
+    const cols = this.currentCols();
+    if (this.cursor - cols < 0) {
+      if (this.scrollCursor > 0) {
+        return this.setScrollCursor(this.scrollCursor - 1);
+      }
+      return false;
+    }
+    return this.setCursor(this.cursor - cols);
   }
 
-  override setCursor(cursor: number): boolean {
-    const changed = super.setCursor(cursor);
-    this.cursorObj.setPosition(1, ROWS_Y + cursor * ROW_H - 1);
-    return changed;
+  private processDownInput(): boolean {
+    const cols = this.currentCols();
+    const rows = this.level === Level.CATEGORY_MENU ? LEVEL0_ROWS : LEVEL1_ROWS;
+    const itemOffset = this.scrollCursor * cols;
+    if (this.cursor + cols >= rows * cols || this.cursor + cols + itemOffset >= this.currentTotal) {
+      const maxScrollCursor = Math.max(0, Math.ceil(this.currentTotal / cols) - rows);
+      if (this.scrollCursor < maxScrollCursor) {
+        return this.setScrollCursor(this.scrollCursor + 1);
+      }
+      return false;
+    }
+    return this.setCursor(this.cursor + cols);
+  }
+
+  private processLeftInput(): boolean {
+    const cols = this.currentCols();
+    const itemOffset = this.scrollCursor * cols;
+    if (this.cursor % cols === 0) {
+      return this.setCursor(Math.min(this.cursor + cols - 1, this.currentTotal - itemOffset - 1));
+    }
+    return this.setCursor(this.cursor - 1);
+  }
+
+  private processRightInput(): boolean {
+    const cols = this.currentCols();
+    const itemOffset = this.scrollCursor * cols;
+    if ((this.cursor + 1) % cols === 0 || this.cursor + itemOffset === this.currentTotal - 1) {
+      return this.setCursor(this.cursor - (this.cursor % cols));
+    }
+    return this.setCursor(this.cursor + 1);
+  }
+
+  // #endregion Input Processing
+
+  override setCursor(cursor: number, levelChange?: boolean): boolean {
+    const ret = super.setCursor(cursor);
+
+    let update = ret;
+    if (!this.cursorObj) {
+      this.cursorObj = globalScene.add
+        .nineslice(0, 0, "select_cursor_highlight", undefined, 16, 16, 1, 1, 1, 1)
+        .setOrigin(0);
+      this.iconsContainer.add(this.cursorObj);
+      update = true;
+    }
+
+    this.cursorObj.setPositionRelative(this.icons[this.cursor], 0, 0);
+    if (!update && !levelChange) {
+      return ret;
+    }
+
+    this.updateDetailPanel();
+    return ret;
+  }
+
+  setScrollCursor(scrollCursor: number): boolean {
+    if (scrollCursor === this.scrollCursor) {
+      return false;
+    }
+
+    this.scrollCursor = scrollCursor;
+    this.scrollBar.setTotalRows(Math.ceil(this.currentTotal / this.currentCols()));
+    this.scrollBar.setScrollCursor(this.scrollCursor);
+
+    const cols = this.currentCols();
+    const maxCursor = Math.min(this.cursor, this.currentTotal - this.scrollCursor * cols - 1);
+    if (maxCursor !== this.cursor) {
+      this.setCursor(Math.max(0, maxCursor));
+    }
+
+    if (this.level === Level.CATEGORY_MENU) {
+      this.refreshCategoryMenuIcons();
+    } else {
+      this.refreshDrilldownIcons();
+    }
+    this.updateDetailPanel();
+    return true;
   }
 
   override clear(): void {
     super.clear();
-    this.summaryContainer.setVisible(false);
-    this.drilldownContainer.setVisible(false);
+    this.level = Level.CATEGORY_MENU;
+    this.mainContainer.setVisible(false);
+    this.eraseCursor();
+  }
+
+  private eraseCursor(): void {
+    if (this.cursorObj) {
+      this.cursorObj.destroy();
+    }
+    this.cursorObj = null;
   }
 }
