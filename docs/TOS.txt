@@ -1,0 +1,80 @@
+TERMS OF SERVICE — PokeRogue-Offline
+Last updated: 2026-07-07
+
+Please read these Terms of Service ("Terms") before using PokeRogue-Offline
+("the App"). By downloading, installing, or using the App, you agree to
+be bound by these Terms. If you do not agree, do not use the App.
+
+1. NATURE OF THE APP
+   PokeRogue-Offline is an unofficial, community-built wrapper that packages
+   the web game PokeRogue for offline/desktop/mobile use. It is not
+   affiliated with, endorsed by, or sponsored by the developers of
+   PokeRogue or Pokemon/Nintendo/Game Freak/The Pokemon Company.
+
+2. "AS IS" / NO WARRANTY
+   The App is provided "AS IS" and "AS AVAILABLE," without warranty of
+   any kind, express or implied, including but not limited to warranties
+   of merchantability, fitness for a particular purpose, non-infringement,
+   or that the App will be error-free, uninterrupted, or secure.
+
+3. LIMITATION OF LIABILITY
+   To the maximum extent permitted by applicable law, in no event shall
+   the developer(s) of PokeRogue-Offline be liable for any indirect,
+   incidental, special, consequential, or punitive damages, or any loss
+   of data, save files, profits, or goodwill, arising out of or in
+   connection with your use of, or inability to use, the App.
+
+4. INDEMNIFICATION
+   You agree to indemnify, defend, and hold harmless the developer(s) and
+   maintainers of PokeRogue-Offline from and against any and all claims,
+   liabilities, damages, losses, costs, and expenses (including reasonable
+   legal fees) arising out of or related to: (a) your use or misuse of the
+   App; (b) your violation of these Terms; (c) your violation of any
+   applicable law or third-party right; or (d) any content, data, or
+   conduct associated with your use of the App. This indemnification
+   obligation applies regardless of whether the underlying claim arises
+   from your negligence or otherwise.
+
+5. ACCEPTABLE USE / NO ABUSE
+   You agree not to:
+     - Use the App for any unlawful purpose or in violation of any
+       applicable local, state, national, or international law
+     - Attempt to abuse, disrupt, overload, or interfere with any
+       backend services, APIs, or infrastructure the App communicates
+       with (including but not limited to Google's APIs used for save
+       backup/restore)
+     - Attempt to reverse engineer, circumvent, or abuse authentication
+       or authorization mechanisms for purposes other than your own
+       legitimate use of the App
+     - Use the App to harass, abuse, or harm any other person or entity
+     - Redistribute the App in a modified form that misrepresents its
+       origin or removes attribution
+   Violation of this section may result in loss of access to any shared
+   services associated with the App, at the maintainers' discretion.
+
+6. THIRD-PARTY SERVICES
+   The App may interact with third-party services (e.g., Google Drive)
+   for optional features such as save backup. Your use of those services
+   is subject to the applicable third party's own terms and privacy
+   policy. The developer(s) of PokeRogue-Offline are not responsible for
+   the availability, conduct, or policies of third-party services.
+
+7. NO GUARANTEE OF CONTINUED AVAILABILITY
+   The App is provided on a best-effort, community basis. The
+   maintainers may modify, suspend, or discontinue the App, or any
+   feature of it, at any time without notice.
+
+8. CHANGES TO THESE TERMS
+   These Terms may be updated from time to time. Updates will be
+   reflected in this file, versioned alongside the source code at:
+   https://github.com/PokeRogue-Offline/pokerogue-offline
+   Continued use of the App after changes constitutes acceptance of the
+   revised Terms.
+
+9. GOVERNING LAW
+   No specific jurisdiction is designated. To the extent any dispute
+   arises, it shall be resolved under the law otherwise applicable given
+   the circumstances of the parties involved.
+
+10. CONTACT
+   Questions about these Terms: contact "scooom" on Discord.
