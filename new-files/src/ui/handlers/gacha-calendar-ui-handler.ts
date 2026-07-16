@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getLegendaryGachaSpeciesForTimestamp } from "#data/egg";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
@@ -6,7 +7,6 @@ import { UiMode } from "#enums/ui-mode";
 import { UiHandler } from "#ui/ui-handler";
 import { addTextObject } from "#ui/text";
 import { addWindow } from "#ui/ui-theme";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /**
  * Offline-only "Gacha Calendar" screen.
@@ -228,7 +228,7 @@ export class GachaCalendarUiHandler extends UiHandler {
 
       cell.dateText.setText(`${dayOfMonth}`);
 
-      const species = getPokemonSpecies(getLegendaryGachaSpeciesForTimestamp(timestamp));
+      const species = speciesDataRegistry.getSpecies(getLegendaryGachaSpeciesForTimestamp(timestamp));
       cell.icon.setTexture(species.getIconAtlasKey(), species.getIconId(false));
 
       cell.bg.setAlpha(timestamp === todayTimestamp ? 1 : 0.7);
@@ -240,8 +240,8 @@ export class GachaCalendarUiHandler extends UiHandler {
     const todayTimestamp = utcMidnight(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const tomorrowTimestamp = todayTimestamp + DAY_MS;
 
-    const todaySpecies = getPokemonSpecies(getLegendaryGachaSpeciesForTimestamp(todayTimestamp));
-    const tomorrowSpecies = getPokemonSpecies(getLegendaryGachaSpeciesForTimestamp(tomorrowTimestamp));
+    const todaySpecies = speciesDataRegistry.getSpecies(getLegendaryGachaSpeciesForTimestamp(todayTimestamp));
+    const tomorrowSpecies = speciesDataRegistry.getSpecies(getLegendaryGachaSpeciesForTimestamp(tomorrowTimestamp));
 
     this.todayLabel.setText(`Today: ${todaySpecies.getName()}`);
     this.todayIcon.setTexture(todaySpecies.getIconAtlasKey(), todaySpecies.getIconId(false));
