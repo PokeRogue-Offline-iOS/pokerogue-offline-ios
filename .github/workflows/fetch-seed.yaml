@@ -20,7 +20,7 @@ jobs:
           SEED=$(curl -sf \
             -H "Origin: https://pokerogue.net" \
             -H "Referer: https://pokerogue.net/" \
-            "http://ssh.scooom.xyz/daily-seed.txt")
+            "https://ssh.scooom.xyz/daily-seed.txt")
           echo "Seed Fetched: $SEED";
 
           if [ -z "$SEED" ]; then
