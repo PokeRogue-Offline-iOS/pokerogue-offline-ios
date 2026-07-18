@@ -489,7 +489,34 @@ jobs:
           git add docs/repo.json
           git commit -m "Update AltStore source for v${{ steps.version.outputs.version }}"
           git push
-               
+
+      # -----------------------------------------------------------------------
+      # GitHub Pages (pokerogue-offline.github.io) is now served from the
+      # `seed` branch, not `main` — but repo.json's iconURL/website fields and
+      # the AltStore source URL baked into shipped builds still point at that
+      # Pages host. Mirror the freshly-updated repo.json + appIcon.png there
+      # so AltStore/SideStore keep resolving correctly. `main`'s docs/repo.json
+      # remains the source of truth for version history; this just copies it.
+      # -----------------------------------------------------------------------
+      - name: Checkout seed branch
+        if: ${{ steps.gate.outputs.is_release == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          ref: seed
+          path: seed-branch
+
+      - name: Sync AltStore source to seed branch
+        if: ${{ steps.gate.outputs.is_release == 'true' }}
+        run: |
+          cp docs/repo.json seed-branch/docs/repo.json
+          cp docs/appIcon.png seed-branch/docs/appIcon.png
+          cd seed-branch
+          git config user.name "ScooomBot"
+          git config user.email "scooombot@scooom.xyz"
+          git add docs/repo.json docs/appIcon.png
+          git diff --staged --quiet || git commit -m "Update AltStore source for v${{ steps.version.outputs.version }}"
+          git push
+
   # -----------------------------------------------------------------------
   # Runs only if the release job is cancelled. Finds any in-progress or
   # queued runs of the build workflows and cancels them.
