@@ -450,6 +450,9 @@ jobs:
           body: |
             ## PokeRogueOffline v${{ steps.version.outputs.version }}
 
+            <!-- changelog:start -->
+            <!-- changelog:end -->
+
             - **PokeRogueOffline.ipa** — iOS (sideload via SideStore / LiveContainer / Feather)
             - **PokeRogueOffline.apk** — Android (sideload by enabling "Install unknown apps")
             - **PokeRogueOffline.AppImage** — Linux AppImage

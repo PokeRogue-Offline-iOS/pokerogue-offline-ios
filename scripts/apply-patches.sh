@@ -22,6 +22,8 @@ apply_patch "update-title-labels.js"  all
 apply_patch "app-settings-menu.js" all
 apply_patch "gacha-calendar.js"    all
 
+apply_patch "update-available-screen.js" all
+
 # ── Mobile (iOS + Android) ────────────────────────────────────────────────────
 if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
 
