@@ -473,30 +473,13 @@ jobs:
         id: ipa_size
         run: echo "size=$(wc -c < PokeRogueOffline.ipa)" >> $GITHUB_OUTPUT
 
-      - name: Update AltStore source
-        if: ${{ steps.gate.outputs.is_release == 'true' }}
-        env:
-          APP_VERSION: ${{ steps.version.outputs.version }}
-          BUILD_NUMBER: ${{ steps.build.outputs.number }}
-          IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
-        run: node scripts/update-altstore-source.js
-
-      - name: Commit updated repo.json
-        if: ${{ steps.gate.outputs.is_release == 'true' }}
-        run: |
-          git config user.name "ScooomBot"
-          git config user.email "scooombot@scooom.xyz"
-          git add docs/repo.json
-          git commit -m "Update AltStore source for v${{ steps.version.outputs.version }}"
-          git push
-
       # -----------------------------------------------------------------------
-      # GitHub Pages (pokerogue-offline.github.io) is now served from the
-      # `seed` branch, not `main` — but repo.json's iconURL/website fields and
-      # the AltStore source URL baked into shipped builds still point at that
-      # Pages host. Mirror the freshly-updated repo.json + appIcon.png there
-      # so AltStore/SideStore keep resolving correctly. `main`'s docs/repo.json
-      # remains the source of truth for version history; this just copies it.
+      # repo.json (the AltStore source) lives permanently on the `seed`
+      # branch now — GitHub Pages (pokerogue-offline.github.io) serves from
+      # `seed`, and that's the URL baked into shipped builds' AltStore source
+      # and repo.json's own iconURL/website fields. `main` no longer carries
+      # a copy, so check out `seed` and update its repo.json directly.
+      # appIcon.png is also re-copied from `main` in case the icon changed.
       # -----------------------------------------------------------------------
       - name: Checkout seed branch
         if: ${{ steps.gate.outputs.is_release == 'true' }}
@@ -505,10 +488,18 @@ jobs:
           ref: seed
           path: seed-branch
 
-      - name: Sync AltStore source to seed branch
+      - name: Update AltStore source on seed branch
+        if: ${{ steps.gate.outputs.is_release == 'true' }}
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.build.outputs.number }}
+          IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
+          REPO_JSON_PATH: seed-branch/docs/repo.json
+        run: node scripts/update-altstore-source.js
+
+      - name: Commit AltStore source to seed branch
         if: ${{ steps.gate.outputs.is_release == 'true' }}
         run: |
-          cp docs/repo.json seed-branch/docs/repo.json
           cp docs/appIcon.png seed-branch/docs/appIcon.png
           cd seed-branch
           git config user.name "ScooomBot"
