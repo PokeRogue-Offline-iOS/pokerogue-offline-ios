@@ -473,23 +473,41 @@ jobs:
         id: ipa_size
         run: echo "size=$(wc -c < PokeRogueOffline.ipa)" >> $GITHUB_OUTPUT
 
-      - name: Update AltStore source
+      # -----------------------------------------------------------------------
+      # repo.json (the AltStore source) lives permanently on the `seed`
+      # branch now — GitHub Pages (pokerogue-offline.github.io) serves from
+      # `seed`, and that's the URL baked into shipped builds' AltStore source
+      # and repo.json's own iconURL/website fields. `main` no longer carries
+      # a copy, so check out `seed` and update its repo.json directly.
+      # appIcon.png is also re-copied from `main` in case the icon changed.
+      # -----------------------------------------------------------------------
+      - name: Checkout seed branch
+        if: ${{ steps.gate.outputs.is_release == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          ref: seed
+          path: seed-branch
+
+      - name: Update AltStore source on seed branch
         if: ${{ steps.gate.outputs.is_release == 'true' }}
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ steps.build.outputs.number }}
           IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
+          REPO_JSON_PATH: seed-branch/docs/repo.json
         run: node scripts/update-altstore-source.js
 
-      - name: Commit updated repo.json
+      - name: Commit AltStore source to seed branch
         if: ${{ steps.gate.outputs.is_release == 'true' }}
         run: |
+          cp docs/appIcon.png seed-branch/docs/appIcon.png
+          cd seed-branch
           git config user.name "ScooomBot"
           git config user.email "scooombot@scooom.xyz"
-          git add docs/repo.json
-          git commit -m "Update AltStore source for v${{ steps.version.outputs.version }}"
+          git add docs/repo.json docs/appIcon.png
+          git diff --staged --quiet || git commit -m "Update AltStore source for v${{ steps.version.outputs.version }}"
           git push
-               
+
   # -----------------------------------------------------------------------
   # Runs only if the release job is cancelled. Finds any in-progress or
   # queued runs of the build workflows and cancels them.

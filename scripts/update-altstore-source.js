@@ -15,7 +15,9 @@ if (!version || !buildNumber) {
   process.exit(1);
 }
 
-const sourcePath = path.join(__dirname, '../docs/repo.json');
+const sourcePath = process.env.REPO_JSON_PATH
+  ? path.resolve(process.env.REPO_JSON_PATH)
+  : path.join(__dirname, '../docs/repo.json');
 const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
 
 if (!Array.isArray(source.apps) || source.apps.length === 0) {
