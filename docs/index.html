@@ -715,24 +715,24 @@
         <p class="feature-desc">Saves persist between sessions, stored entirely on your device.</p>
       </div>
       <div class="feature-card highlight reveal">
-        <span class="feature-icon">🔓</span>
-        <p class="feature-title">Unlock Everything <span class="new-tag">New</span></p>
-        <p class="feature-desc">Instantly unlock all starters, forms, and progression via <strong>Manage Data</strong> — no save import needed.</p>
-      </div>
-      <div class="feature-card highlight reveal">
-        <span class="feature-icon">🎟️</span>
-        <p class="feature-title">Add Egg Vouchers <span class="new-tag">New</span></p>
-        <p class="feature-desc">Instantly add 99 of every egg voucher type via <strong>Manage Data</strong> — hatch as many eggs as you want.</p>
-      </div>
-      <div class="feature-card highlight reveal">
         <span class="feature-icon">🗑️</span>
-        <p class="feature-title">Reset Everything <span class="new-tag">New</span></p>
-        <p class="feature-desc">Wipe all local data with one tap in <strong>Manage Data</strong>. Use with caution.</p>
+        <p class="feature-title">Clear All Data</p>
+        <p class="feature-desc">Wipe all local save data with one tap via <strong>Settings → Offline</strong>. Use with caution.</p>
       </div>
       <div class="feature-card highlight reveal">
         <span class="feature-icon">📅</span>
         <p class="feature-title">Live Daily Seed <span class="new-tag">New</span></p>
         <p class="feature-desc">The <em>only</em> offline client that loads the actual server daily seed — including special event daily runs.</p>
+      </div>
+      <div class="feature-card highlight reveal">
+        <span class="feature-icon">☁️</span>
+        <p class="feature-title">Google Drive Backup <span class="new-tag">New</span></p>
+        <p class="feature-desc">Connect your Google account under <strong>Settings → Offline</strong> to back up and restore your save to a private Drive app folder — no manual file transfers needed.</p>
+      </div>
+      <div class="feature-card highlight reveal">
+        <span class="feature-icon">🎰</span>
+        <p class="feature-title">Gacha Calendar <span class="new-tag">New</span></p>
+        <p class="feature-desc">A new entry under <strong>Egg Gacha</strong> in the pause menu shows which species is boosted in the Legendary gacha for any day of the month.</p>
       </div>
       <div class="feature-card reveal">
         <span class="feature-icon">📦</span>
@@ -751,22 +751,6 @@
       </div>
     </div>
 
-    <div class="reveal" style="margin-top: 2.5rem;">
-      <p class="section-label" style="margin-bottom:0.6rem;">Applied Patches</p>
-      <p style="color:var(--text-dim); font-size:0.95rem; font-style:italic; margin-bottom:1rem;">
-        These upstream fixes are applied on top of the official game. Once accepted by the PokéRogue team, they'll be removed from the patch list automatically.
-      </p>
-      <div class="patches-list">
-        <div class="patch-item">
-          <span class="patch-pr"><a href="https://github.com/pagefaultgames/pokerogue/pull/7222" target="_blank">#7222</a></span>
-          <span>Fix for the file import screen on iOS</span>
-        </div>
-        <div class="patch-item">
-          <span class="patch-pr"><a href="https://github.com/pagefaultgames/pokerogue/pull/7223" target="_blank">#7223</a></span>
-          <span>Fix to prevent accidental screen zoom-in when tapping quickly</span>
-        </div>
-      </div>
-    </div>
   </section>
 
   <div class="divider"><span class="divider-icon">✦</span></div>
@@ -1057,7 +1041,7 @@ sudo apparmor_parser -r /etc/apparmor.d/pokerogue-offline</code>
     <div class="reveal">
       <p class="section-label">Save Data</p>
       <h2 class="section-title">Import Your Online Save</h2>
-      <p class="section-intro">Already have progress on pokerogue.net? Bring it into the app — or use Unlock Everything to start fresh.</p>
+      <p class="section-intro">Already have progress on pokerogue.net? Bring it into the app.</p>
     </div>
     <div class="install-card reveal">
       <div class="steps">
@@ -1067,8 +1051,25 @@ sudo apparmor_parser -r /etc/apparmor.d/pokerogue-offline</code>
           <div class="step-row"><span class="step-n">4</span><span>Navigate to <strong>Menu → Manage Data → Import Data</strong></span></div>
           <div class="step-row"><span class="step-n">5</span><span>Select the exported file — your save will load immediately</span></div>
           </div>
+    </div>
+
+    <div class="install-card reveal" style="margin-top:1.5rem;">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">☁️ Or Back Up to Google Drive</h3>
+        </div>
+        <span class="badge badge-recommended">New</span>
+      </div>
+      <p style="margin-bottom:1.25rem; color: var(--text-dim); font-size:0.97rem;">
+        Prefer not to shuttle files around? Connect a Google account from the in-game Settings menu and back up or restore your save straight from a private Drive app folder.
+      </p>
+      <div class="steps">
+        <div class="step-row"><span class="step-n">1</span><span>Open <strong>Settings → Offline</strong> (the tab next to General/Display/Audio)</span></div>
+        <div class="step-row"><span class="step-n">2</span><span>Tap <strong>Connect</strong> and sign in with Google</span></div>
+        <div class="step-row"><span class="step-n">3</span><span>Tap <strong>Backup Save</strong> to upload, or <strong>Restore Backup</strong> to pull it down on another device</span></div>
+      </div>
       <div class="card-note">
-        Alternatively, open <strong>Manage Data</strong> and tap <strong>Unlock Everything</strong> to instantly unlock all starters and forms without importing a save.
+        Only the app's own hidden Drive folder is used — see the <a href="privacy.html">Privacy Policy</a> for exactly what's accessed and how to revoke it.
       </div>
     </div>
   </section>
