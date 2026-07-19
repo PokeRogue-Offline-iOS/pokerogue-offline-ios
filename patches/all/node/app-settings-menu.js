@@ -6,6 +6,14 @@
  * General/Display/Audio/Gamepad/Keyboard), via NavigationManager's
  * documented extension point.
  *
+ * v6 of this patch. Changes from v5 (verified working):
+ *   - NEW "Non-Intrusive Update Notification" row — a genuine two-option
+ *     Setting (Off/On), same zero-custom-code shape as "Include Current
+ *     Run". Read by update-check.js's checkForOfflineUpdate() to decide
+ *     whether a detected update opens the full changelog screen (default)
+ *     or just sets a small "Update Available!" hint under the title
+ *     screen's version text.
+ *
  * v5 of this patch. Changes from v4 (verified working):
  *   - REMOVED entirely: "Debug: List AppData Files" (row, screen, UiMode,
  *     new file) and the local "Last Played" / "Battles" info rows.
@@ -253,6 +261,7 @@ if (settingsSrc.includes("SettingType.APP")) {
   Offline_Daily_Seed_Value: "OFFLINE_DAILY_SEED_VALUE",
   Offline_Daily_Seed_Fetched: "OFFLINE_DAILY_SEED_FETCHED",
   Offline_Daily_Seed_Expires: "OFFLINE_DAILY_SEED_EXPIRES",
+  Offline_Non_Intrusive_Update: "OFFLINE_NON_INTRUSIVE_UPDATE",
 };`,
   );
 
@@ -350,6 +359,16 @@ if (settingsSrc.includes("SettingType.APP")) {
     key: SettingKeys.Offline_Daily_Seed_Expires,
     label: "Daily Seed Expires",
     options: [{ value: "0", label: "—" }],
+    default: 0,
+    type: SettingType.APP,
+  },
+  {
+    key: SettingKeys.Offline_Non_Intrusive_Update,
+    label: "Non-Intrusive Update Notification",
+    options: [
+      { value: "0", label: "Off" },
+      { value: "1", label: "On" },
+    ],
     default: 0,
     type: SettingType.APP,
   },
