@@ -21,6 +21,7 @@ apply_patch "update-title-labels.js"  all
 
 apply_patch "app-settings-menu.js" all
 apply_patch "gacha-calendar.js"    all
+apply_patch "community-menu.js"    all
 
 apply_patch "update-available-screen.js" all
 
