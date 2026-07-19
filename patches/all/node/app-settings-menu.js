@@ -7,12 +7,13 @@
  * documented extension point.
  *
  * v6 of this patch. Changes from v5 (verified working):
- *   - NEW "Non-Intrusive Update Notification" row — a genuine two-option
- *     Setting (Off/On), same zero-custom-code shape as "Include Current
- *     Run". Read by update-check.js's checkForOfflineUpdate() to decide
- *     whether a detected update opens the full changelog screen (default)
- *     or just sets a small "Update Available!" hint under the title
- *     screen's version text.
+ *   - NEW "Update Pop-Ups" row — a genuine two-option Setting (Off/On,
+ *     default On), same zero-custom-code shape as "Include Current Run".
+ *     Read by update-check.js's checkForOfflineUpdate() to decide whether a
+ *     detected update also opens the full changelog screen automatically on
+ *     first launch. The small "Update Available!" hint under the title
+ *     screen's version text is unconditional - it always shows once an
+ *     update is found, regardless of this setting.
  *
  * v5 of this patch. Changes from v4 (verified working):
  *   - REMOVED entirely: "Debug: List AppData Files" (row, screen, UiMode,
@@ -261,7 +262,7 @@ if (settingsSrc.includes("SettingType.APP")) {
   Offline_Daily_Seed_Value: "OFFLINE_DAILY_SEED_VALUE",
   Offline_Daily_Seed_Fetched: "OFFLINE_DAILY_SEED_FETCHED",
   Offline_Daily_Seed_Expires: "OFFLINE_DAILY_SEED_EXPIRES",
-  Offline_Non_Intrusive_Update: "OFFLINE_NON_INTRUSIVE_UPDATE",
+  Offline_Update_Pop_Ups: "OFFLINE_UPDATE_POP_UPS",
 };`,
   );
 
@@ -363,13 +364,13 @@ if (settingsSrc.includes("SettingType.APP")) {
     type: SettingType.APP,
   },
   {
-    key: SettingKeys.Offline_Non_Intrusive_Update,
-    label: "Non-Intrusive Update Notification",
+    key: SettingKeys.Offline_Update_Pop_Ups,
+    label: "Update Pop-Ups",
     options: [
       { value: "0", label: "Off" },
       { value: "1", label: "On" },
     ],
-    default: 0,
+    default: 1,
     type: SettingType.APP,
   },
 ];`,

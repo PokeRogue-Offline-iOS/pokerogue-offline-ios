@@ -20,14 +20,17 @@
  * (OFFLINE_BUILD_NUMBER.includes("DEV")) - the actual "is there an update"
  * decision is version-based, not build-number-based (see update-check-api.ts).
  *
- * Also adds a small "Update Available!" hint label under the version text,
- * used INSTEAD of opening the full UPDATE_AVAILABLE screen when the
- * "Non-Intrusive Update Notification" setting (Offline tab, added by
- * app-settings-menu.js) is turned on. Reads it via SettingKeys, which is
- * upstream's own pre-existing settings module — no ordering dependency on
+ * Also adds a small "Update Available!" hint label under the version text.
+ * This ALWAYS shows whenever an update is found, regardless of any setting,
+ * and persists across return visits to the title screen within the same
+ * session (nothing ever clears it once set - checkForOfflineUpdate() itself
+ * only ever runs once per launch, per hasCheckedForUpdate below). The
+ * "Update Pop-Ups" setting (Offline tab, added by app-settings-menu.js)
+ * governs ONLY whether the full UPDATE_AVAILABLE changelog screen also pops
+ * up automatically on first launch - defaults to on (matching the original,
+ * pre-setting behavior). Reads it via SettingKeys, which is upstream's own
+ * pre-existing settings module — no ordering dependency on
  * app-settings-menu.js, which only appends more keys to that same object.
- * Default (setting off) behavior is unchanged: the full changelog screen
- * still opens.
  *
  * Targets: pokerogue-src/src/ui/handlers/title-ui-handler.ts
  *          pokerogue-src/src/system/offline/update-check-api.ts (new file)
@@ -132,16 +135,19 @@ const CONSTANTS_BLOCK =
   `// google-drive-backup.ts's includeCurrentRunEnabled() for the same reason -\n` +
   `// this runs before any UiHandler has necessarily read the settings blob\n` +
   `// itself, so it reads the shared "settings" localStorage entry directly.\n` +
-  `function nonIntrusiveUpdateNotificationEnabled(): boolean {\n` +
+  `// Absent key (never visited the Offline settings tab) falls back to the\n` +
+  `// Setting's own default of on, not to off.\n` +
+  `function updatePopUpsEnabled(): boolean {\n` +
   `  try {\n` +
   `    const raw = localStorage.getItem("settings");\n` +
   `    if (!raw) {\n` +
-  `      return false;\n` +
+  `      return true;\n` +
   `    }\n` +
   `    const parsed = JSON.parse(raw);\n` +
-  `    return parsed?.[SettingKeys.Offline_Non_Intrusive_Update] === 1;\n` +
+  `    const value = parsed?.[SettingKeys.Offline_Update_Pop_Ups];\n` +
+  `    return value === undefined ? true : value === 1;\n` +
   `  } catch {\n` +
-  `    return false;\n` +
+  `    return true;\n` +
   `  }\n` +
   `}\n` +
   `\n` +
@@ -156,9 +162,11 @@ const CONSTANTS_BLOCK =
   `      return;\n` +
   `    }\n` +
   `\n` +
-  `    if (nonIntrusiveUpdateNotificationEnabled()) {\n` +
-  `      hintText.setText("Update Available!");\n` +
-  `    } else {\n` +
+  `    // Always shown, independent of the setting below - persists across\n` +
+  `    // return visits to the title screen since nothing ever clears it.\n` +
+  `    hintText.setText("Update Available!");\n` +
+  `\n` +
+  `    if (updatePopUpsEnabled()) {\n` +
   `      globalScene.ui.setOverlayMode(UiMode.UPDATE_AVAILABLE, releases);\n` +
   `    }\n` +
   `  } catch {\n` +
@@ -204,8 +212,8 @@ requireAnchor(src, SETUP_ANCHOR, "appVersionText creation in title-ui-handler.ts
 src = src.replace(
   SETUP_ANCHOR,
   `${SETUP_ANCHOR}\n\n` +
-    `    // update-check: shown instead of the full changelog screen when\n` +
-    `    // "Non-Intrusive Update Notification" is enabled (Offline settings tab).\n` +
+    `    // update-check: always shown once an update is found, independent of\n` +
+    `    // the "Update Pop-Ups" setting (Offline settings tab).\n` +
     `    this.updateAvailableHintText = addTextObject(logoX - 60, logoHeight + 14, "", TextStyle.SUMMARY_GREEN, {\n` +
     `      fontSize: "54px",\n` +
     `    }).setOrigin();`,
