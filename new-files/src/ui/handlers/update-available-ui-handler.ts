@@ -15,8 +15,7 @@ import type BBCodeText from "phaser3-rex-plugins/plugins/gameobjects/tagtext/bbc
  * title-ui-handler.ts's update checker) when one or more app versions newer
  * than the one currently installed exist. Left/Right page through each
  * missing version in ascending order; Up/Down scroll that version's
- * changelog text, with auto-scroll that stops the moment either is pressed
- * and resumes (from the top) on the next page change.
+ * changelog text.
  */
 
 // wordWrap/mask geometry use "true" font pixels, unaffected by the text
@@ -25,9 +24,8 @@ import type BBCodeText from "phaser3-rex-plugins/plugins/gameobjects/tagtext/bbc
 const GLOBAL_SCALE = 6;
 
 const HEADER_H = 20;
-const VERSION_H = 13;
 const FOOTER_H = 20;
-const BODY_Y = HEADER_H + VERSION_H;
+const BODY_Y = HEADER_H;
 const BODY_H = 180 - BODY_Y - FOOTER_H;
 const FOOTER_Y = BODY_Y + BODY_H;
 
@@ -37,14 +35,11 @@ const SCROLLBAR_X = 320 - SCROLLBAR_W - 2;
 const BODY_WIDTH_PX = SCROLLBAR_X - BODY_X - 4;
 
 const SCROLL_STEP_PX = 16;
-const AUTO_SCROLL_TICK_MS = 50;
-const AUTO_SCROLL_PX_PER_TICK = 0.5;
 
 export class UpdateAvailableUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private titleText: Phaser.GameObjects.Text;
   private pagerText: Phaser.GameObjects.Text;
-  private versionText: Phaser.GameObjects.Text;
   private footerText: Phaser.GameObjects.Text;
   private bodyText: BBCodeText;
   private scrollBar: ScrollBar;
@@ -53,10 +48,7 @@ export class UpdateAvailableUiHandler extends UiHandler {
   private pageIndex = 0;
 
   private scrollY = 0;
-  private autoScrollEnabled = true;
   private contentHeight = 0;
-
-  private autoScrollTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super(UiMode.UPDATE_AVAILABLE);
@@ -87,9 +79,6 @@ export class UpdateAvailableUiHandler extends UiHandler {
       maxLines: 1,
     }).setOrigin(1, 0);
     this.container.add(this.pagerText);
-
-    this.versionText = addTextObject(4, HEADER_H + 2, "", TextStyle.WINDOW_ALT, { maxLines: 1 }).setOrigin(0);
-    this.container.add(this.versionText);
 
     this.bodyText = addBBCodeTextObject(BODY_X, BODY_Y, "", TextStyle.WINDOW, {
       wordWrap: { width: BODY_WIDTH_PX * GLOBAL_SCALE },
@@ -131,12 +120,12 @@ export class UpdateAvailableUiHandler extends UiHandler {
     return true;
   }
 
-  /** Renders the current page's version/changelog and resets scroll + auto-scroll, per spec. */
+  /** Renders the current page's version/changelog and resets scroll, per spec. */
   private renderPage(): void {
     const release = this.releases[this.pageIndex];
 
+    this.titleText.setText(`Update Available   v${release.version} (build ${release.buildNumber})`);
     this.pagerText.setText(this.releases.length > 1 ? `${this.pageIndex + 1} / ${this.releases.length}` : "");
-    this.versionText.setText(`v${release.version}  (build ${release.buildNumber})`);
     this.bodyText.setText(markdownToBBCode(release.changelog));
 
     const hints: string[] = ["↑↓ Scroll"];
@@ -147,14 +136,11 @@ export class UpdateAvailableUiHandler extends UiHandler {
     this.footerText.setText(hints.join("   "));
 
     this.scrollY = 0;
-    this.autoScrollEnabled = true;
     this.contentHeight = this.bodyText.displayHeight;
     this.applyScrollY();
 
     this.scrollBar.setTotalRows(Math.max(this.contentHeight, BODY_H));
     this.scrollBar.setScrollCursor(0);
-
-    this.resetAutoScrollTimer();
   }
 
   processInput(button: Button): boolean {
@@ -163,7 +149,6 @@ export class UpdateAvailableUiHandler extends UiHandler {
 
     switch (button) {
       case Button.CANCEL:
-        this.destroyAutoScrollTimer();
         ui.revertMode();
         success = true;
         break;
@@ -198,15 +183,11 @@ export class UpdateAvailableUiHandler extends UiHandler {
     return success;
   }
 
-  /** Manual scroll - disables auto-scroll for the remainder of this page, per spec. */
   private manualScroll(delta: number): boolean {
     const maxScroll = Math.max(0, this.contentHeight - BODY_H);
     if (maxScroll === 0) {
       return false;
     }
-
-    this.autoScrollEnabled = false;
-    this.destroyAutoScrollTimer();
 
     const newScrollY = Phaser.Math.Clamp(this.scrollY + delta, 0, maxScroll);
     if (newScrollY === this.scrollY) {
@@ -222,37 +203,8 @@ export class UpdateAvailableUiHandler extends UiHandler {
     this.scrollBar.setScrollCursor(this.scrollY);
   }
 
-  /** UiHandler has no per-frame update() hook, so auto-scroll drives itself off a Scene timer. */
-  private resetAutoScrollTimer(): void {
-    this.destroyAutoScrollTimer();
-    if (!this.autoScrollEnabled) {
-      return;
-    }
-
-    this.autoScrollTimer = globalScene.time.addEvent({
-      delay: AUTO_SCROLL_TICK_MS,
-      loop: true,
-      callback: () => {
-        const maxScroll = Math.max(0, this.contentHeight - BODY_H);
-        if (maxScroll === 0 || this.scrollY >= maxScroll) {
-          return;
-        }
-        this.scrollY = Math.min(this.scrollY + AUTO_SCROLL_PX_PER_TICK, maxScroll);
-        this.applyScrollY();
-      },
-    });
-  }
-
-  private destroyAutoScrollTimer(): void {
-    if (this.autoScrollTimer) {
-      this.autoScrollTimer.destroy();
-      this.autoScrollTimer = null;
-    }
-  }
-
   override clear(): void {
     super.clear();
     this.container.setVisible(false);
-    this.destroyAutoScrollTimer();
   }
 }
