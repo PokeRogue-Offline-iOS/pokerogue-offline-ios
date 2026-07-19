@@ -65,7 +65,11 @@ export class UpdateAvailableUiHandler extends UiHandler {
   setup(): void {
     const ui = this.getUi();
 
-    this.container = globalScene.add.container(0, 0).setVisible(false);
+    // Ui itself is positioned at (0, scaledCanvas.height) (see Ui's constructor), so any
+    // container added directly via ui.add(...) must start at -scaledCanvas.height to land
+    // back at world (0,0) - confirmed against AchvsUiHandler, a real shipped screen that's
+    // also in noTransitionModes, which uses the exact same offset for the same reason.
+    this.container = globalScene.add.container(0, -globalScene.scaledCanvas.height).setVisible(false);
     ui.add(this.container);
 
     const bg = globalScene.add
