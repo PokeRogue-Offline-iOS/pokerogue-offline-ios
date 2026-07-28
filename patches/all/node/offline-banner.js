@@ -7,7 +7,7 @@
  *
  * Changes to src/ui/handlers/title-ui-handler.ts:
  *   1. Adds `isApp` to the import from "#constants/app-constants"
- *   2. Appends " - Unofficial Offline Client (Scooom) Build #<N>" to the
+ *   2. Appends " - SilverShadow Offline Client | Build #<N>" to the
  *      version text when running as the Capacitor app (isApp === true).
  *
  * BUILD_NUMBER_PLACEHOLDER is substituted by the CI workflow via sed before
