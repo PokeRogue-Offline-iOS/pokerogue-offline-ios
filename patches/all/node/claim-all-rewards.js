@@ -757,43 +757,108 @@ import { commitPendingClaimAllReward } from "#system/offline/claim-all-rewards-s
 }
 
 if (!learnMoveSource.includes("commitPendingClaimAllReward()")) {
-  const tmAnchor = `      pokemon.usedTMs.push(this.moveId);
-      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");`;
+  const learnMoveSignature = "  async learnMove(";
+  const learnMoveStart = learnMoveSource.indexOf(learnMoveSignature);
 
-  const tmReplacement = `      pokemon.usedTMs.push(this.moveId);
-      if (
-        !activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE
-        || !commitPendingClaimAllReward()
-      ) {
-        globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
-      }`;
+  if (learnMoveStart < 0) {
+    fail("Could not find the LearnMovePhase.learnMove method.");
+  }
 
-  learnMoveSource = replaceRequired(
-    learnMoveSource,
-    tmAnchor,
-    tmReplacement,
-    "the successful TM reward cleanup",
+  const learnMoveBodyStart = learnMoveSource.indexOf("{", learnMoveStart);
+
+  if (learnMoveBodyStart < 0) {
+    fail("Could not find the LearnMovePhase.learnMove method body.");
+  }
+
+  let learnMoveBraceDepth = 0;
+  let learnMoveEnd = -1;
+
+  for (let index = learnMoveBodyStart; index < learnMoveSource.length; index++) {
+    if (learnMoveSource[index] === "{") {
+      learnMoveBraceDepth++;
+    } else if (learnMoveSource[index] === "}") {
+      learnMoveBraceDepth--;
+      if (learnMoveBraceDepth === 0) {
+        learnMoveEnd = index + 1;
+        break;
+      }
+    }
+  }
+
+  if (learnMoveEnd < 0) {
+    fail("Could not find the end of the LearnMovePhase.learnMove method.");
+  }
+
+  let learnMoveMethod = learnMoveSource.slice(learnMoveStart, learnMoveEnd);
+
+  const tmBranchStart = learnMoveMethod.indexOf(
+    "if (this.learnMoveType === LearnMoveType.TM)",
+  );
+  const memoryBranchStart = learnMoveMethod.indexOf(
+    "else if (this.learnMoveType === LearnMoveType.MEMORY)",
   );
 
-  const memoryAnchor = `      if (this.cost === -1) {
-        globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
-      } else {`;
+  if (tmBranchStart < 0 || memoryBranchStart < 0 || memoryBranchStart <= tmBranchStart) {
+    fail("Could not find the TM and Memory Mushroom success branches.");
+  }
 
-  const memoryReplacement = `      if (this.cost === -1) {
-        if (
-          !activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE
-          || !commitPendingClaimAllReward()
-        ) {
-          globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
-        }
-      } else {`;
+  let tmBranch = learnMoveMethod.slice(tmBranchStart, memoryBranchStart);
+  const cleanupPattern =
+    /^(\s*)globalScene\.phaseManager\.tryRemovePhase\("SelectModifierPhase"\);/m;
+  const tmCleanupMatch = tmBranch.match(cleanupPattern);
 
-  learnMoveSource = replaceRequired(
-    learnMoveSource,
-    memoryAnchor,
-    memoryReplacement,
-    "the successful free Memory Mushroom cleanup",
+  if (!tmCleanupMatch) {
+    fail("Could not find the successful TM reward cleanup call.");
+  }
+
+  const tmIndent = tmCleanupMatch[1];
+  const tmCleanupReplacement = `${tmIndent}if (
+${tmIndent}  !activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE
+${tmIndent}  || !commitPendingClaimAllReward()
+${tmIndent}) {
+${tmIndent}  globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+${tmIndent}}`;
+
+  tmBranch = tmBranch.replace(cleanupPattern, tmCleanupReplacement);
+
+  let memoryBranch = learnMoveMethod.slice(memoryBranchStart);
+  const freeMemoryStart = memoryBranch.indexOf("if (this.cost === -1)");
+
+  if (freeMemoryStart < 0) {
+    fail("Could not find the free Memory Mushroom branch.");
+  }
+
+  const memoryPrefix = memoryBranch.slice(0, freeMemoryStart);
+  let freeMemoryBranch = memoryBranch.slice(freeMemoryStart);
+  const memoryCleanupMatch = freeMemoryBranch.match(cleanupPattern);
+
+  if (!memoryCleanupMatch) {
+    fail("Could not find the successful free Memory Mushroom cleanup call.");
+  }
+
+  const memoryIndent = memoryCleanupMatch[1];
+  const memoryCleanupReplacement = `${memoryIndent}if (
+${memoryIndent}  !activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE
+${memoryIndent}  || !commitPendingClaimAllReward()
+${memoryIndent}) {
+${memoryIndent}  globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+${memoryIndent}}`;
+
+  freeMemoryBranch = freeMemoryBranch.replace(
+    cleanupPattern,
+    memoryCleanupReplacement,
   );
+  memoryBranch = memoryPrefix + freeMemoryBranch;
+
+  learnMoveMethod =
+    learnMoveMethod.slice(0, tmBranchStart)
+    + tmBranch
+    + memoryBranch;
+
+  learnMoveSource =
+    learnMoveSource.slice(0, learnMoveStart)
+    + learnMoveMethod
+    + learnMoveSource.slice(learnMoveEnd);
 }
 
 writeFile(learnMoveTarget, learnMoveSource);
