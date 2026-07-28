@@ -362,27 +362,41 @@ const generalSettingsPath = path.join(
 
 let generalSource = readFile(generalSettingsPath);
 
-generalSource = generalSource.replace(
-  '\nimport * as offlineBackup from "#system/offline/google-drive-backup";',
-  "",
-);
+const driveImport =
+  '\nimport * as offlineBackup from "#system/offline/google-drive-backup";';
 
-const prewarmMarker =
-  "\n\n  // app-settings-menu: prewarm";
-
-const prewarmStart = generalSource.indexOf(prewarmMarker);
-
-if (prewarmStart !== -1) {
-  const finalClassBrace = generalSource.lastIndexOf("\\n}");
-
-  if (finalClassBrace === -1) {
-    fail("Could not locate final class brace in settings-ui-handler.ts");
-  }
-
-  generalSource =
-    generalSource.slice(0, prewarmStart) +
-    generalSource.slice(finalClassBrace);
+if (!generalSource.includes(driveImport)) {
+  fail(
+    "Could not find the Google Drive import in settings-ui-handler.ts",
+  );
 }
+
+generalSource = generalSource.replace(driveImport, "");
+
+const prewarmBlock = `
+
+  // app-settings-menu: prewarm the Google Drive connection state whenever
+  // the Settings screen is opened (General is always the entry tab), so
+  // the Offline tab's row already reflects the resolved state instead of
+  // a "Checking…" flash if/when the player tabs over to it. No-op if
+  // already signed in this session.
+  override show(args: any[]): boolean {
+    const result = super.show(args);
+    if (!offlineBackup.isSignedIn()) {
+      offlineBackup.tryRestoreSession().catch(err => {
+        console.warn("Silent session restore failed:", err);
+      });
+    }
+    return result;
+  }`;
+
+if (!generalSource.includes(prewarmBlock)) {
+  fail(
+    "Could not find the Google Drive prewarm method in settings-ui-handler.ts",
+  );
+}
+
+generalSource = generalSource.replace(prewarmBlock, "");
 
 writeFile(generalSettingsPath, generalSource);
 
