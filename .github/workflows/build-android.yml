@@ -20,6 +20,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  SILVERSHADOW_VERSION: '1.0.1'
   
 concurrency:
   group: android-build-${{ github.ref }}
