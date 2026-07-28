@@ -265,6 +265,22 @@ import {
   );
 }
 
+if (!phaseSource.includes("  PersistentModifier,\n")) {
+  const modifierImportAnchor = `  PokemonHeldItemModifier,
+  TempExtraModifierModifier,`;
+
+  const modifierImportReplacement = `  PokemonHeldItemModifier,
+  PersistentModifier,
+  TempExtraModifierModifier,`;
+
+  phaseSource = replaceRequired(
+    phaseSource,
+    modifierImportAnchor,
+    modifierImportReplacement,
+    "the modifier class import block",
+  );
+}
+
 if (!phaseSource.includes("private claimedRewardIndices: Set<number>;")) {
   const fieldAnchor = `  private isCopy: boolean;
 
@@ -549,6 +565,12 @@ if (!phaseSource.includes("private completeClaimAllReward(")) {
 
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
 
+    // BattleScene.addModifier() reports immediate effect success for
+    // consumables. Persistent rewards such as Berries and X items can be
+    // added successfully while still returning false, so do not treat that
+    // return value as a failed reward claim.
+    const claimSucceeded = result || modifier instanceof PersistentModifier;
+
     // Preserve upstream retry behavior for ordinary TMs and Memory Mushrooms.
     if (!claimAllReward && isMoveSelectionModifier) {
       globalScene.phaseManager.unshiftPhase(this.copy());
@@ -578,7 +600,7 @@ if (!phaseSource.includes("private completeClaimAllReward(")) {
     }
 
     if (claimAllReward) {
-      if (!result) {
+      if (!claimSucceeded) {
         clearPendingClaimAllReward();
         globalScene.ui.playError();
         if (modifierSelectCallback) {
