@@ -363,12 +363,12 @@ const generalSettingsPath = path.join(
 let generalSource = readFile(generalSettingsPath);
 
 generalSource = generalSource.replace(
-  '\\nimport * as offlineBackup from "#system/offline/google-drive-backup";',
+  '\nimport * as offlineBackup from "#system/offline/google-drive-backup";',
   "",
 );
 
 const prewarmMarker =
-  "\\n\\n  // app-settings-menu: prewarm";
+  "\n\n  // app-settings-menu: prewarm";
 
 const prewarmStart = generalSource.indexOf(prewarmMarker);
 
