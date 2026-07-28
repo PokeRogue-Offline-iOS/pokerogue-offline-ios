@@ -340,10 +340,19 @@ if (!phaseSource.includes("clearPendingClaimAllReward();\n\n    if (!this.isPlay
 }
 
 if (!phaseSource.includes("this.claimedRewardIndices.size >= this.typeOptions.length")) {
-  const typeOptionsAnchor = `    this.typeOptions = this.getModifierTypeOptions(modifierCount);
-    const modifierSelectCallback = (rowCursor: number, cursor: number) => {`;
+  const typeOptionsPattern =
+    /(\n\s*this\.typeOptions\s*=\s*this\.getModifierTypeOptions\(\s*modifierCount\s*\);)/;
 
-  const typeOptionsReplacement = `    this.typeOptions = this.getModifierTypeOptions(modifierCount);
+  if (!typeOptionsPattern.test(phaseSource)) {
+    fail(
+      "Could not find the reward option assignment. "
+        + "The upstream PokéRogue source or an earlier SilverShadow patch may have changed.",
+    );
+  }
+
+  phaseSource = phaseSource.replace(
+    typeOptionsPattern,
+    `$1
 
     // A successful TM or Memory Mushroom can resume through one final copied
     // phase. End immediately when that success completed the whole reward set.
@@ -355,15 +364,7 @@ if (!phaseSource.includes("this.claimedRewardIndices.size >= this.typeOptions.le
       globalScene.ui.setMode(UiMode.MESSAGE);
       super.end();
       return;
-    }
-
-    const modifierSelectCallback = (rowCursor: number, cursor: number) => {`;
-
-  phaseSource = replaceRequired(
-    phaseSource,
-    typeOptionsAnchor,
-    typeOptionsReplacement,
-    "the reward option generation block",
+    }`,
   );
 }
 
