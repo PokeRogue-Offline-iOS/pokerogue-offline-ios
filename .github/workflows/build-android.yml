@@ -19,59 +19,111 @@ on:
         default: 'main'
 
 permissions:
-  contents: write
+  contents: read
+  
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
-      - name: Install pnpm
-        run: npm install -g pnpm
+        uses: actions/checkout@v6
 
       - name: Clone PokeRogue
-        run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+        run: |
+          git clone \
+            --recurse-submodules \
+            --shallow-submodules \
+            --depth 1 \
+            --branch "${{ inputs.branch || 'main' }}" \
+            https://github.com/pagefaultgames/pokerogue.git \
+            pokerogue-src
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          check-latest: false
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2
+          run_install: false
 
       - name: Get PokeRogue version
         id: pokerogue_version
         run: |
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Apply patches
-        run: bash ${{ github.workspace }}/scripts/apply-patches.sh android
+        run: |
+          bash "${{ github.workspace }}/scripts/apply-patches.sh" android
 
       - name: Inject build number into banner
         run: |
-          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          BUILD_NUM="${{ inputs.build_number || github.run_number }}"
+
           if [ "${{ inputs.dev }}" = "true" ]; then
-            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+            sed -i \
+              "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" \
+              pokerogue-src/src/ui/handlers/title-ui-handler.ts
           else
-            sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+            sed -i \
+              "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" \
+              pokerogue-src/src/ui/handlers/title-ui-handler.ts
           fi
 
-      - name: Install PokeRogue dependencies
-        working-directory: pokerogue-src
-        run: pnpm install
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: |
+          echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
-      - name: Install Capacitor
+      - name: Restore pnpm package cache
+        id: pnpm-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-node24-silver-android-v1-${{ hashFiles('pokerogue-src/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-node24-silver-android-v1-
+            ${{ runner.os }}-pnpm-node24-
+
+      - name: Add Capacitor dependencies to lockfile
         working-directory: pokerogue-src
         run: |
-            pnpm add @capacitor/core@8.4.1 @capacitor/cli@8.4.1 @capacitor/android@8.4.1 @capacitor/app@8.1.1 @capacitor/filesystem@8.1.2 @capacitor/share@8.0.1 @capacitor/status-bar@8.0.2
+          pnpm add \
+            --lockfile-only \
+            --save-exact \
+            @capacitor/core@8.4.1 \
+            @capacitor/cli@8.4.1 \
+            @capacitor/android@8.4.1 \
+            @capacitor/app@8.1.1 \
+            @capacitor/filesystem@8.1.2 \
+            @capacitor/share@8.0.1 \
+            @capacitor/status-bar@8.0.2
+
+      - name: Install all JavaScript dependencies
+        working-directory: pokerogue-src
+        run: |
+          pnpm install \
+            --frozen-lockfile \
+            --prefer-offline \
+            --reporter=append-only
+
+      - name: Save pnpm package cache
+        if: steps.pnpm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
@@ -86,18 +138,40 @@ jobs:
         working-directory: pokerogue-src
         env:
           VITE_BYPASS_LOGIN: '1'
-        run: pnpm build --mode app
+        run: pnpm build:app
 
       - name: Apply post-build patches
         run: bash ${{ github.workspace }}/scripts/apply-post-build-patches.sh android
-
+        
       - name: Add Android platform
         working-directory: pokerogue-src
-        run: npx cap add android
+        run: pnpm exec cap add android
 
       - name: Sync Capacitor
         working-directory: pokerogue-src
-        run: npx cap sync android
+        run: pnpm exec cap sync android
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          add-job-summary: on-failure
+
+      - name: Configure Gradle performance
+        run: |
+          mkdir -p "$HOME/.gradle"
+
+          cat >> "$HOME/.gradle/gradle.properties" <<'EOF'
+          org.gradle.caching=true
+          org.gradle.parallel=true
+          org.gradle.daemon=true
+          org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
+          EOF
 
       - name: Copy static MainActivity
         working-directory: pokerogue-src
@@ -123,8 +197,10 @@ jobs:
 
       - name: Copy app icon
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y imagemagick
+          if ! command -v convert >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends imagemagick
+          fi
 
           if [ "${{ inputs.dev }}" = "true" ]; then
             ICON_SRC="${{ github.workspace }}/docs/appIcon-dev.png"
@@ -185,11 +261,13 @@ jobs:
           mkdir -p ~/.android
           echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > ~/.android/debug.keystore
 
-      - name: Build release APK
+      - name: Build Android APK
         working-directory: pokerogue-src/android
         run: |
           ./gradlew assembleDebug \
-            -Pandroid.injected.signing.store.file=$HOME/.android/debug.keystore \
+            --build-cache \
+            --parallel \
+            -Pandroid.injected.signing.store.file="$HOME/.android/debug.keystore" \
             -Pandroid.injected.signing.store.password=android \
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
