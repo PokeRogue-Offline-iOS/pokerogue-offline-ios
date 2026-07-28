@@ -69,18 +69,30 @@ jobs:
         run: |
           bash "${{ github.workspace }}/scripts/apply-patches.sh" android
 
-      - name: Inject build number into banner
+      - name: Inject SilverShadow version into banner
         run: |
           BUILD_NUM="${{ inputs.build_number || github.run_number }}"
+          SILVER_VERSION="${{ env.SILVERSHADOW_VERSION }}"
+          BANNER_FILE="pokerogue-src/src/ui/handlers/title-ui-handler.ts"
+
+          sed -i \
+            "s|SILVERSHADOW_VERSION_PLACEHOLDER|${SILVER_VERSION}|g" \
+            "$BANNER_FILE"
 
           if [ "${{ inputs.dev }}" = "true" ]; then
             sed -i \
-              "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" \
-              pokerogue-src/src/ui/handlers/title-ui-handler.ts
+              "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUM} DEV|g" \
+              "$BANNER_FILE"
           else
             sed -i \
-              "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" \
-              pokerogue-src/src/ui/handlers/title-ui-handler.ts
+              "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUM}|g" \
+              "$BANNER_FILE"
+          fi
+
+          if grep -q "PLACEHOLDER" "$BANNER_FILE"; then
+            echo "::error::An unresolved banner placeholder remains."
+            grep "PLACEHOLDER" "$BANNER_FILE"
+            exit 1
           fi
 
       - name: Get pnpm store path
