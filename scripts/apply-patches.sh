@@ -12,7 +12,6 @@ PLATFORM="${1:-all}"
 source "$(dirname "$0")/patch-lib.sh"
 
 # ── All platforms ─────────────────────────────────────────────────────────────
-
 # Offline client modifications
 apply_patch "fix-daily-seed.js"       all
 apply_patch "offline-banner.js"       all
@@ -22,11 +21,11 @@ apply_patch "update-title-labels.js"  all
 apply_patch "app-settings-menu.js"          all
 apply_patch "remove-google-drive.js"        all
 apply_patch "sandbox-economy-settings.js"   all
+apply_patch "claim-all-rewards.js"          all
 apply_patch "gacha-calendar.js"             all
-apply_patch "community-menu.js"    all
+apply_patch "community-menu.js"             all
 
 apply_patch "update-available-screen.js" all
-
 # ── Mobile (iOS + Android) ────────────────────────────────────────────────────
 if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
 
@@ -35,7 +34,6 @@ if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
   apply_patch "export-fix.js"                mobile
   apply_patch "background-audio-pause.js"    mobile
 fi
-
 # ── Android only ──────────────────────────────────────────────────────────────
 if [[ "$PLATFORM" == "android" ]]; then
 
