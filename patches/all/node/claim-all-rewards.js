@@ -355,35 +355,6 @@ if (!phaseSource.includes("clearPendingClaimAllReward();\n\n    if (!this.isPlay
   );
 }
 
-if (!phaseSource.includes("this.claimedRewardIndices.size >= this.typeOptions.length")) {
-  const typeOptionsPattern =
-    /(\n\s*this\.typeOptions\s*=\s*this\.getModifierTypeOptions\(\s*modifierCount\s*\);)/;
-
-  if (!typeOptionsPattern.test(phaseSource)) {
-    fail(
-      "Could not find the reward option assignment. "
-        + "The upstream PokéRogue source or an earlier SilverShadow patch may have changed.",
-    );
-  }
-
-  phaseSource = phaseSource.replace(
-    typeOptionsPattern,
-    `$1
-
-    // A successful TM or Memory Mushroom can resume through one final copied
-    // phase. End immediately when that success completed the whole reward set.
-    if (
-      activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE
-      && this.claimedRewardIndices.size >= this.typeOptions.length
-    ) {
-      globalScene.ui.clearText();
-      globalScene.ui.setMode(UiMode.MESSAGE);
-      super.end();
-      return;
-    }`,
-  );
-}
-
 if (!phaseSource.includes("this.claimedRewardIndices.has(cursor)")) {
   const rewardMethodAnchor = `  // Pick a modifier from among the rewards and apply it
   private selectRewardModifierOption(cursor: number, modifierSelectCallback: ModifierSelectCallback): boolean {
@@ -523,8 +494,10 @@ if (!phaseSource.includes("private completeClaimAllReward(")) {
   }
 
   /**
-   * Finish a successfully claimed free reward and queue the same reward set
-   * again when unclaimed slots remain.
+   * Finish a successfully claimed free reward and reopen the same reward set.
+   *
+   * Even after every slot is claimed, keep the reward screen available so
+   * the player can reroll for a fresh set or leave manually.
    */
   private completeClaimAllReward(rewardIndex: number): void {
     const nextClaimedRewardIndices = new Set(this.claimedRewardIndices);
@@ -532,10 +505,9 @@ if (!phaseSource.includes("private completeClaimAllReward(")) {
 
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE);
-
-    if (nextClaimedRewardIndices.size < this.typeOptions.length) {
-      globalScene.phaseManager.unshiftPhase(this.copy(nextClaimedRewardIndices));
-    }
+    globalScene.phaseManager.unshiftPhase(
+      this.copy(nextClaimedRewardIndices),
+    );
 
     super.end();
   }
