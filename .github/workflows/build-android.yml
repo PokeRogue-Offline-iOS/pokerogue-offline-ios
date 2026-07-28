@@ -198,9 +198,9 @@ jobs:
         run: |
           UNSIGNED="pokerogue-src/android/app/build/outputs/apk/debug/app-debug.apk"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="PokeRogueOffline-dev.apk"
+            OUTPUT="PokeRogueSilverShadow-dev.apk"
           else
-            OUTPUT="PokeRogueOffline.apk"
+            OUTPUT="PokeRogueSilverShadow.apk"
           fi
           cp -v $UNSIGNED $OUTPUT
           echo "APK_NAME=$OUTPUT" >> $GITHUB_ENV
@@ -208,6 +208,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PokeRogueOffline-Android${{ inputs.dev && '-dev' || '' }}
+          name: PokeRogueSilverShadow-Android${{ inputs.dev && '-dev' || '' }}
           path: ${{ env.APK_NAME }}
           retention-days: 30
