@@ -1,6 +1,6 @@
 {
-  "appId": "xyz.scooom.pkrdev",
-  "appName": "PokéRogue Offline",
+  "appId": "com.silvershadow.pkrdev",
+  "appName": "PokéRogue SilverShadow Dev",
   "webDir": "dist",
   "android": {
     "backgroundColor": "#000000",
