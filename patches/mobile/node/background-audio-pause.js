@@ -1,86 +1,117 @@
 #!/usr/bin/env node
+
 /**
- * Patch: background-audio-pause.js
+ * Reliably pauses PokéRogue music whenever the native app becomes
+ * inactive, including when the Android screen is locked.
  *
- * Pauses music (BGM) when the app is backgrounded on iOS/Android, and resumes
- * it when the app returns to the foreground.
- *
- * Problem:
- *   The game sets `pauseOnBlur = false` so Phaser never auto-pauses audio.
- *   On desktop this is fine — the tab loses focus but the page stays visible.
- *   On mobile Capacitor builds, backgrounding the app fires the standard
- *   `visibilitychange` event (document.hidden = true) but audio keeps playing
- *   because nothing handles it.
- *
- * Solution:
- *   Listen for `visibilitychange` on the document and call
- *   `globalScene.pauseBgm()` / `globalScene.resumeBgm()` accordingly.
- *   These methods already exist in BattleScene and handle the isPlaying guard
- *   and resume-timer correctly, so we don't need to touch audio state directly.
- *   The listener is only registered on Capacitor native platforms — desktop/web
- *   behaviour is unchanged.
- *
- * Targets: pokerogue-src/src/main.ts
+ * Uses Capacitor's native appStateChange event, with browser visibility
+ * events retained as a fallback.
  */
 
 const fs = require("fs");
 const path = require("path");
 
-const TARGET = path.join("pokerogue-src", "src", "main.ts");
+const target = path.join(
+  "pokerogue-src",
+  "src",
+  "main.ts",
+);
 
-if (!fs.existsSync(TARGET)) {
-  console.error(`ERROR: Could not find target file: ${TARGET}`);
-  console.error("Make sure this script is run from the repo root.");
+function fail(message) {
+  console.error(`ERROR: ${message}`);
   process.exit(1);
 }
 
-let src = fs.readFileSync(TARGET, "utf8");
+if (!fs.existsSync(target)) {
+  fail(`Could not find ${target}`);
+}
 
-if (src.includes("background-audio-pause")) {
-  console.log("Background audio pause already present, skipping.");
+let source = fs
+  .readFileSync(target, "utf8")
+  .replace(/\r\n/g, "\n");
+
+if (source.includes("silvershadow-app-state-audio")) {
+  console.log("App-state audio handling already applied.");
   process.exit(0);
 }
 
-const ANCHOR = `  game.sound.pauseOnBlur = false;
+const importAnchor =
+  'import { isBeta, isDev } from "#constants/app-constants";';
+
+if (!source.includes(importAnchor)) {
+  fail("Could not find app-constants import in main.ts");
+}
+
+source = source.replace(
+  importAnchor,
+  `${importAnchor}
+import { globalScene } from "#app/global-scene";
+import { App } from "@capacitor/app";`,
+);
+
+const audioAnchor = `  game.sound.pauseOnBlur = false;
 }`;
 
-if (!src.includes(ANCHOR)) {
-  console.error("ERROR: Could not find anchor in main.ts.");
-  console.error("The file may have been updated upstream. Manual inspection required.");
-  process.exit(1);
+if (!source.includes(audioAnchor)) {
+  fail("Could not find pauseOnBlur configuration in main.ts");
 }
 
-// We need globalScene — add the import if it isn't already there
-if (!src.includes("from \"#app/global-scene\"") && !src.includes("from '#app/global-scene'")) {
-  src = src.replace(
-    `import { isBeta, isDev } from "#constants/app-constants";`,
-    `import { isBeta, isDev } from "#constants/app-constants";\nimport { globalScene } from "#app/global-scene";`
-  );
-}
+const audioReplacement = `  game.sound.pauseOnBlur = false;
 
-const INJECTION = `  game.sound.pauseOnBlur = false;
+  // silvershadow-app-state-audio
+  // Native lifecycle handling for Android/iOS, with browser events
+  // retained as a fallback.
+  const capacitor = (window as any).Capacitor;
 
-  // background-audio-pause: pause BGM when the app is backgrounded on mobile.
-  // Only active on Capacitor native platforms — desktop/web is unchanged.
-  const cap = (window as any).Capacitor;
-  if (cap?.isNativePlatform?.()) {
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) {
-        globalScene?.pauseBgm();
+  if (capacitor?.isNativePlatform?.()) {
+    let appAudioPaused = false;
+
+    const pauseAppAudio = () => {
+      if (appAudioPaused) {
+        return;
+      }
+
+      appAudioPaused = true;
+      globalScene?.pauseBgm();
+    };
+
+    const resumeAppAudio = () => {
+      if (!appAudioPaused) {
+        return;
+      }
+
+      appAudioPaused = false;
+      globalScene?.resumeBgm();
+    };
+
+    App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) {
+        resumeAppAudio();
       } else {
-        globalScene?.resumeBgm();
+        pauseAppAudio();
       }
     });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        pauseAppAudio();
+      } else {
+        resumeAppAudio();
+      }
+    });
+
+    window.addEventListener("pagehide", pauseAppAudio);
+    window.addEventListener("pageshow", resumeAppAudio);
   }
 }`;
 
-const patched = src.replace(ANCHOR, INJECTION);
+source = source.replace(
+  audioAnchor,
+  audioReplacement,
+);
 
-if (patched === src) {
-  console.error("ERROR: Replacement produced no change. Something went wrong.");
-  process.exit(1);
-}
+fs.writeFileSync(target, source, "utf8");
 
-fs.writeFileSync(TARGET, patched, "utf8");
-console.log(`Injected background audio pause into ${TARGET}`);
-console.log("Background audio pause applied successfully.");
+console.log(
+  "Added native foreground/background audio handling.",
+);
