@@ -1,3 +1,5 @@
+# Mod: Attempt to Add a Debug Menu
+
 # PokeRogueOffline
 
 A fully offline wrapper for PokéRogue, available on iOS, Android, Windows, and Linux. Play fully offline with local saves, or import your save from [pokerogue.net](https://pokerogue.net).
