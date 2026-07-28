@@ -20,6 +20,7 @@ apply_patch "update-check.js"         all
 apply_patch "update-title-labels.js"  all
 
 apply_patch "app-settings-menu.js"          all
+apply_patch "remove-google-drive.js"        all
 apply_patch "sandbox-economy-settings.js"   all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"    all
