@@ -151,6 +151,20 @@ jobs:
         working-directory: pokerogue-src
         run: pnpm exec cap sync android
 
+      - name: Add AndroidX WebKit dependency
+        working-directory: pokerogue-src
+        run: |
+          APP_GRADLE="android/app/build.gradle"
+
+          if ! grep -q 'androidx.webkit:webkit' "$APP_GRADLE"; then
+            sed -i \
+              '/^dependencies {/a\    implementation "androidx.webkit:webkit:1.14.0"' \
+              "$APP_GRADLE"
+          fi
+
+          echo "AndroidX WebKit dependency:"
+          grep 'androidx.webkit:webkit' "$APP_GRADLE"        
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
