@@ -463,38 +463,43 @@ if (!phaseSource.includes("rewardIndex?: number,")) {
 }
 
 if (!phaseSource.includes("private completeClaimAllReward(")) {
-  const applyModifierAnchor = `  /**
-   * Apply the effects of the chosen modifier
-   * @param modifier - The modifier to apply
-   * @param cost - The cost of the modifier if it was purchased, or -1 if selected as the modifier reward
-   * @param playSound - Whether the 'obtain modifier' sound should be played when adding the modifier.
-   */
-  private applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
-    const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
-    // Queue a copy of this phase when applying a TM or Memory Mushroom.
-    // If the player selects either of these, then escapes out of consuming them,
-    // they are returned to a shop in the same state.
-    if (modifier.type instanceof RememberMoveModifierType || modifier.type instanceof TmModifierType) {
-      globalScene.phaseManager.unshiftPhase(this.copy());
-    }
-    if (cost !== -1 && !(modifier.type instanceof RememberMoveModifierType)) {
-      if (result) {
-        if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
-          globalScene.money -= cost;
-          globalScene.updateMoneyText();
-          globalScene.animateMoneyChanged(false);
-        }
-        audioManager.playSound("se/buy");
-        (globalScene.ui.getHandler() as ModifierSelectUiHandler).updateCostText();
-      } else {
-        globalScene.ui.playError();
+  const methodSignature = "  private applyModifier(";
+  const methodStart = phaseSource.indexOf(methodSignature);
+
+  if (methodStart < 0) {
+    fail(
+      "Could not find the applyModifier method signature. "
+        + "The upstream PokéRogue source or an earlier SilverShadow patch may have changed.",
+    );
+  }
+
+  // Replace the method by structure instead of matching every line exactly.
+  // This tolerates upstream comment, spacing, and formatting changes.
+  const documentationStart = phaseSource.lastIndexOf("  /**", methodStart);
+  const bodyStart = phaseSource.indexOf("{", methodStart);
+
+  if (documentationStart < 0 || bodyStart < 0) {
+    fail("Could not locate the applyModifier documentation or method body.");
+  }
+
+  let braceDepth = 0;
+  let methodEnd = -1;
+
+  for (let index = bodyStart; index < phaseSource.length; index++) {
+    if (phaseSource[index] === "{") {
+      braceDepth++;
+    } else if (phaseSource[index] === "}") {
+      braceDepth--;
+      if (braceDepth === 0) {
+        methodEnd = index + 1;
+        break;
       }
-    } else {
-      globalScene.ui.clearText();
-      globalScene.ui.setMode(UiMode.MESSAGE);
-      super.end();
     }
-  }`;
+  }
+
+  if (methodEnd < 0) {
+    fail("Could not find the end of the applyModifier method.");
+  }
 
   const applyModifierReplacement = `  /** Mark one slot on a copied Claim All Rewards phase. */
   public markRewardClaimed(rewardIndex: number): void {
@@ -598,12 +603,10 @@ if (!phaseSource.includes("private completeClaimAllReward(")) {
     super.end();
   }`;
 
-  phaseSource = replaceRequired(
-    phaseSource,
-    applyModifierAnchor,
-    applyModifierReplacement,
-    "the modifier-application method",
-  );
+  phaseSource =
+    phaseSource.slice(0, documentationStart)
+    + applyModifierReplacement
+    + phaseSource.slice(methodEnd);
 }
 
 if (!phaseSource.includes("rewardIndex?: number,\n  ): void {\n    const party = globalScene.getPlayerParty();")) {
