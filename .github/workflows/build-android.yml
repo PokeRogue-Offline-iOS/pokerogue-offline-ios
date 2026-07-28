@@ -209,7 +209,7 @@ jobs:
           echo "Contents of ${MANIFEST}"
           cat $MANIFEST
 
-      - name: Copy app icon
+      - name: Generate Android launcher icons
         run: |
           if ! command -v convert >/dev/null 2>&1; then
             sudo apt-get update -qq
@@ -217,37 +217,65 @@ jobs:
           fi
 
           if [ "${{ inputs.dev }}" = "true" ]; then
-            ICON_SRC="${{ github.workspace }}/docs/appIcon-dev.png"
+            ICON_SRC="${{ github.workspace }}/configs/android/icon-dev.png"
           else
-            ICON_SRC="${{ github.workspace }}/docs/appIcon.png"
+            ICON_SRC="${{ github.workspace }}/configs/android/icon-main.png"
           fi
-          ICON_ADAPTIVE="${{ github.workspace }}/docs/appIcon-adaptive.png"
+
+          if [ ! -f "$ICON_SRC" ]; then
+            echo "::error::Launcher icon not found: $ICON_SRC"
+            exit 1
+          fi
+
           RES_DIR="pokerogue-src/android/app/src/main/res"
 
-          # Legacy icons
-          convert "$ICON_SRC" -resize 48x48   "$RES_DIR/mipmap-mdpi/ic_launcher.png"
-          convert "$ICON_SRC" -resize 72x72   "$RES_DIR/mipmap-hdpi/ic_launcher.png"
-          convert "$ICON_SRC" -resize 96x96   "$RES_DIR/mipmap-xhdpi/ic_launcher.png"
-          convert "$ICON_SRC" -resize 144x144 "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"
-          convert "$ICON_SRC" -resize 192x192 "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"
+          # density:legacy-size:adaptive-layer-size
+          ICON_SIZES=(
+            "mdpi:48:108"
+            "hdpi:72:162"
+            "xhdpi:96:216"
+            "xxhdpi:144:324"
+            "xxxhdpi:192:432"
+          )
 
-          cp "$RES_DIR/mipmap-mdpi/ic_launcher.png"    "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-hdpi/ic_launcher.png"    "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-xhdpi/ic_launcher.png"   "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"  "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
-          cp "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png" "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
+          for ICON_ENTRY in "${ICON_SIZES[@]}"; do
+            IFS=: read -r DENSITY LEGACY_SIZE ADAPTIVE_SIZE <<< "$ICON_ENTRY"
+            DEST_DIR="$RES_DIR/mipmap-$DENSITY"
 
-          # Foreground layers for adaptive icon (1.5x size)
-          convert "$ICON_ADAPTIVE" -resize 72x72   "$RES_DIR/mipmap-mdpi/ic_launcher_foreground.png"
-          convert "$ICON_ADAPTIVE" -resize 108x108 "$RES_DIR/mipmap-hdpi/ic_launcher_foreground.png"
-          convert "$ICON_ADAPTIVE" -resize 144x144 "$RES_DIR/mipmap-xhdpi/ic_launcher_foreground.png"
-          convert "$ICON_ADAPTIVE" -resize 216x216 "$RES_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
-          convert "$ICON_ADAPTIVE" -resize 288x288 "$RES_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
+            mkdir -p "$DEST_DIR"
 
-          # Adaptive icon XMLs - same image for both layers for full bleed
+            # Standard launcher icon.
+            convert "$ICON_SRC" \
+              -strip \
+              -filter Lanczos \
+              -resize "${LEGACY_SIZE}x${LEGACY_SIZE}!" \
+              "$DEST_DIR/ic_launcher.png"
+
+            # Round launcher fallback.
+            cp "$DEST_DIR/ic_launcher.png" \
+              "$DEST_DIR/ic_launcher_round.png"
+
+            # Android 8+ adaptive icon layer.
+            convert "$ICON_SRC" \
+              -strip \
+              -filter Lanczos \
+              -resize "${ADAPTIVE_SIZE}x${ADAPTIVE_SIZE}!" \
+              "$DEST_DIR/ic_launcher_foreground.png"
+          done
+
+          # Enable adaptive icons on Android 8.0 and newer.
           mkdir -p "$RES_DIR/mipmap-anydpi-v26"
-          cp ${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher.xml "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml"
-          cp ${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher_round.xml "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml"
+
+          cp \
+            "${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher.xml" \
+            "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml"
+
+          cp \
+            "${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher_round.xml" \
+            "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml"
+
+          echo "Generated launcher icons from: $ICON_SRC"
+          identify "$ICON_SRC"
 
       - name: Set version in build.gradle
         working-directory: pokerogue-src/android/app
