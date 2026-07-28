@@ -304,7 +304,12 @@ jobs:
           HOTFIX=$(echo "$VERSION" | cut -d. -f4)
 
           VERSION_CODE=$(( MINOR * 100000000 + PATCH * 1000000 + HOTFIX * 10000 + BUILD_NUM ))
-          VERSION_NAME="${VERSION}.${BUILD_NUM}"
+          SILVER_VERSION="${{ env.SILVERSHADOW_VERSION }}"
+          VERSION_NAME="${VERSION}.${BUILD_NUM}-${SILVER_VERSION}"
+
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            VERSION_NAME="${VERSION_NAME}-dev"
+          fi
 
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" build.gradle
           sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" build.gradle
