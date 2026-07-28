@@ -1,4 +1,4 @@
-package xyz.scooom.pkr;
+package com.silvershadow.pkr;
 
 import android.content.Intent;
 import android.os.Build;
