@@ -929,59 +929,86 @@ if (!uiSource.includes("const claimedRewardIndices = new Set<number>")) {
 }
 
 if (!uiSource.includes("markClaimed(): void")) {
-  const methodAnchor = `    if (this.modifierTypeOption.cost) {
-      this.itemCostText = addTextObject(0, 45, "", TextStyle.MONEY, {
-        align: "center",
-      });
+  const modifierOptionClassSignature =
+    "class ModifierOption extends Phaser.GameObjects.Container {";
+  const modifierOptionClassStart = uiSource.indexOf(
+    modifierOptionClassSignature,
+  );
 
-      this.itemCostText.setOrigin(0.5, 0);
-      this.itemCostText.setAlpha(0);
-      this.add(this.itemCostText);
+  if (modifierOptionClassStart < 0) {
+    fail("Could not find the ModifierOption class.");
+  }
 
-      this.updateCostText();
+  const setupSignature = "  setup() {";
+  const setupStart = uiSource.indexOf(
+    setupSignature,
+    modifierOptionClassStart,
+  );
+
+  if (setupStart < 0) {
+    fail("Could not find ModifierOption.setup().");
+  }
+
+  const setupBodyStart = uiSource.indexOf("{", setupStart);
+
+  if (setupBodyStart < 0) {
+    fail("Could not find the ModifierOption.setup() method body.");
+  }
+
+  let setupBraceDepth = 0;
+  let setupEnd = -1;
+
+  for (let index = setupBodyStart; index < uiSource.length; index++) {
+    if (uiSource[index] === "{") {
+      setupBraceDepth++;
+    } else if (uiSource[index] === "}") {
+      setupBraceDepth--;
+      if (setupBraceDepth === 0) {
+        setupEnd = index + 1;
+        break;
+      }
     }
   }
-  /**
-   * Start the tweens responsible for animating the option's appearance`;
 
-  const methodReplacement = `    if (this.modifierTypeOption.cost) {
-      this.itemCostText = addTextObject(0, 45, "", TextStyle.MONEY, {
-        align: "center",
-      });
-
-      this.itemCostText.setOrigin(0.5, 0);
-      this.itemCostText.setAlpha(0);
-      this.add(this.itemCostText);
-
-      this.updateCostText();
-    }
+  if (setupEnd < 0) {
+    fail("Could not find the end of ModifierOption.setup().");
   }
+
+  const markClaimedMethod = `
 
   markClaimed(): void {
     this.item.setTint(0x666666);
     this.itemText.setTint(0x777777);
     this.pb?.setTint(0x555555);
 
-    const claimedBackground = globalScene.add.rectangle(0, 62, 96, 18, 0x000000, 0.9);
+    const claimedBackground = globalScene.add.rectangle(
+      0,
+      62,
+      96,
+      18,
+      0x000000,
+      0.9,
+    );
     claimedBackground.setStrokeStyle(2, 0xff3030, 1);
     this.add(claimedBackground);
 
-    const claimedText = addTextObject(0, 56, "CLAIMED", TextStyle.PARTY_RED, {
-      align: "center",
-    });
+    const claimedText = addTextObject(
+      0,
+      56,
+      "CLAIMED",
+      TextStyle.PARTY_RED,
+      {
+        align: "center",
+      },
+    );
     claimedText.setOrigin(0.5, 0);
     this.add(claimedText);
-  }
+  }`;
 
-  /**
-   * Start the tweens responsible for animating the option's appearance`;
-
-  uiSource = replaceRequired(
-    uiSource,
-    methodAnchor,
-    methodReplacement,
-    "the ModifierOption setup method ending",
-  );
+  uiSource =
+    uiSource.slice(0, setupEnd)
+    + markClaimedMethod
+    + uiSource.slice(setupEnd);
 }
 
 writeFile(uiTarget, uiSource);
