@@ -69,7 +69,7 @@ if (!versionMatch) {
 const indent = versionMatch[1];
 const REPLACEMENT =
   `${indent}// offline-banner: append client label when running as Capacitor app.\n` +
-  `${indent}const appText = isApp ? " - SilverShadow Offline Client | Build #BUILD_NUMBER_PLACEHOLDER" : "";\n` +
+  `${indent}const appText = isApp ? " - SilverShadow vSILVERSHADOW_VERSION_PLACEHOLDER | Build #BUILD_NUMBER_PLACEHOLDER" : "";\n` +
   `${indent}this.appVersionText.setText("v" + version + betaText + appText);`;
 
 src = src.replace(versionMatch[0], REPLACEMENT);
