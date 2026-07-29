@@ -9,6 +9,7 @@ import {
   SWITCH_PLATFORM_VERSION,
 } from "./constants";
 import { appendLog } from "./logger";
+import { showWebGlFatalScreen } from "./fatal-screen";
 
 interface RequiredFile {
   path: string;
@@ -237,6 +238,11 @@ export function runCanvasDiagnostics(): CanvasDiagnostics {
 }
 
 export function showFatalError(error: unknown): void {
+  const global = globalThis as any;
+  if (global.__SILVERSHADOW_FATAL_ERROR_ACTIVE__) {
+    return;
+  }
+  global.__SILVERSHADOW_FATAL_ERROR_ACTIVE__ = true;
   const normalized = error instanceof Error ? error : new Error(String(error));
   const diagnostics = {
     startupStage: currentStage,
@@ -260,7 +266,22 @@ export function showFatalError(error: unknown): void {
   };
   appendLog("ERROR", "Fatal startup failure", diagnostics);
 
-  if (Boolean((globalThis as any).__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__)) {
+  if (Boolean(global.__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__)) {
+    try {
+      if (
+        showWebGlFatalScreen({
+          stage: currentStage,
+          name: normalized.name,
+          message: normalized.message,
+          resource: requestedResource,
+          logPath: LOG_PATH,
+        })
+      ) {
+        return;
+      }
+    } catch (renderError) {
+      appendLog("ERROR", "Unable to render WebGL fatal screen", renderError);
+    }
     console.error("SilverShadow PokeRogue could not start.");
     console.error(`Stage: ${currentStage}`);
     console.error(`${normalized.name}: ${normalized.message}`);

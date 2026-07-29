@@ -267,6 +267,7 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
         const global = globalThis as any;
         const firstAcquisition = !global.__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__;
         global.__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__ = true;
+        global.__SILVERSHADOW_WEBGL2_CONTEXT__ = context;
         global.__SILVERSHADOW_WEBGL_CONTEXT__ = {
           requested: requestedKind,
           provided: nativeKind,

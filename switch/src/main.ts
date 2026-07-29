@@ -1,6 +1,7 @@
 import { GAME_ROOT, LOG_PATH, NXJS_VERSION, PHASER_VERSION } from "./constants";
 import { appendLog } from "./logger";
 import { installPersistentStorage } from "./storage";
+import { installXmlHttpRequestShim } from "./xhr-shim";
 import {
   runCanvasDiagnostics,
   setRequestedResource,
@@ -20,6 +21,7 @@ addEventListener("error", (event: any) => {
     line: event.lineno ?? null,
     column: event.colno ?? null,
   });
+  showFatalError(event.error ?? new Error(event.message || "Unknown global error"));
 });
 addEventListener("unhandledrejection", (event: any) => {
   appendLog("ERROR", "Unhandled promise rejection", {
@@ -27,6 +29,7 @@ addEventListener("unhandledrejection", (event: any) => {
     message: event.reason?.message ?? String(event.reason),
     stack: event.reason?.stack ?? null,
   });
+  showFatalError(event.reason);
 });
 
 async function boot(): Promise<void> {
@@ -53,6 +56,7 @@ async function boot(): Promise<void> {
   installLocationShim();
   installPersistentStorage();
   installOfflineFetch();
+  installXmlHttpRequestShim();
   installFontFaceShim();
   installFonts();
   setStartupStage("compatibility-shims-installed", {

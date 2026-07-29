@@ -133,11 +133,13 @@ Implemented compatibility behavior:
   select the bundled MP4 assets;
 - fixed local `location`;
 - root-relative, relative, `sdmc:`, and `file:` mapping to `game/`;
+- fetch-backed asynchronous `XMLHttpRequest` for Phaser's asset loader;
 - explicit rejection and diagnostics for remote/unsupported/out-of-root URLs;
 - external `emerald` and `pkmnems` font loading;
 - recoverable SD-card-backed localStorage;
 - in-memory sessionStorage;
-- full staged error reporting.
+- full staged error reporting, including a WebGL text overlay after Phaser owns
+  the physical screen.
 
 Deliberately deferred until a log requires them:
 
