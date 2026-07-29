@@ -2,11 +2,13 @@
 
 ## Status
 
-This branch implements Milestone 0 and a hardware-validated Milestone 1 proof
-of concept. A minimal Phaser 3.90.0 Canvas scene, local PNG loading, animation,
-and handheld controller input run successfully on the tested Switch OLED
-configuration. This result does not claim that PokéRogue, Phaser WebGL, audio,
-storage, or lifecycle behavior works on Switch.
+This branch implements Milestone 0, a hardware-validated Milestone 1 proof of
+concept, and a code-verified Milestone 2 real-game bootstrap package. A minimal
+Phaser 3.90.0 Canvas scene, local PNG loading, animation, and handheld
+controller input run successfully on the tested Switch OLED configuration.
+Milestone 2 packages the actual SilverShadow-patched PokéRogue `1.12.0.10`
+build, but has not yet been run on hardware. This does not claim that the real
+game, Phaser WebGL, audio, saves, or lifecycle behavior works on Switch.
 
 The final architecture remains a direct nx.js NRO. It does not use the Android
 APK, Nintendo WebApplet, a browser applet, a local HTTP server, or Nintendo's
@@ -163,6 +165,117 @@ docs/
   SWITCH_NXJS_COMPATIBILITY.md
 ```
 
+## Milestone 2 architecture
+
+The selected source remains commit
+`0d94c5bbbc7a4fc67014c480e31dab1cfdf7ceb4`, version `1.12.0.10`. Its asset and
+locale gitlinks are pinned to `909b43612324622608023b3beb2f24f4ef159c1d`
+and `c2f9c794ce17f1445d14357a4995353447e9df55`.
+
+The build now:
+
+1. Validates or populates a reusable bare upstream object database.
+2. Creates or resets a detached worktree at the exact commit.
+3. Restores checksum-validated immutable asset/locale archives.
+4. Applies the existing `patches/all` layer, followed by one assertion-backed
+   `patches/switch` source patch.
+5. Uses exact pnpm `10.33.2`, a persistent store, `pnpm fetch`, and a frozen
+   offline install.
+6. Runs the real `vite build --mode app`.
+7. Overlays the complete external asset and locale trees.
+8. Preserves Vite's original hashed output and creates one additional
+   `switch-entry.js` from the actual module/chunk graph.
+9. Packages the native bootstrap in a fat NRO and the game beside it.
+10. Writes schema-2 metadata/checksums and rejects proof-of-concept-only
+    packages.
+
+The consolidated entry has no remaining JavaScript imports. It is evaluated as
+an async function because the real entry contains top-level await. This avoids
+assuming that nx.js can parse `index.html` or dynamically import arbitrary
+SD-card ESM chunks. Original Vite files remain present for provenance and
+diagnosis.
+
+The only Switch source patch supplies Phaser with the physical nx.js `screen`
+canvas, enables Phaser's custom-environment path, injects the Switch build
+label, and records two bootstrap markers. It does not force Canvas rendering or
+remove the game's WebGL/custom pipeline behavior.
+
+## Runtime startup and offline policy
+
+The NRO records these stages:
+
+1. `native-bootstrap`
+2. `directories-resolved`
+3. `logging-initialized`
+4. `manifest-opened`
+5. `package-version-validated`
+6. `required-files-checked`
+7. `compatibility-shims-installed`
+8. `compiled-entry-resolved`
+9. `compiled-entry-evaluated`
+10. `phaser-startup-reached`
+11. `pokerogue-bootstrap-started`
+12. `title-screen-or-first-blocker`
+
+Schema 2 verifies important file sizes and SHA-256 values before evaluation.
+The runtime maps build-relative, root-relative, `sdmc:`, and `file:` asset
+requests into the external game root. It allows `data:`, `blob:`, and embedded
+`romfs:` resources, blocks HTTP(S), WebSocket, protocol-relative, unsupported,
+and out-of-root requests, and logs the URL plus an origin stack. It does not
+turn local file loads into a blanket fetch rejection.
+
+The deliberately narrow compatibility layer provides the Milestone 1 DOM and
+screen-canvas behavior, location, local fetch mapping, external fonts,
+in-memory session storage, and persistent local storage. It does not
+speculatively implement IndexedDB, workers, service workers, Rex InputText,
+software keyboard, or a generalized browser.
+
+## Save path and format
+
+The local save root is:
+
+```text
+sdmc:/switch/SilverShadow-PokeRogue/saves/
+```
+
+Milestone 2 provides a `localStorage`-compatible JSON document at
+`local-storage.json`. Values remain strings and unknown keys are preserved.
+Every mutation writes `local-storage.tmp.json`, rotates the valid primary to
+`local-storage.backup.json`, and renames the temporary file into place. Reads
+do not write. If the primary is invalid, the backup is used. Ordinary package
+installation merges the saves directory and never migrates or clears it.
+
+## Package metadata
+
+`game/manifest.json` includes package kind, schema/platform versions,
+SilverShadow and upstream versions/commits, exact nx.js/Phaser/pnpm versions,
+actual and expected Node versions, timestamp, shared/Switch/build-script
+hashes, compiled-input hash, original and controlled entry points, evaluation
+mode, required directories/files and their important checksums, offline
+policy, and active shims.
+
+`SHA256SUMS.txt` covers the NRO, manifest, version metadata, and controlled
+entry. The verifier also checks the ZIP central directory, ensures exactly one
+correctly placed NRO, requires the real compiled JavaScript and critical asset
+trees, and rejects Milestone 1 indicators and cache leakage.
+
+## Code-verified versus hardware-verified
+
+Code-verified in Milestone 2:
+
+- the exact real upstream/SilverShadow build completes;
+- 14,273 JSON assets are processed;
+- Vite output is converted to an 8.8 MB no-import controlled entry;
+- the external package includes compiled code, images, audio, fonts, locales,
+  and data;
+- the fat NRO, 610 MB-class ZIP, manifest, and checksums verify;
+- exact-key compiled reuse works.
+
+Hardware-verified remains limited to the Milestone 1 results above. The first
+real Milestone 2 compatibility blocker is not known until the new package is
+run on a Switch and `logs/milestone2.log` is returned. Do not infer title-screen
+or gameplay success from desktop build verification.
+
 ## Next milestones
 
 The returned Milestone 1 log confirms:
@@ -178,7 +291,7 @@ Boot with Wi-Fi disabled and the missing-game-folder error path remain
 unverified Milestone 1 checks. They should be completed alongside, but do not
 block starting, the first Milestone 2 integration work.
 
-Milestone 2 will then build the patched PokéRogue source, create a local URL
-resolver for Vite chunks and assets, disable API/update code, and attempt the
-title screen. WebGL is a separate proof gate; Canvas success alone is not
-enough.
+The next action is the Milestone 2 hardware run. Fix only the first logged
+compatibility blocker. Likely proof gates remain async-function evaluation,
+Phaser WebGL2/custom pipelines, DOM container behavior, image/audio loaders,
+memory use, and controller mapping. Canvas success alone is not enough.

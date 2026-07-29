@@ -112,3 +112,42 @@ Current result:
 - [x] A-button input changes scene state.
 - [ ] Wi-Fi-off boot succeeds.
 - [ ] Missing-game-folder error is readable and logged.
+
+## Milestone 2 real-game bootstrap
+
+Milestone 2 is code-verified but not hardware-verified. The actual
+SilverShadow-patched PokéRogue `1.12.0.10` Vite graph is packaged externally
+and consolidated into `game/switch-entry.js` without unresolved JavaScript
+imports. The NRO validates schema-2 metadata and hashes, installs the narrow
+compatibility layer, reads that external entry, and evaluates it as an async
+function.
+
+Implemented compatibility behavior:
+
+- Milestone 1 DOM and nx.js screen-canvas adaptation;
+- a source-level Phaser `canvas: globalThis.screen` handoff;
+- fixed local `location`;
+- root-relative, relative, `sdmc:`, and `file:` mapping to `game/`;
+- explicit rejection and diagnostics for remote/unsupported/out-of-root URLs;
+- external `emerald` and `pkmnems` font loading;
+- recoverable SD-card-backed localStorage;
+- in-memory sessionStorage;
+- full staged error reporting.
+
+Deliberately deferred until a log requires them:
+
+- IndexedDB;
+- workers and service workers;
+- native software keyboard and Rex InputText replacement;
+- broad HTML form emulation;
+- save import/export file picker behavior;
+- renderer or shader substitutions;
+- audio lifecycle work.
+
+Unknown first hardware blocker:
+
+- The package has not yet executed the real external entry on a Switch.
+- Desktop verification cannot prove nx.js async-function evaluation, WebGL,
+  custom Phaser pipelines, GPU memory, or title-screen reach.
+- The authoritative next result is the last stage and full stack in
+  `logs/milestone2.log`.

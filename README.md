@@ -105,14 +105,18 @@ The main and development builds contain the same gameplay changes but use separa
 
 ## Nintendo Switch (Experimental)
 
-This repository includes an experimental nx.js V8 / Phaser 3 proof of concept.
-It is currently Milestone 1 and is not yet a playable PokéRogue port. Existing
-Android builds are unaffected.
+This repository includes an experimental nx.js V8 Nintendo Switch port.
+Milestone 1 is hardware-validated. Milestone 2 builds and packages the real
+SilverShadow-patched PokéRogue `1.12.0.10` web application and attempts its
+bootstrap from external SD-card files. It is not yet a playable PokéRogue port.
+Existing Android builds are unaffected.
 
 The proof of concept uses exactly `@nx.js/runtime@1.0.0-beta.6`,
 `@nx.js/nro@1.0.0-beta.6`, and Phaser `3.90.0`, with fat/self-contained NRO
-packaging. Detailed architecture, runtime compatibility findings, and hardware
-test instructions are in [`docs/SWITCH_PORT.md`](docs/SWITCH_PORT.md),
+packaging. The real-game build is pinned to upstream commit
+`0d94c5bbbc7a4fc67014c480e31dab1cfdf7ceb4`. Detailed architecture, cache
+behavior, runtime compatibility findings, and hardware test instructions are
+in [`docs/SWITCH_PORT.md`](docs/SWITCH_PORT.md),
 [`docs/SWITCH_NXJS_COMPATIBILITY.md`](docs/SWITCH_NXJS_COMPATIBILITY.md), and
 [`docs/SWITCH_INSTALL.md`](docs/SWITCH_INSTALL.md).
 
