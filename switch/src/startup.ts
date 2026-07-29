@@ -168,8 +168,8 @@ export function showFatalError(error: unknown): void {
     context.fillText("SilverShadow PokeRogue could not start.", 64, 100);
     context.fillStyle = "#ffffff";
     context.font = "26px system-ui";
-    context.fillText("The required game files are missing or incompatible.", 64, 165);
-    context.fillText("Reinstall the complete Switch release package.", 64, 205);
+    context.fillText("Milestone 1 startup did not complete.", 64, 165);
+    context.fillText("Review the error below and return the hardware log.", 64, 205);
     context.fillStyle = "#ffc8d5";
     context.font = "20px system-ui";
     const lines = wrapText(context, message, SCREEN_WIDTH - 128);

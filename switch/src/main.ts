@@ -63,8 +63,7 @@ async function boot(): Promise<void> {
 
   // Phaser is deliberately evaluated only after startup validation and the
   // Canvas regression checks, so missing external files get a readable error.
-  const phaserModule = await import("phaser");
-  const Phaser = phaserModule.default;
+  const Phaser = await import("phaser");
   appendLog("INFO", "Phaser module evaluated", Phaser.VERSION);
 
   class ProofScene extends Phaser.Scene {
