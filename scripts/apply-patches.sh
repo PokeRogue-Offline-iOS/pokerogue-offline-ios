@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-# apply-patches.sh — pre-build patches
+# apply-patches.sh - pre-build patches
 #
 # Usage:
 #   ./apply-patches.sh            # all platforms (default)
@@ -12,7 +12,7 @@ PLATFORM="${1:-all}"
 
 source "$(dirname "$0")/patch-lib.sh"
 
-# ── All platforms ─────────────────────────────────────────────────────────────
+# --- All platforms ------------------------------------------------------------
 # Offline client modifications
 apply_patch "fix-daily-seed.js"       all
 apply_patch "offline-banner.js"       all
@@ -29,7 +29,7 @@ apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all
 
 apply_patch "update-available-screen.js" all
-# ── Mobile (iOS + Android) ────────────────────────────────────────────────────
+# --- Mobile (iOS + Android) ---------------------------------------------------
 if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
 
   # Targeted Patches
@@ -37,18 +37,18 @@ if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
   apply_patch "export-fix.js"                mobile
   apply_patch "background-audio-pause.js"    mobile
 fi
-# ── Android only ──────────────────────────────────────────────────────────────
+# --- Android only -------------------------------------------------------------
 if [[ "$PLATFORM" == "android" ]]; then
 
   apply_patch "fix-android-image-paths.js"  android
 
 fi
 
-# â”€â”€ Switch only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --- Switch only --------------------------------------------------------------
 if [[ "$PLATFORM" == "switch" ]]; then
 
-  # Milestone 1 tests Phaser independently. Add source-level PokéRogue
-  # compatibility patches here once Milestone 2 identifies exact blockers.
+  # Milestone 1 requires no Switch-specific PokeRogue source patches. This
+  # block is reserved for future compatibility patches.
   :
 
 fi

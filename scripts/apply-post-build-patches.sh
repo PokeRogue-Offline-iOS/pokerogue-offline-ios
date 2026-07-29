@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-# apply-post-build-patches.sh — post-build patches (run after pnpm build, targeting dist/)
+# apply-post-build-patches.sh - post-build patches (run after pnpm build, targeting dist/)
 #
 # Usage:
 #   ./apply-post-build-patches.sh            # all platforms (default)
@@ -12,7 +12,7 @@ PLATFORM="${1:-all}"
 
 source "$(dirname "$0")/patch-lib.sh"
 
-# ── Mobile (iOS + Android) ────────────────────────────────────────────────────
+# --- Mobile (iOS + Android) ---------------------------------------------------
 if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
 
   apply_patch "notch-fix.js"           mobile
@@ -21,6 +21,7 @@ if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
 
 fi
 
+# --- Switch only --------------------------------------------------------------
 if [[ "$PLATFORM" == "switch" ]]; then
 
   # Switch patches belong at source level before compilation. This hook remains
