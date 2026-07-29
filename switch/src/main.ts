@@ -61,6 +61,7 @@ async function boot(): Promise<void> {
   installAudioListenerShim();
   installFontFaceShim();
   installFonts();
+  logFontMetrics();
   setStartupStage("compatibility-shims-installed", {
     active: manifest.compatibilityShims,
   });
@@ -282,6 +283,53 @@ function installFonts(): void {
       path,
       bytes: data.byteLength,
       status: face.status,
+    });
+  }
+}
+
+function logFontMetrics(): void {
+  try {
+    const canvas = new OffscreenCanvas(512, 128);
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Could not create a 2D canvas context");
+    }
+    context.textBaseline = "alphabetic";
+    context.fillStyle = "#ffffff";
+
+    for (const family of ["emerald", "pkmnems"]) {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.font = `48px ${family}`;
+      const sample = "Agjpqy0123";
+      const metrics = context.measureText(sample);
+      context.fillText(sample, 8, 88);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let firstPixelY = canvas.height;
+      let lastPixelY = -1;
+      for (let y = 0; y < canvas.height; y++) {
+        const rowStart = y * canvas.width * 4;
+        for (let x = 0; x < canvas.width; x++) {
+          if (pixels[rowStart + x * 4 + 3] !== 0) {
+            firstPixelY = Math.min(firstPixelY, y);
+            lastPixelY = Math.max(lastPixelY, y);
+          }
+        }
+      }
+      appendLog("INFO", "Font metrics diagnostic", {
+        family,
+        font: context.font,
+        width: metrics.width,
+        actualBoundingBoxAscent: metrics.actualBoundingBoxAscent,
+        actualBoundingBoxDescent: metrics.actualBoundingBoxDescent,
+        fontBoundingBoxAscent: metrics.fontBoundingBoxAscent,
+        fontBoundingBoxDescent: metrics.fontBoundingBoxDescent,
+        firstPixelY: firstPixelY === canvas.height ? null : firstPixelY,
+        lastPixelY: lastPixelY < 0 ? null : lastPixelY,
+      });
+    }
+  } catch (error) {
+    appendLog("WARN", "Font metrics diagnostic failed", {
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 }

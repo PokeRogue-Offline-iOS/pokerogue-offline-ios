@@ -131,6 +131,9 @@ Implemented compatibility behavior:
 - a narrow `webgl`/`experimental-webgl` context alias to nx.js `webgl2`,
   validated through Phaser game creation and PokéRogue asset preloading on
   real hardware;
+- logical 1920x1080 default-framebuffer viewport and scissor scaling to the
+  physical 1280x720 nx.js screen while leaving offscreen render targets at
+  their requested dimensions;
 - nx.js `Video` format capability and element-method adaptation so Phaser can
   select the bundled MP4 assets;
 - fixed local `location`;
@@ -154,10 +157,13 @@ Deliberately deferred until a log requires them:
 - renderer or shader substitutions;
 - audio lifecycle work.
 
-Unknown first hardware blocker:
+Current hardware result:
 
-- The package has not yet executed the real external entry on a Switch.
-- Desktop verification cannot prove nx.js async-function evaluation, WebGL,
-  custom Phaser pipelines, GPU memory, or title-screen reach.
-- The authoritative next result is the last stage and full stack in
-  the newest `logs/milestone2-*.log`.
+- The real external entry reaches starter selection on a Switch OLED in
+  handheld mode.
+- Phaser WebGL2 renders game assets and D-pad, A, and B input work.
+- The first visible display defect is a logical 1920x1080 viewport being
+  clipped to the bottom-left of the physical 1280x720 framebuffer.
+- Text generated through Phaser Canvas textures is visibly damaged; a bounded
+  font-metrics diagnostic records the next evidence without changing text
+  behavior.

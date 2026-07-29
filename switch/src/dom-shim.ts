@@ -204,6 +204,75 @@ function collectElementsByTagName(roots: any[], requestedTagName: string): any[]
   return matches;
 }
 
+function installDefaultFramebufferScale(context: any): void {
+  if (context.__silverShadowDefaultFramebufferScaleInstalled) {
+    return;
+  }
+  context.__silverShadowDefaultFramebufferScaleInstalled = true;
+
+  const logicalWidth = 1920;
+  const logicalHeight = 1080;
+  const physicalWidth = Number(context.drawingBufferWidth);
+  const physicalHeight = Number(context.drawingBufferHeight);
+  if (
+    !Number.isFinite(physicalWidth) ||
+    !Number.isFinite(physicalHeight) ||
+    physicalWidth <= 0 ||
+    physicalHeight <= 0 ||
+    (physicalWidth === logicalWidth && physicalHeight === logicalHeight)
+  ) {
+    return;
+  }
+
+  const scaleX = physicalWidth / logicalWidth;
+  const scaleY = physicalHeight / logicalHeight;
+  let drawFramebuffer: unknown = null;
+  const nativeBindFramebuffer = context.bindFramebuffer.bind(context);
+  const nativeViewport = context.viewport.bind(context);
+  const nativeScissor = context.scissor.bind(context);
+
+  context.bindFramebuffer = (target: number, framebuffer: unknown) => {
+    if (target === context.FRAMEBUFFER || target === context.DRAW_FRAMEBUFFER) {
+      drawFramebuffer = framebuffer;
+    }
+    return nativeBindFramebuffer(target, framebuffer);
+  };
+  context.viewport = (x: number, y: number, width: number, height: number) => {
+    if (drawFramebuffer === null) {
+      return nativeViewport(
+        Math.round(x * scaleX),
+        Math.round(y * scaleY),
+        Math.round(width * scaleX),
+        Math.round(height * scaleY),
+      );
+    }
+    return nativeViewport(x, y, width, height);
+  };
+  context.scissor = (x: number, y: number, width: number, height: number) => {
+    if (drawFramebuffer === null) {
+      // Phaser converts its top-origin scissor coordinates with the physical
+      // drawingBufferHeight even though its logical render size is 1080. The
+      // offset term restores that logical bottom-origin before scaling.
+      return nativeScissor(
+        Math.round(x * scaleX),
+        Math.round(physicalHeight - (physicalHeight - y) * scaleY),
+        Math.round(width * scaleX),
+        Math.round(height * scaleY),
+      );
+    }
+    return nativeScissor(x, y, width, height);
+  };
+
+  appendLog("INFO", "Installed logical-to-physical default framebuffer scale", {
+    logicalWidth,
+    logicalHeight,
+    physicalWidth,
+    physicalHeight,
+    scaleX,
+    scaleY,
+  });
+}
+
 function elementStub(tagName: string): any {
   const attributes = new Map<string, string>();
   const element: any = {
@@ -395,6 +464,7 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
             provided: nativeKind,
           });
         }
+        installDefaultFramebufferScale(context);
       }
       safeSet(context, "canvas", target);
       if (!("imageSmoothingEnabled" in context)) {

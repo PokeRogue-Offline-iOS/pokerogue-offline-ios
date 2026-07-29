@@ -3,12 +3,14 @@
 ## Status
 
 This branch implements Milestone 0, a hardware-validated Milestone 1 proof of
-concept, and a code-verified Milestone 2 real-game bootstrap package. A minimal
-Phaser 3.90.0 Canvas scene, local PNG loading, animation, and handheld
+concept, and a hardware-tested Milestone 2 real-game bootstrap package. A
+minimal Phaser 3.90.0 Canvas scene, local PNG loading, animation, and handheld
 controller input run successfully on the tested Switch OLED configuration.
-Milestone 2 packages the actual SilverShadow-patched PokéRogue `1.12.0.10`
-build, but has not yet been run on hardware. This does not claim that the real
-game, Phaser WebGL, audio, saves, or lifecycle behavior works on Switch.
+The actual SilverShadow-patched PokéRogue `1.12.0.10` build now reaches the
+starter-selection UI on hardware with D-pad, A, and B input working. The
+returned screenshots expose a logical 1920x1080 versus physical 1280x720
+default-framebuffer mismatch and damaged text rendering. Audio, saves, and
+lifecycle behavior remain unverified.
 
 The final architecture remains a direct nx.js NRO. It does not use the Android
 APK, Nintendo WebApplet, a browser applet, a local HTTP server, or Nintendo's
