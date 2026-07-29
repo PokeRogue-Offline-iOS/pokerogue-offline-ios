@@ -173,6 +173,57 @@ function patchImage(image: any): any {
   return image;
 }
 
+function patchVideo(video: any): any {
+  const target = video as any;
+  if (target.__silverShadowPatched) {
+    return video;
+  }
+  safeSet(target, "__silverShadowPatched", true);
+  safeSet(target, "style", makeStyle());
+  safeSet(target, "parentNode", null);
+  safeSet(target, "parentElement", null);
+  safeSet(target, "nodeName", "VIDEO");
+  safeSet(target, "tagName", "VIDEO");
+  safeSet(target, "nodeType", 1);
+
+  if (typeof target.canPlayType !== "function") {
+    safeSet(target, "canPlayType", (mimeType: string) => {
+      const type = String(mimeType).toLowerCase();
+      if (
+        type.startsWith("video/mp4") ||
+        type.startsWith("video/x-m4v") ||
+        type.startsWith("video/webm") ||
+        type.startsWith("video/ogg")
+      ) {
+        return "probably";
+      }
+      return "";
+    });
+  }
+
+  const attributes = new Map<string, string>();
+  if (typeof target.setAttribute !== "function") {
+    safeSet(target, "setAttribute", (name: string, value: string) => {
+      attributes.set(String(name).toLowerCase(), String(value));
+    });
+  }
+  if (typeof target.getAttribute !== "function") {
+    safeSet(target, "getAttribute", (name: string) => {
+      return attributes.get(String(name).toLowerCase()) ?? null;
+    });
+  }
+  if (typeof target.removeAttribute !== "function") {
+    safeSet(target, "removeAttribute", (name: string) => {
+      attributes.delete(String(name).toLowerCase());
+    });
+  }
+  if (typeof target.hasChildNodes !== "function") {
+    safeSet(target, "hasChildNodes", () => false);
+  }
+
+  return video;
+}
+
 export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement {
   const target = canvas as any;
   if (target.__silverShadowPatched) {
@@ -380,7 +431,7 @@ export function installDomShim(): void {
       return new Audio();
     }
     if (tag === "video" && global.Video) {
-      return new global.Video();
+      return patchVideo(new global.Video());
     }
     return elementStub(tag);
   },
