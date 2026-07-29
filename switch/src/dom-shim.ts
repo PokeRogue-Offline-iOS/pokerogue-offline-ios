@@ -204,80 +204,6 @@ function collectElementsByTagName(roots: any[], requestedTagName: string): any[]
   return matches;
 }
 
-function installWebGlActivityProbe(context: any): void {
-  const global = globalThis as any;
-  if (global.__silverShadowWebGlActivityProbeInstalled) {
-    return;
-  }
-  global.__silverShadowWebGlActivityProbeInstalled = true;
-  const stats = {
-    clearCalls: 0,
-    drawArraysCalls: 0,
-    drawElementsCalls: 0,
-    useProgramCalls: 0,
-    textureUploads: 0,
-    lastClearColor: null as number[] | null,
-    lastViewport: null as number[] | null,
-    instrumentedMethods: [] as string[],
-  };
-
-  const wrap = (
-    name: string,
-    before: (args: unknown[]) => void,
-  ): void => {
-    const nativeMethod = context[name];
-    if (typeof nativeMethod !== "function") {
-      return;
-    }
-    const bound = nativeMethod.bind(context);
-    const replacement = (...args: unknown[]) => {
-      before(args);
-      return bound(...args);
-    };
-    try {
-      context[name] = replacement;
-      if (context[name] === replacement) {
-        stats.instrumentedMethods.push(name);
-      }
-    } catch {
-      // Host WebGL methods may be read-only in future nx.js builds.
-    }
-  };
-
-  wrap("clear", () => {
-    stats.clearCalls++;
-  });
-  wrap("drawArrays", () => {
-    stats.drawArraysCalls++;
-  });
-  wrap("drawElements", () => {
-    stats.drawElementsCalls++;
-  });
-  wrap("useProgram", () => {
-    stats.useProgramCalls++;
-  });
-  wrap("texImage2D", () => {
-    stats.textureUploads++;
-  });
-  wrap("clearColor", args => {
-    stats.lastClearColor = args.slice(0, 4).map(Number);
-  });
-  wrap("viewport", args => {
-    stats.lastViewport = args.slice(0, 4).map(Number);
-  });
-
-  for (const delayMs of [5_000, 15_000, 30_000]) {
-    setTimeout(() => {
-      appendLog("INFO", "GPU activity probe", {
-        elapsedMs: delayMs,
-        drawingBufferWidth: Number(context.drawingBufferWidth ?? 0),
-        drawingBufferHeight: Number(context.drawingBufferHeight ?? 0),
-        ...stats,
-      });
-    }, delayMs);
-  }
-}
-
 function elementStub(tagName: string): any {
   const attributes = new Map<string, string>();
   const element: any = {
@@ -291,6 +217,7 @@ function elementStub(tagName: string): any {
     nodeName: tagName.toUpperCase(),
     tagName: tagName.toUpperCase(),
     nodeType: 1,
+    dataset: {},
     parentNode: null,
     parentElement: null,
     childNodes: [],
@@ -467,7 +394,6 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
             requested: requestedKind,
             provided: nativeKind,
           });
-          installWebGlActivityProbe(context);
         }
       }
       safeSet(context, "canvas", target);

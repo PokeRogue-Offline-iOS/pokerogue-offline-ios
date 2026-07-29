@@ -125,7 +125,8 @@ function.
 Implemented compatibility behavior:
 
 - Milestone 1 DOM and nx.js screen-canvas adaptation, including stateful
-  `classList` and CSS custom-property operations used by PokéRogue settings;
+  `classList`, CSS custom-property, and `dataset` operations used by PokéRogue
+  settings and UI-mode transitions;
 - a source-level Phaser `canvas: globalThis.screen` handoff;
 - a narrow `webgl`/`experimental-webgl` context alias to nx.js `webgl2`,
   validated through Phaser game creation and PokéRogue asset preloading on
@@ -142,8 +143,6 @@ Implemented compatibility behavior:
 - recoverable SD-card-backed localStorage;
 - in-memory sessionStorage;
 - full staged file error reporting after Phaser owns the physical screen.
-- bounded GPU activity counters at 5, 15, and 30 seconds for diagnosing a
-  silent black screen without altering game assets or renderer configuration.
 
 Deliberately deferred until a log requires them:
 
