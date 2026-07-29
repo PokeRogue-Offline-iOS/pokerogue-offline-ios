@@ -3,14 +3,18 @@
 ## Status
 
 This branch implements Milestone 0, a hardware-validated Milestone 1 proof of
-concept, and a hardware-tested Milestone 2 real-game bootstrap package. A
-minimal Phaser 3.90.0 Canvas scene, local PNG loading, animation, and handheld
-controller input run successfully on the tested Switch OLED configuration.
-The actual SilverShadow-patched PokéRogue `1.12.0.10` build now reaches the
-starter-selection UI on hardware with D-pad, A, and B input working. The
-returned screenshots expose a logical 1920x1080 versus physical 1280x720
-default-framebuffer mismatch and damaged text rendering. Audio, saves, and
-lifecycle behavior remain unverified.
+concept, and a hardware-tested Milestone 2 real-game package. The port entered
+Alpha on 2026-07-29 after the real SilverShadow-patched PokéRogue `1.12.0.10`
+build reached sustained gameplay on a Switch OLED. The title screen, starter
+selection, battles, rewards, Pokédex, readable text, attached-controller input,
+and save/session persistence have been observed.
+
+It is not a stable port. Audio is silent, move animations can use Phaser's
+missing-texture placeholder, cold boot shows a black screen for roughly 35-44
+seconds, controller prompts are not Switch-specific, and Plus caused one
+native crash during a rival battle. The authoritative evidence, resolved
+blockers, known bugs, and next investigation order are in
+[`SWITCH_ALPHA_STATUS.md`](SWITCH_ALPHA_STATUS.md).
 
 The final architecture remains a direct nx.js NRO. It does not use the Android
 APK, Nintendo WebApplet, a browser applet, a local HTTP server, or Nintendo's
@@ -273,27 +277,38 @@ Code-verified in Milestone 2:
 - the fat NRO, 610 MB-class ZIP, manifest, and checksums verify;
 - exact-key compiled reuse works.
 
-Hardware-verified remains limited to the Milestone 1 results above. The first
-real Milestone 2 compatibility blocker is not known until the new package is
-run on a Switch and the newest `logs/milestone2-*.log` is returned. Do not infer title-screen
-or gameplay success from desktop build verification.
+Hardware-verified in the Alpha baseline:
+
+- the real compiled entry evaluates and Phaser creates the WebGL game;
+- the title screen and starter selection render at the correct 1280x720
+  output size;
+- D-pad and Nintendo A/B behavior work on attached controls;
+- readable text renders across title, Pokédex, party, battle, and reward UIs;
+- a new run can battle, catch a Pokémon, select a reward, and advance;
+- Pokédex and active-session data persist after HOME and relaunch;
+- Continue Run restores the session and advances to the next battle;
+- existing custom cheat/sandbox behavior was reported working after a long
+  reload.
+
+These claims apply only to the returned Switch OLED handheld evidence. See
+`SWITCH_ALPHA_STATUS.md` for limitations and unverified configurations.
 
 ## Next milestones
 
-The returned Milestone 1 log confirms:
+The next branch should begin from the merged Alpha baseline and keep the
+hardware-driven, one-blocker-at-a-time workflow.
 
-- exact nx.js version and V8 startup;
-- both Canvas diagnostics;
-- Phaser module evaluation and scene `create()`;
-- external PNG decode through the Phaser loader;
-- visible tween/requestAnimationFrame behavior;
-- attached handheld controller A-button input.
+The immediate proof gates are:
 
-Boot with Wi-Fi disabled and the missing-game-folder error path remain
-unverified Milestone 1 checks. They should be completed alongside, but do not
-block starting, the first Milestone 2 integration work.
+1. distinguish the native Plus crash from post-reload memory pressure;
+2. log Phaser loader failures and stop move animations from using unregistered
+   texture keys;
+3. establish a minimized nx.js audio decode/playback result;
+4. add a low-risk loading indicator for the 35-44 second black startup;
+5. replace keyboard/Xbox controller prompts;
+6. complete Wi-Fi-off, docked, controller, suspend/resume, long-session,
+   software-keyboard, and deliberate error-path testing.
 
-The next action is the Milestone 2 hardware run. Fix only the first logged
-compatibility blocker. Likely proof gates remain async-function evaluation,
-Phaser WebGL2/custom pipelines, DOM container behavior, image/audio loaders,
-memory use, and controller mapping. Canvas success alone is not enough.
+Do not rename the internal `milestone2-real-game` schema or timestamped
+`milestone2-*.log` format as part of the maturity-label change. They identify
+the proven package generation and remain the Alpha baseline.

@@ -103,12 +103,18 @@ During each build, the workflow:
 
 The main and development builds contain the same gameplay changes but use separate Android package identities.
 
-## Nintendo Switch (Experimental)
+## Nintendo Switch Alpha
 
-This repository includes an experimental nx.js V8 Nintendo Switch port.
-Milestone 1 is hardware-validated. Milestone 2 builds and packages the real
-SilverShadow-patched PokéRogue `1.12.0.10` web application and attempts its
-bootstrap from external SD-card files. It is not yet a playable PokéRogue port.
+This repository includes an experimental nx.js V8 Nintendo Switch port. The
+real SilverShadow-patched PokéRogue `1.12.0.10` application now boots into
+gameplay on real Switch hardware. Starter selection, battles, catching,
+rewards, readable text, attached-controller input, Pokédex persistence, and
+active-session continuation have been observed.
+
+The port is **Alpha**, not a stable release. Audio is currently silent, battle
+effects can show Phaser's green/black missing-texture placeholder, startup can
+remain black for roughly 35-44 seconds, controller prompts are not
+Switch-specific, and Plus caused one native crash during a rival battle.
 Existing Android builds are unaffected.
 
 The proof of concept uses exactly `@nx.js/runtime@1.0.0-beta.6`,
@@ -118,7 +124,9 @@ packaging. The real-game build is pinned to upstream commit
 behavior, runtime compatibility findings, and hardware test instructions are
 in [`docs/SWITCH_PORT.md`](docs/SWITCH_PORT.md),
 [`docs/SWITCH_NXJS_COMPATIBILITY.md`](docs/SWITCH_NXJS_COMPATIBILITY.md), and
-[`docs/SWITCH_INSTALL.md`](docs/SWITCH_INSTALL.md).
+[`docs/SWITCH_INSTALL.md`](docs/SWITCH_INSTALL.md). The authoritative Alpha
+test record, resolved blockers, known bugs, and continuation plan are in
+[`docs/SWITCH_ALPHA_STATUS.md`](docs/SWITCH_ALPHA_STATUS.md).
 
 ## Save Data Warning
 

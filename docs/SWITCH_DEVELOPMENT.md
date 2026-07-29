@@ -157,5 +157,32 @@ sdmc:/switch/SilverShadow-PokeRogue/logs/milestone2-YYYYMMDDTHHMMSSmmmZ.log
 Each launch creates a new UTC-timestamped log. The log records explicit startup
 stages, local/blocked resource resolution,
 manifest and version information, full error stacks, active shims, requested
-paths, and memory information when available. Delete only the log between
-controlled test runs. Never delete `saves/`.
+paths, and memory information when available. Old logs do not need to be
+deleted between controlled test runs. Never delete `saves/`.
+
+## Alpha continuation workflow
+
+The 2026-07-29 Alpha evidence and next investigation order are recorded in
+`docs/SWITCH_ALPHA_STATUS.md`. Start continued troubleshooting from the merged
+`main` baseline on a new branch:
+
+```powershell
+git switch main
+git pull --ff-only origin main
+git switch -c fix/switch-alpha-runtime
+```
+
+Keep each hardware iteration narrow:
+
+1. Reproduce one failure and preserve the timestamped log and screenshot.
+2. Fix or instrument only that failure.
+3. Run `npm.cmd --prefix switch run check`.
+4. Build the fat NRO and run `npm.cmd --prefix switch run verify`.
+5. If external game files did not change, deliver only the changed NRO,
+   `game/manifest.json`, and `SHA256SUMS.txt`.
+6. Never overwrite or delete the tester's `saves/` directory.
+
+The first Alpha continuation should add memory snapshots and Phaser
+loader-error diagnostics. It should then reproduce the Plus crash without the
+preceding all-cheats reload and verify animation texture registration before
+changing renderer behavior.

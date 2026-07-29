@@ -6,7 +6,7 @@
   `patches/android`, and `patches/switch`. Shared SilverShadow behavior belongs
   in `all`; never move Android-only behavior into `switch`.
 - The authoritative Switch runtime is <https://github.com/TooTallNate/nx.js>.
-  Use published packages first. The tested Milestone 1 pin is
+  Use published packages first. The hardware-tested Alpha pin is
   `@nx.js/runtime` and `@nx.js/nro` `1.0.0-beta.6`; do not replace exact pins
   with `latest` or a range.
 - Switch releases must use `nxjs-nro --fat`, run without network access, and
@@ -17,11 +17,16 @@
 - Never claim Phaser, PokéRogue, controller, audio, save, suspend, or hardware
   compatibility without logs from a real Switch in title-override/application
   memory mode.
-- Milestone 1 commands:
+- Switch Alpha baseline commands:
   `npm --prefix switch ci`, `npm --prefix switch run check`,
   `npm --prefix switch run package`, and `npm --prefix switch run verify`.
 - Android source patch validation remains
   `bash scripts/apply-patches.sh android`; Switch source patch validation is
   `bash scripts/apply-patches.sh switch`.
-- Read `docs/SWITCH_PORT.md` and `docs/SWITCH_NXJS_COMPATIBILITY.md` before
-  expanding the port.
+- Read `docs/SWITCH_ALPHA_STATUS.md`, `docs/SWITCH_PORT.md`, and
+  `docs/SWITCH_NXJS_COMPATIBILITY.md` before expanding the port.
+- The Alpha maturity label does not change the proven internal
+  `milestone2-real-game` manifest schema or `milestone2-*.log` names. Treat any
+  rename as a separately tested migration.
+- For hardware hotfixes, provide only changed release files when possible and
+  never overwrite or remove the tester's `saves/` directory.

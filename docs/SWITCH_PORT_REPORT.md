@@ -1,11 +1,16 @@
-# Nintendo Switch Milestone 2 report
+# Nintendo Switch Milestone 2 and Alpha handoff report
 
 ## Summary
 
 Milestone 2 replaces the small release payload with the real
 SilverShadow-patched PokéRogue web build while retaining the hardware-proven
 nx.js bootstrap and diagnostics. The result is a hardware-testable, offline,
-SD-card-oriented package. It is not claimed playable.
+SD-card-oriented package. Hardware testing on 2026-07-29 advanced the port to
+Alpha: it now reaches battles, catches Pokémon, persists Pokédex/session data,
+and resumes a run. It is not claimed stable.
+
+The detailed hardware record is maintained in
+[`SWITCH_ALPHA_STATUS.md`](SWITCH_ALPHA_STATUS.md).
 
 ## Selected source
 
@@ -22,15 +27,18 @@ SD-card-oriented package. It is not claimed playable.
 
 ## Logical changes and commits
 
-The implementation is separated into logical local commits for:
+The branch history intentionally preserves the major implementation stages:
 
-1. persistent cache and real-game build integration;
-2. runtime loader, packaging, metadata, and verification;
-3. Milestone 2 documentation and hardware-test instructions;
-4. final measured build and validation results.
+1. `247e4cc` through `8458f20`: architecture, nx.js Phaser proof of concept,
+   patch hooks, and Milestone 1 hardware evidence.
+2. `22a1b01` through `2470757`: pinned real-game cache/build, external package
+   loader, verification, documentation, and measured build results.
+3. `0a697b6` through `77ba54b`: hardware-driven compatibility fixes for fonts,
+   unsupported regular expressions, timestamped logs, DOM APIs, WebGL2, video,
+   XHR asset loading, audio-listener startup, UI state, framebuffer scaling,
+   text metrics, Nintendo controls, Plus interception, and bitmap-font XML.
 
-Exact hashes and messages are included in the final local handoff because a
-commit cannot record its own final hash.
+The complete blocker-to-commit table is in `SWITCH_ALPHA_STATUS.md`.
 
 ## Build artifacts
 
@@ -144,24 +152,42 @@ Executed and passed:
 - `git diff --check`;
 - final clean branch/worktree confirmation.
 
-Requires real Switch hardware:
+Hardware-verified:
 
 - external async-function evaluation under nx.js;
-- the exact first real compatibility blocker;
-- Phaser WebGL and custom pipelines;
-- title screen;
-- image/audio decoding through the real loaders;
-- controller mappings;
-- persistent storage behavior across launches;
-- suspend/resume and long-session memory behavior.
+- Phaser WebGL2 game creation and real asset rendering;
+- title, starter selection, Pokédex, party, reward, and battle screens;
+- readable text and correct 1280x720 scaling;
+- attached-controller D-pad and Nintendo A/B behavior;
+- catching, reward progression, Pokédex persistence, active-session
+  persistence, and Continue Run.
+
+Still requires real Switch hardware:
+
+- working audio;
+- correct dynamic battle-animation textures;
+- safe Plus handling across scenes;
+- suspend/resume, controller reconnection, and long-session memory behavior;
+- docked and additional controller configurations;
+- save import/export and software-keyboard flows.
 
 ## Known blockers and risks
 
-No real runtime blocker is yet established because Milestone 2 has not run on
-hardware. The first returned failure must be treated as authoritative.
-Anticipated risk areas are WebGL2/Phaser renderer assumptions, Rex DOM plugins,
-the minimal DOM tree, audio lifecycle, decoded asset memory, controller
-mapping, and software-keyboard flows.
+The established Alpha defects are:
+
+- silent music and sound effects;
+- Phaser `__MISSING` textures in move animations despite local PNG requests;
+- approximately 35-44 seconds of black screen during cold boot;
+- keyboard/Xbox artwork in some controller prompts;
+- one native software crash after Plus during a rival battle, with no
+  JavaScript exception after the `beforeunload` interception;
+- unknown memory behavior after settings-driven in-process reloads;
+- unverified lifecycle, docked, alternate-controller, import/export, and
+  software-keyboard paths.
+
+The next branch should add memory and Phaser loader diagnostics before changing
+input or renderer behavior. See `SWITCH_ALPHA_STATUS.md` for the ordered path
+forward.
 
 The local Codex Windows sandbox cannot create the normal `%LOCALAPPDATA%`
 default cache because its execution account is ACL-isolated. Validation uses a

@@ -1,7 +1,9 @@
-# Switch Milestone 2 installation and hardware test
+# Switch Alpha installation and hardware test
 
-This package attempts the real SilverShadow PokéRogue bootstrap. It is
-experimental and is not claimed to be playable.
+This Alpha package boots the real SilverShadow PokéRogue application and has
+reached gameplay on a tested Switch OLED. It remains experimental: audio is
+silent, some move animations show missing textures, startup is slow, and Plus
+is not yet safe in every scene.
 
 ## Requirements
 
@@ -44,20 +46,24 @@ external beside it.
 ## Test procedure
 
 1. First boot with Wi-Fi disabled.
-2. Photograph the first stable screen or exact error screen.
-3. Leave the app running for at least 60 seconds if it reaches a rendered game
-   screen.
-4. Record whether the PokéRogue loading/title screen appears.
-5. Record visible animation and image/font correctness.
-6. Test attached handheld controls, then a Pro Controller if available.
-7. If audio starts, record whether music/effects decode and whether volume is
-   reasonable.
-8. Exit with HOME. Do not rely on an in-app `+` exit.
-9. Relaunch and report whether
-   `saves/local-storage.json` is preserved and the log appends.
-10. Temporarily rename `game` to `game-disabled`, relaunch, and confirm the
+2. Allow at least 60 seconds for the initial black loading period. The Alpha
+   baseline has taken approximately 35-44 seconds to show its first asset.
+3. Photograph the first stable screen or exact error screen.
+4. Record visible animation, image, text, and controller-prompt correctness.
+5. Test attached handheld controls, then a Pro Controller if available.
+6. Record whether music and sound effects are audible. Alpha hardware evidence
+   currently reports silence.
+7. Do not use Plus as the normal exit path. It opened the game menu in earlier
+   tests but caused one native crash during a rival battle. Exit with HOME.
+8. Relaunch and report whether `saves/local-storage.json`, Pokédex data, and
+   Continue Run are preserved.
+9. Continue the saved run and confirm it reaches the next interactive battle
+   screen rather than stopping at the session-loaded message.
+10. Record any black/green move-effect rectangles; these are currently
+    suspected missing animation textures.
+11. Temporarily rename `game` to `game-disabled`, relaunch, and confirm the
     error screen names the missing game folder and log path. Restore it.
-11. Restore `game`, temporarily rename `game/switch-entry.js`, relaunch, and
+12. Restore `game`, temporarily rename `game/switch-entry.js`, relaunch, and
     confirm the precise missing-file/checksum error. Restore it.
 
 ## Return evidence
@@ -75,6 +81,8 @@ Return:
 - free SD-card space before launch
 - SD-card filesystem and allocation-unit size if known
 - whether `local-storage.json` and its backup were created
+- cold-boot time to the first visible asset
+- whether audio, move effects, and Switch-specific button prompts worked
 - whether the game-folder and entry-file error tests were readable
 - any crash report or exception exactly as displayed
 - the last startup stage reached

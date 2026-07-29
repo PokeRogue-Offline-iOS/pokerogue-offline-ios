@@ -113,14 +113,15 @@ Current result:
 - [ ] Wi-Fi-off boot succeeds.
 - [ ] Missing-game-folder error is readable and logged.
 
-## Milestone 2 real-game bootstrap
+## Milestone 2 real-game bootstrap and Alpha baseline
 
-Milestone 2 is code-verified but not hardware-verified. The actual
-SilverShadow-patched PokéRogue `1.12.0.10` Vite graph is packaged externally
-and consolidated into `game/switch-entry.js` without unresolved JavaScript
-imports. The NRO validates schema-2 metadata and hashes, installs the narrow
-compatibility layer, reads that external entry, and evaluates it as an async
-function.
+Milestone 2 is code-verified and hardware-tested. The port entered Alpha on
+2026-07-29 after the actual SilverShadow-patched PokéRogue `1.12.0.10` Vite
+graph reached battles and persisted a run on real Switch hardware. The graph
+is packaged externally and consolidated into `game/switch-entry.js` without
+unresolved JavaScript imports. The NRO validates schema-2 metadata and hashes,
+installs the narrow compatibility layer, reads that external entry, and
+evaluates it as an async function.
 
 Implemented compatibility behavior:
 
@@ -144,6 +145,7 @@ Implemented compatibility behavior:
 - fixed local `location`;
 - root-relative, relative, `sdmc:`, and `file:` mapping to `game/`;
 - fetch-backed asynchronous `XMLHttpRequest` for Phaser's asset loader;
+- a narrow XML DOM parser sufficient for Phaser bitmap-font metadata;
 - a no-spatialization `AudioListener` facade over nx.js Web Audio, whose native
   listener getter is not implemented in beta.6;
 - explicit rejection and diagnostics for remote/unsupported/out-of-root URLs;
@@ -160,15 +162,29 @@ Deliberately deferred until a log requires them:
 - broad HTML form emulation;
 - save import/export file picker behavior;
 - renderer or shader substitutions;
-- audio lifecycle work.
+- generalized audio playback and lifecycle work.
 
 Current hardware result:
 
-- The real external entry reaches starter selection on a Switch OLED in
-  handheld mode.
-- Phaser WebGL2 renders game assets and D-pad, A, and B input work.
-- The first visible display defect is a logical 1920x1080 viewport being
-  clipped to the bottom-left of the physical 1280x720 framebuffer.
-- Text generated through Phaser Canvas textures is visibly damaged; a bounded
-  font-metrics diagnostic records the next evidence without changing text
-  behavior.
+- The real external entry reaches title, starter selection, Pokédex, party,
+  reward, and battle screens on a Switch OLED in handheld mode.
+- Phaser WebGL2 renders at the correct physical 1280x720 size.
+- Text is readable.
+- Attached-controller D-pad and Nintendo A/B behavior work.
+- A caught Pokémon and active session persist after HOME and relaunch.
+- Continue Run restores the session and reaches the next battle.
+- Timestamped logging and the `item-count` bitmap-font path work.
+
+Known compatibility failures:
+
+- audio is silent;
+- dynamically loaded move effects can display Phaser's green/black
+  `__MISSING` texture;
+- cold boot remains black for approximately 35-44 seconds;
+- controller prompts still use keyboard/Xbox artwork in some screens;
+- a later Plus press during a rival battle ended in a native Switch software
+  crash immediately after the `beforeunload` interception log entry.
+
+See [`SWITCH_ALPHA_STATUS.md`](SWITCH_ALPHA_STATUS.md) for the complete
+hardware evidence, resolved-blocker history, known bugs, and next diagnostic
+order.
