@@ -162,6 +162,7 @@ const manifest = {
   compatibilityShims: [
     "minimal-dom",
     "dom-tag-lookup",
+    "dom-classlist-toggle",
     "sdmc-local-fetch",
     "fetch-backed-xmlhttprequest",
     "phaser-audio-listener",

@@ -18,6 +18,78 @@ function makeStyle(): Record<string, string> {
   );
 }
 
+function makeClassList(): DOMTokenList {
+  const tokens = new Set<string>();
+  const classList = {
+    add(...values: string[]) {
+      values.forEach(value => tokens.add(String(value)));
+    },
+    remove(...values: string[]) {
+      values.forEach(value => tokens.delete(String(value)));
+    },
+    contains(value: string) {
+      return tokens.has(String(value));
+    },
+    toggle(value: string, force?: boolean) {
+      const token = String(value);
+      const enabled = force === undefined ? !tokens.has(token) : Boolean(force);
+      if (enabled) {
+        tokens.add(token);
+      } else {
+        tokens.delete(token);
+      }
+      return enabled;
+    },
+    replace(oldValue: string, newValue: string) {
+      if (!tokens.delete(String(oldValue))) {
+        return false;
+      }
+      tokens.add(String(newValue));
+      return true;
+    },
+    supports() {
+      return false;
+    },
+    item(index: number) {
+      return [...tokens][index] ?? null;
+    },
+    forEach(callback: (value: string, key: number, parent: DOMTokenList) => void, thisArg?: any) {
+      [...tokens].forEach((value, index) =>
+        callback.call(thisArg, value, index, classList as unknown as DOMTokenList),
+      );
+    },
+    get length() {
+      return tokens.size;
+    },
+    get value() {
+      return [...tokens].join(" ");
+    },
+    set value(value: string) {
+      tokens.clear();
+      String(value)
+        .split(/\s+/)
+        .filter(Boolean)
+        .forEach(token => tokens.add(token));
+    },
+    entries() {
+      return [...tokens].entries();
+    },
+    keys() {
+      return [...tokens].keys();
+    },
+    values() {
+      return [...tokens].values();
+    },
+    [Symbol.iterator]() {
+      return tokens.values();
+    },
+    toString() {
+      return [...tokens].join(" ");
+    },
+  };
+  return classList as unknown as DOMTokenList;
+}
+
 function safeSet(target: any, property: string, value: unknown): void {
   const own = Object.getOwnPropertyDescriptor(target, property);
   const inherited = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target) ?? {}, property);
@@ -79,13 +151,7 @@ function elementStub(tagName: string): any {
   const attributes = new Map<string, string>();
   const element: any = {
     style: makeStyle(),
-    classList: {
-      add() {},
-      remove() {},
-      contains() {
-        return false;
-      },
-    },
+    classList: makeClassList(),
     relList: {
       supports(feature: string) {
         return tagName.toLowerCase() === "link" && feature === "modulepreload";
@@ -233,13 +299,7 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
   safeSet(target, "style", makeStyle());
   safeSet(target, "parentNode", null);
   safeSet(target, "parentElement", null);
-  safeSet(target, "classList", {
-    add() {},
-    remove() {},
-    contains() {
-      return false;
-    },
-  });
+  safeSet(target, "classList", makeClassList());
   safeSet(target, "tagName", "CANVAS");
   safeSet(target, "focus", () => {});
   safeSet(target, "blur", () => {});
