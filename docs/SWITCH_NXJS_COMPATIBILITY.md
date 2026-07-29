@@ -134,12 +134,13 @@ Implemented compatibility behavior:
 - fixed local `location`;
 - root-relative, relative, `sdmc:`, and `file:` mapping to `game/`;
 - fetch-backed asynchronous `XMLHttpRequest` for Phaser's asset loader;
+- a no-spatialization `AudioListener` facade over nx.js Web Audio, whose native
+  listener getter is not implemented in beta.6;
 - explicit rejection and diagnostics for remote/unsupported/out-of-root URLs;
 - external `emerald` and `pkmnems` font loading;
 - recoverable SD-card-backed localStorage;
 - in-memory sessionStorage;
-- full staged error reporting, including a WebGL text overlay after Phaser owns
-  the physical screen.
+- full staged file error reporting after Phaser owns the physical screen.
 
 Deliberately deferred until a log requires them:
 
