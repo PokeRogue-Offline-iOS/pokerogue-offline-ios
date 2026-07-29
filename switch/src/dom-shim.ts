@@ -6,6 +6,7 @@
  * the experiment, not evidence that Phaser is officially supported by nx.js.
  */
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "./constants";
+import { appendLog } from "./logger";
 
 function makeStyle(): Record<string, string> {
   return new Proxy(
@@ -195,8 +196,37 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
 
   const originalGetContext = target.getContext.bind(target);
   target.getContext = (kind: string, attributes?: unknown) => {
-    const context = originalGetContext(kind, attributes);
+    const requestedKind = String(kind).toLowerCase();
+    const isWebGLAlias =
+      target === screen && (requestedKind === "webgl" || requestedKind === "experimental-webgl");
+    const nativeKind = isWebGLAlias ? "webgl2" : kind;
+    const context = originalGetContext(nativeKind, attributes);
+    if (isWebGLAlias && !context) {
+      const global = globalThis as any;
+      if (!global.__SILVERSHADOW_WEBGL_CONTEXT_ATTEMPTED__) {
+        global.__SILVERSHADOW_WEBGL_CONTEXT_ATTEMPTED__ = true;
+        appendLog("WARN", "nx.js WebGL2 context request returned null", {
+          requested: requestedKind,
+          provided: nativeKind,
+        });
+      }
+    }
     if (context) {
+      if (nativeKind === "webgl2") {
+        const global = globalThis as any;
+        const firstAcquisition = !global.__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__;
+        global.__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__ = true;
+        global.__SILVERSHADOW_WEBGL_CONTEXT__ = {
+          requested: requestedKind,
+          provided: nativeKind,
+        };
+        if (firstAcquisition) {
+          appendLog("INFO", "Mapped Phaser WebGL context request to nx.js WebGL2", {
+            requested: requestedKind,
+            provided: nativeKind,
+          });
+        }
+      }
       safeSet(context, "canvas", target);
       if (!("imageSmoothingEnabled" in context)) {
         safeSet(context, "imageSmoothingEnabled", true);

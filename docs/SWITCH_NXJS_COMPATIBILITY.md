@@ -126,6 +126,8 @@ Implemented compatibility behavior:
 
 - Milestone 1 DOM and nx.js screen-canvas adaptation;
 - a source-level Phaser `canvas: globalThis.screen` handoff;
+- a narrow `webgl`/`experimental-webgl` context alias to nx.js `webgl2`,
+  pending real-hardware validation with Phaser's WebGL1-oriented renderer;
 - fixed local `location`;
 - root-relative, relative, `sdmc:`, and `file:` mapping to `game/`;
 - explicit rejection and diagnostics for remote/unsupported/out-of-root URLs;

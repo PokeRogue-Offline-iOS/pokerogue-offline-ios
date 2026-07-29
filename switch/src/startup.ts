@@ -260,6 +260,14 @@ export function showFatalError(error: unknown): void {
   };
   appendLog("ERROR", "Fatal startup failure", diagnostics);
 
+  if (Boolean((globalThis as any).__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__)) {
+    console.error("SilverShadow PokeRogue could not start.");
+    console.error(`Stage: ${currentStage}`);
+    console.error(`${normalized.name}: ${normalized.message}`);
+    console.error(`Log: ${LOG_PATH.replace(/^sdmc:/, "")}`);
+    return;
+  }
+
   try {
     const context = (screen as any).getContext("2d") as CanvasRenderingContext2D;
     context.fillStyle = "#170b14";

@@ -22,6 +22,13 @@ export function appendLog(level: "INFO" | "WARN" | "ERROR", ...values: unknown[]
     console.error("Unable to write the SilverShadow log:", error);
   }
 
+  if (
+    Boolean((globalThis as any).__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__) &&
+    level !== "ERROR"
+  ) {
+    return;
+  }
+
   if (level === "ERROR") {
     console.error(...values);
   } else if (level === "WARN") {

@@ -169,6 +169,7 @@ const manifest = {
     "location",
     "external-fonts",
     "local-font-url-to-buffer",
+    "phaser-webgl1-to-nxjs-webgl2",
     "nxjs-screen-canvas",
   ],
   manifest: {},
