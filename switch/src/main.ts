@@ -1,221 +1,214 @@
-import {
-  NXJS_VERSION,
-  PHASER_VERSION,
-  SCREEN_HEIGHT,
-  SCREEN_WIDTH,
-  TEST_ASSET_PATH,
-} from "./constants";
-import { patchCanvas } from "./dom-shim";
+import { GAME_ROOT, NXJS_VERSION, PHASER_VERSION } from "./constants";
 import { appendLog } from "./logger";
+import { installPersistentStorage } from "./storage";
 import {
   runCanvasDiagnostics,
+  setRequestedResource,
+  setStartupStage,
   showFatalError,
   validateStartup,
-  type CanvasDiagnostics,
-  type SwitchGameManifest,
 } from "./startup";
 
-const originalFetch = globalThis.fetch.bind(globalThis);
-globalThis.fetch = (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-  const value = input instanceof Request ? input.url : input.toString();
-  if (/^https?:/i.test(value)) {
-    appendLog("ERROR", "Blocked runtime network request", value);
-    return Promise.reject(new TypeError(`Network access is disabled in the Switch build: ${value}`));
-  }
-  return originalFetch(input, init);
-};
+const nativeFetch = globalThis.fetch.bind(globalThis);
 
 addEventListener("error", (event: any) => {
-  const detail = event.error ?? event.message;
-  appendLog("ERROR", "Global error", detail);
+  appendLog("ERROR", "Global error", {
+    name: event.error?.name ?? "ErrorEvent",
+    message: event.error?.message ?? event.message,
+    stack: event.error?.stack ?? null,
+    file: event.filename ?? null,
+    line: event.lineno ?? null,
+    column: event.colno ?? null,
+  });
 });
 addEventListener("unhandledrejection", (event: any) => {
-  appendLog("ERROR", "Unhandled promise rejection", event.reason);
+  appendLog("ERROR", "Unhandled promise rejection", {
+    name: event.reason?.name ?? "UnhandledRejection",
+    message: event.reason?.message ?? String(event.reason),
+    stack: event.reason?.stack ?? null,
+  });
 });
 
-interface ButtonDefinition {
-  index: number;
-  label: string;
-}
-
-const BUTTONS: ButtonDefinition[] = [
-  { index: 0, label: "B" },
-  { index: 1, label: "A" },
-  { index: 2, label: "Y" },
-  { index: 3, label: "X" },
-  { index: 8, label: "-" },
-  { index: 9, label: "+" },
-  { index: 12, label: "Up" },
-  { index: 13, label: "Down" },
-  { index: 14, label: "Left" },
-  { index: 15, label: "Right" },
-];
-
 async function boot(): Promise<void> {
-  appendLog("INFO", "Milestone 1 boot", {
+  setStartupStage("native-bootstrap", {
     expectedNxjs: NXJS_VERSION,
     actualNxjs: Switch.version.nxjs,
     v8: Switch.version.v8,
+    skia: Switch.version.skia,
     expectedPhaser: PHASER_VERSION,
   });
-  const manifest = validateStartup();
+  Switch.mkdirSync("sdmc:/switch/SilverShadow-PokeRogue/logs");
+  setStartupStage("logging-initialized", {
+    log: "sdmc:/switch/SilverShadow-PokeRogue/logs/milestone2.log",
+  });
+
+  const manifest = await validateStartup();
   const diagnostics = runCanvasDiagnostics();
-
-  // Phaser is deliberately evaluated only after startup validation and the
-  // Canvas regression checks, so missing external files get a readable error.
-  const Phaser = await import("phaser");
-  appendLog("INFO", "Phaser module evaluated", Phaser.VERSION);
-
-  class ProofScene extends Phaser.Scene {
-    private controllerText!: import("phaser").GameObjects.Text;
-    private pulse!: import("phaser").GameObjects.Rectangle;
-    private previousA = false;
-    private pressCount = 0;
-    private assetLoadError = "";
-
-    constructor() {
-      super({ key: "SilverShadowNxjsProof" });
-    }
-
-    preload(): void {
-      this.load.once("loaderror", (file: { src?: string }) => {
-        this.assetLoadError = `Phaser could not decode ${file.src ?? TEST_ASSET_PATH}`;
-        appendLog("ERROR", this.assetLoadError);
-      });
-      this.load.image("milestone1-test", TEST_ASSET_PATH);
-    }
-
-    create(): void {
-      this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x101526);
-      this.add
-        .text(52, 42, "SilverShadow PokeRogue", {
-          fontFamily: "system-ui",
-          fontSize: "42px",
-          color: "#f2f5ff",
-        })
-        .setDepth(2);
-      this.add
-        .text(54, 98, "nx.js V8 + Phaser 3 Milestone 1", {
-          fontFamily: "system-ui",
-          fontSize: "24px",
-          color: "#92a7ff",
-        })
-        .setDepth(2);
-
-      if (this.textures.exists("milestone1-test") && !this.assetLoadError) {
-        const asset = this.add.image(235, 300, "milestone1-test").setScale(2.25);
-        this.tweens.add({
-          targets: asset,
-          angle: { from: -2, to: 2 },
-          duration: 900,
-          yoyo: true,
-          repeat: -1,
-        });
-        appendLog("INFO", "Phaser loaded the external SD-card PNG", TEST_ASSET_PATH);
-      } else {
-        this.add.text(70, 260, this.assetLoadError || "External PNG texture is unavailable.", {
-          fontFamily: "system-ui",
-          fontSize: "22px",
-          color: "#ff718a",
-          wordWrap: { width: 360 },
-        });
-      }
-
-      this.pulse = this.add.rectangle(625, 325, 170, 90, 0x637bff).setStrokeStyle(4, 0xbcc7ff);
-      this.tweens.add({
-        targets: this.pulse,
-        scale: { from: 0.92, to: 1.08 },
-        alpha: { from: 0.7, to: 1 },
-        duration: 750,
-        yoyo: true,
-        repeat: -1,
-      });
-      this.add.text(548, 310, "rAF / tween", {
-        fontFamily: "system-ui",
-        fontSize: "22px",
-        color: "#ffffff",
-      });
-
-      addDiagnosticText(this, diagnostics, manifest);
-      this.controllerText = this.add.text(70, 585, "Controller: waiting for input...", {
-        fontFamily: "system-ui",
-        fontSize: "23px",
-        color: "#ffe69b",
-      });
-      this.add.text(70, 630, "Press A to increment the input counter. Press + to exit.", {
-        fontFamily: "system-ui",
-        fontSize: "20px",
-        color: "#aeb8d6",
-      });
-      appendLog("INFO", "Phaser scene create() completed");
-    }
-
-    update(): void {
-      const gamepad = navigator.getGamepads().find(value => value !== null);
-      if (!gamepad) {
-        this.controllerText.setText("Controller: none detected");
-        return;
-      }
-
-      const pressed = BUTTONS.filter(button => gamepad.buttons[button.index]?.pressed).map(button => button.label);
-      const aPressed = Boolean(gamepad.buttons[1]?.pressed);
-      if (aPressed && !this.previousA) {
-        this.pressCount += 1;
-        this.pulse.setFillStyle(this.pressCount % 2 ? 0xff4f8b : 0x637bff);
-        appendLog("INFO", "Controller A press", { controller: gamepad.id, count: this.pressCount });
-      }
-      this.previousA = aPressed;
-      this.controllerText.setText(
-        `Controller: ${gamepad.id || "Switch controller"} | pressed: ${pressed.join(", ") || "none"} | A count: ${this.pressCount}`,
-      );
-    }
+  if (diagnostics.resizeContext !== "PASS" || diagnostics.crossContextFont !== "PASS") {
+    appendLog("WARN", "Continuing after a Canvas regression diagnostic failure", diagnostics);
   }
 
-  const config: import("phaser").Types.Core.GameConfig = {
-    type: Phaser.CANVAS,
-    canvas: patchCanvas(screen),
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    backgroundColor: "#101526",
-    customEnvironment: true,
-    scene: ProofScene,
-    banner: false,
-    audio: {
-      noAudio: true,
-    },
-    input: {
-      keyboard: false,
-      mouse: false,
-      touch: false,
-      gamepad: false,
-    },
-    loader: {
-      imageLoadType: "HTMLImageElement",
-    },
-  };
+  const { installDomShim } = await import("./dom-shim");
+  installDomShim();
+  installLocationShim();
+  installPersistentStorage();
+  installOfflineFetch();
+  await installFonts();
+  setStartupStage("compatibility-shims-installed", {
+    active: manifest.compatibilityShims,
+  });
 
-  new Phaser.Game(config);
+  const entryPath = `${GAME_ROOT}/${manifest.compiledEntryPoint}`;
+  setRequestedResource(entryPath, "sd-card");
+  const entryData = Switch.readFileSync(entryPath);
+  if (entryData === null) {
+    throw new Error(`Compiled entry is missing after manifest validation: ${entryPath}`);
+  }
+  const entryCode = new TextDecoder().decode(entryData);
+  setStartupStage("compiled-entry-resolved", {
+    path: entryPath,
+    bytes: entryData.byteLength,
+    evaluationMode: manifest.evaluationMode,
+  });
+
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (
+    ...args: string[]
+  ) => (...values: unknown[]) => Promise<unknown>;
+  const evaluate = new AsyncFunction(
+    "globalThis",
+    `"use strict";\n${entryCode}\n//# sourceURL=${entryPath}`,
+  );
+  await evaluate(globalThis);
+  setStartupStage("compiled-entry-evaluated", {
+    bootstrapStarted: Boolean((globalThis as any).__SILVERSHADOW_WEB_BOOTSTRAP_STARTED__),
+    bootstrapResolved: Boolean((globalThis as any).__SILVERSHADOW_WEB_BOOTSTRAP_RESOLVED__),
+  });
+
+  const gameStage = (globalThis as any).__SILVERSHADOW_POKEROGUE_STAGE__;
+  if (gameStage === "phaser-game-created") {
+    setStartupStage("phaser-startup-reached", { marker: gameStage });
+  }
+  if (gameStage === "startGame-entered" || gameStage === "phaser-game-created") {
+    setStartupStage("pokerogue-bootstrap-started", { marker: gameStage });
+  }
+  setStartupStage("title-screen-or-first-blocker", {
+    status: "awaiting hardware observation",
+    marker: gameStage ?? null,
+  });
 }
 
-function addDiagnosticText(
-  scene: import("phaser").Scene,
-  diagnostics: CanvasDiagnostics,
-  manifest: SwitchGameManifest,
-): void {
-  const ok = diagnostics.resizeContext === "PASS" && diagnostics.crossContextFont === "PASS";
-  const lines = [
-    `nx.js: ${Switch.version.nxjs} (V8 ${Switch.version.v8})`,
-    `Phaser: ${PHASER_VERSION}`,
-    `Canvas resize/context: ${diagnostics.resizeContext}`,
-    `Cross-context font: ${diagnostics.crossContextFont}`,
-    `External bundle: ${manifest.silverShadowGameVersion}`,
-  ];
-  scene.add.text(770, 210, lines.join("\n"), {
-    fontFamily: "system-ui",
-    fontSize: "23px",
-    color: ok ? "#91f4b2" : "#ff718a",
-    lineSpacing: 12,
+function installLocationShim(): void {
+  const location = {
+    href: `${GAME_ROOT}/index.html`,
+    origin: "null",
+    protocol: "sdmc:",
+    host: "",
+    hostname: "",
+    port: "",
+    pathname: "/switch/SilverShadow-PokeRogue/game/index.html",
+    search: "",
+    hash: "",
+    ancestorOrigins: {} as DOMStringList,
+    assign(url: string | URL) {
+      throw new Error(`Navigation is unsupported in the Switch build: ${String(url)}`);
+    },
+    replace(url: string | URL) {
+      throw new Error(`Navigation is unsupported in the Switch build: ${String(url)}`);
+    },
+    reload() {
+      appendLog("WARN", "Application requested location.reload(); restart the NRO from hbmenu.");
+    },
+    toString() {
+      return this.href;
+    },
+  } satisfies Location;
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    enumerable: true,
+    value: location,
   });
+}
+
+function installOfflineFetch(): void {
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const original = input instanceof Request ? input.url : String(input);
+    const resolution = resolveLocalRequest(original);
+    setRequestedResource(resolution.url, resolution.kind);
+    if (resolution.kind === "network" || resolution.kind === "unknown") {
+      appendLog("ERROR", "Blocked runtime resource request", {
+        url: original,
+        resolved: resolution.url,
+        kind: resolution.kind,
+        stack: new Error("Network request origin").stack,
+      });
+      throw new TypeError(
+        resolution.kind === "network"
+          ? `Network access is disabled in the Switch build: ${original}`
+          : `Unsupported or out-of-root resource URL is blocked: ${original}`,
+      );
+    }
+    appendLog("INFO", "Local resource request", {
+      requested: original,
+      resolved: resolution.url,
+      kind: resolution.kind,
+    });
+    if (input instanceof Request) {
+      return nativeFetch(new Request(resolution.url, input), init);
+    }
+    return nativeFetch(resolution.url, init);
+  };
+}
+
+function resolveLocalRequest(input: string): {
+  url: string;
+  kind: "embedded" | "sd-card" | "local" | "network" | "unknown";
+} {
+  if (/^https?:/i.test(input) || /^wss?:/i.test(input) || input.startsWith("//")) {
+    return { url: input, kind: "network" };
+  }
+  if (/^(data|blob):/i.test(input)) {
+    return { url: input, kind: "local" };
+  }
+  if (/^romfs:/i.test(input)) {
+    return { url: input, kind: "embedded" };
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(input) && !/^(sdmc|file):/i.test(input)) {
+    return { url: input, kind: "unknown" };
+  }
+
+  const withoutQuery = input.replace(/[?#].*$/, "");
+  let resolved: string;
+  if (/^(sdmc|file):/i.test(withoutQuery)) {
+    resolved = withoutQuery.replace(/^file:/i, "sdmc:");
+  } else {
+    resolved = `${GAME_ROOT}/${withoutQuery.replace(/^\.?\//, "")}`;
+  }
+  if (!resolved.startsWith(`${GAME_ROOT}/`) && resolved !== GAME_ROOT) {
+    return { url: resolved, kind: "unknown" };
+  }
+  if (resolved.split("/").includes("..")) {
+    throw new TypeError(`Local path traversal is blocked: ${input}`);
+  }
+  return { url: resolved, kind: "sd-card" };
+}
+
+async function installFonts(): Promise<void> {
+  for (const [family, file] of [
+    ["emerald", "pokemon-emerald-pro.ttf"],
+    ["pkmnems", "pkmnems.ttf"],
+  ] as const) {
+    const path = `${GAME_ROOT}/fonts/${file}`;
+    setRequestedResource(path, "sd-card");
+    const data = Switch.readFileSync(path);
+    if (data === null) {
+      appendLog("WARN", "Optional bootstrap font is missing", { family, path });
+      continue;
+    }
+    const face = new FontFace(family, data);
+    await face.load();
+    fonts.add(face);
+    appendLog("INFO", "Loaded external game font", { family, path, bytes: data.byteLength });
+  }
 }
 
 boot().catch(showFatalError);

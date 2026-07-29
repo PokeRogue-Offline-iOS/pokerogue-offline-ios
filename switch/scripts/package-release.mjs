@@ -1,148 +1,290 @@
-import { zipSync } from "fflate";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { deflateSync } from "node:zlib";
+import { createReadStream, createWriteStream } from "node:fs";
+import {
+  copyFile,
+  cp,
+  mkdir,
+  open,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import path from "node:path";
+import { once } from "node:events";
+import { execFileSync } from "node:child_process";
+import { Zip, ZipDeflate, ZipPassThrough } from "fflate";
+import {
+  MANIFEST_SCHEMA_VERSION,
+  NODE_VERSION,
+  NXJS_NRO_VERSION,
+  NXJS_VERSION,
+  PHASER_VERSION,
+  PNPM_VERSION,
+  SWITCH_PLATFORM_VERSION,
+  UPSTREAM_COMMIT,
+  UPSTREAM_VERSION,
+  buildLogPath,
+  buildResultPath,
+  repositoryRoot,
+  switchRoot,
+} from "./config.mjs";
 
-const projectRoot = new URL("../", import.meta.url);
-const releaseRoot = new URL("release/", projectRoot);
-const appRoot = new URL("switch/SilverShadow-PokeRogue/", releaseRoot);
-const gameRoot = new URL("game/", appRoot);
-const assetsRoot = new URL("assets/", gameRoot);
-const sourceNro = new URL("silvershadow-pokerogue-switch-poc.nro", projectRoot);
-const outputNro = new URL("SilverShadow-PokeRogue.nro", appRoot);
-const outputZip = new URL("SilverShadow-PokeRogue-Switch-Milestone1.zip", releaseRoot);
+const releaseRoot = path.join(switchRoot, "release");
+const appRoot = path.join(releaseRoot, "switch", "SilverShadow-PokeRogue");
+const gameRoot = path.join(appRoot, "game");
+const sourceNro = path.join(switchRoot, "silvershadow-pokerogue-switch.nro");
+const outputNro = path.join(appRoot, "SilverShadow-PokeRogue.nro");
+const outputZip = path.join(releaseRoot, "SilverShadow-PokeRogue-Switch-Milestone2.zip");
 
-await mkdir(assetsRoot, { recursive: true });
-await mkdir(new URL("saves/", appRoot), { recursive: true });
-await mkdir(new URL("logs/", appRoot), { recursive: true });
-await mkdir(new URL("config/", appRoot), { recursive: true });
+const buildResult = JSON.parse(await readFile(buildResultPath, "utf8"));
+if (
+  buildResult.packageKind !== "milestone2-real-game" ||
+  buildResult.upstreamCommit !== UPSTREAM_COMMIT ||
+  buildResult.compiledEntryPoint !== "switch-entry.js"
+) {
+  throw new Error("The cached game-build result is missing or incompatible with Milestone 2.");
+}
+
+await rm(releaseRoot, { recursive: true, force: true });
+await mkdir(gameRoot, { recursive: true });
+await cp(buildResult.compiledGameRoot, gameRoot, { recursive: true });
+await mkdir(path.join(appRoot, "saves"), { recursive: true });
+await mkdir(path.join(appRoot, "logs"), { recursive: true });
+await mkdir(path.join(appRoot, "config"), { recursive: true });
+await mkdir(path.join(releaseRoot, "symbols"), { recursive: true });
 await copyFile(sourceNro, outputNro);
 
+const sourceMap = path.join(gameRoot, "switch-entry.js.map");
+try {
+  await copyFile(sourceMap, path.join(releaseRoot, "symbols", "SilverShadow-PokeRogue-switch-entry.js.map"));
+  await rm(sourceMap);
+} catch {
+  // Source maps are useful but not required for a production-mode upstream build.
+}
+
+const repositoryCommit = execFileSync("git", ["-C", repositoryRoot, "rev-parse", "HEAD"], {
+  encoding: "utf8",
+}).trim();
+const repositoryDirty = Boolean(
+  execFileSync("git", ["-C", repositoryRoot, "status", "--porcelain"], { encoding: "utf8" }).trim(),
+);
+const patchSetHash = await hashPaths(["new-files", "patches/all"]);
+const switchPatchSetHash = await hashPaths(["patches/switch"]);
+const buildScriptHash = await hashPaths([
+  "scripts/apply-patches.sh",
+  "scripts/apply-post-build-patches.sh",
+  "scripts/patch-lib.sh",
+  "switch/scripts",
+  "switch/src",
+  "switch/package.json",
+  "switch/package-lock.json",
+]);
+
 const version = {
-  schemaVersion: 1,
-  switchPlatformVersion: "0.1.0",
-  silverShadowGameVersion: "milestone1-phaser-poc",
-  nxjsPackageVersion: "1.0.0-beta.6",
-  phaserVersion: "3.90.0",
+  schemaVersion: MANIFEST_SCHEMA_VERSION,
+  packageKind: "milestone2-real-game",
+  switchPlatformVersion: SWITCH_PLATFORM_VERSION,
+  silverShadowGameVersion: `${UPSTREAM_VERSION}-switch-m2`,
+  upstreamPokeRogueCommit: UPSTREAM_COMMIT,
+  upstreamPokeRogueVersion: UPSTREAM_VERSION,
 };
-await writeJson(new URL("version.json", gameRoot), version);
-await writeFile(new URL("milestone1-test.png", assetsRoot), createTestPng());
-await writeJson(new URL("defaults.json", new URL("config/", appRoot)), {
+await writeJson(path.join(gameRoot, "version.json"), version);
+await writeJson(path.join(appRoot, "config", "defaults.json"), {
   networkEnabled: false,
-  renderer: "phaser-canvas",
-  intendedMemoryMode: "application",
+  renderer: "upstream-phaser-webgl",
+  intendedMemoryMode: "application/title-override",
+  gameRoot: "sdmc:/switch/SilverShadow-PokeRogue/game",
+  saveRoot: "sdmc:/switch/SilverShadow-PokeRogue/saves",
 });
 await writeFile(
-  new URL("README.txt", new URL("saves/", appRoot)),
-  "Switch save data will live in this directory in later milestones. Do not delete it when updating.\n",
+  path.join(appRoot, "saves", "README.txt"),
+  "Persistent localStorage is stored here as local-storage.json with a recoverable backup. Preserve this directory when updating.\n",
 );
 await writeFile(
-  new URL("README.txt", new URL("logs/", appRoot)),
-  "Return milestone1.log when reporting hardware test results.\n",
+  path.join(appRoot, "logs", "README.txt"),
+  "Return milestone2.log and a photo of the screen when reporting hardware results.\n",
 );
 
-const requiredPaths = ["version.json", "assets/milestone1-test.png"];
+const requiredDirectories = ["assets", "audio", "fonts", "images", "locales"];
+const importantPaths = [
+  "index.html",
+  "version.json",
+  buildResult.originalEntryPoint,
+  buildResult.compiledEntryPoint,
+];
 const requiredFiles = [];
-for (const relativePath of requiredPaths) {
-  const data = await readFile(new URL(relativePath, gameRoot));
+for (const relativePath of [...new Set(importantPaths)]) {
+  const absolutePath = safeGamePath(relativePath);
+  const info = await stat(absolutePath);
   requiredFiles.push({
-    path: relativePath,
-    size: data.byteLength,
-    sha256: createHash("sha256").update(data).digest("hex"),
+    path: relativePath.replaceAll("\\", "/"),
+    size: info.size,
+    sha256: await sha256File(absolutePath),
+    purpose:
+      relativePath === buildResult.compiledEntryPoint
+        ? "nx.js controlled real-game entry"
+        : relativePath === buildResult.originalEntryPoint
+          ? "original Vite module entry"
+          : "package bootstrap metadata",
   });
 }
 
 const manifest = {
-  schemaVersion: 1,
-  switchPlatformVersion: "0.1.0",
-  nxjsPackageVersion: "1.0.0-beta.6",
-  phaserVersion: "3.90.0",
-  silverShadowGameVersion: "milestone1-phaser-poc",
-  upstreamPokeRogueCommit: null,
-  assetVersion: "milestone1-test-asset-v1",
+  schemaVersion: MANIFEST_SCHEMA_VERSION,
+  packageKind: "milestone2-real-game",
+  switchPlatformVersion: SWITCH_PLATFORM_VERSION,
+  silverShadowGameVersion: `${UPSTREAM_VERSION}-switch-m2`,
+  silverShadowRepositoryCommit: repositoryCommit,
+  repositoryDirtyAtBuild: repositoryDirty,
+  upstreamPokeRogueCommit: UPSTREAM_COMMIT,
+  upstreamPokeRogueVersion: UPSTREAM_VERSION,
+  nxjsRuntimeVersion: NXJS_VERSION,
+  nxjsNroVersion: NXJS_NRO_VERSION,
+  phaserVersion: PHASER_VERSION,
+  expectedNodeVersion: NODE_VERSION,
+  nodeVersion: buildResult.actualNodeVersion,
+  pnpmVersion: PNPM_VERSION,
   buildDate: new Date().toISOString(),
+  patchSetHash,
+  switchPatchSetHash,
+  buildScriptHash,
+  compiledInputHash: buildResult.inputHash,
+  compiledEntryPoint: buildResult.compiledEntryPoint,
+  originalEntryPoint: buildResult.originalEntryPoint,
+  evaluationMode: "async-function",
+  requiredDirectories,
+  requiredFiles,
   packageLayout: "switch/SilverShadow-PokeRogue",
   intendedMemoryMode: "application/title-override",
   offlineRequired: true,
-  requiredFiles,
+  compatibilityShims: [
+    "minimal-dom",
+    "sdmc-local-fetch",
+    "remote-network-block",
+    "persistent-local-storage-v1",
+    "memory-session-storage",
+    "location",
+    "external-fonts",
+    "nxjs-screen-canvas",
+  ],
+  manifest: {},
 };
-await writeJson(new URL("manifest.json", gameRoot), manifest);
+await writeJson(path.join(gameRoot, "manifest.json"), manifest);
+
+const checksumTargets = [
+  "SilverShadow-PokeRogue.nro",
+  "game/manifest.json",
+  "game/version.json",
+  `game/${buildResult.compiledEntryPoint}`,
+];
+const checksumLines = [];
+for (const relativePath of checksumTargets) {
+  checksumLines.push(`${await sha256File(path.join(appRoot, relativePath))}  ${relativePath.replaceAll("\\", "/")}`);
+}
+await writeFile(path.join(appRoot, "SHA256SUMS.txt"), `${checksumLines.join("\n")}\n`);
+await copyFile(buildLogPath, path.join(releaseRoot, "milestone2-build.log"));
 
 await createZip(appRoot, outputZip);
-console.log(`Created ${fileURLToPath(outputNro)}`);
-console.log(`Created ${fileURLToPath(outputZip)}`);
+console.log(`Created ${outputNro}`);
+console.log(`Created ${outputZip}`);
 
-async function writeJson(url, value) {
-  await writeFile(url, `${JSON.stringify(value, null, 2)}\n`);
-}
-
-function createTestPng() {
-  const width = 160;
-  const height = 96;
-  const scanlines = Buffer.alloc((width * 4 + 1) * height);
-  for (let y = 0; y < height; y += 1) {
-    const row = y * (width * 4 + 1);
-    scanlines[row] = 0;
-    for (let x = 0; x < width; x += 1) {
-      const offset = row + 1 + x * 4;
-      const checker = (Math.floor(x / 16) + Math.floor(y / 16)) % 2;
-      scanlines[offset] = checker ? 99 : 242;
-      scanlines[offset + 1] = checker ? 123 : 79;
-      scanlines[offset + 2] = checker ? 255 : 139;
-      scanlines[offset + 3] = 255;
-    }
+function safeGamePath(relativePath) {
+  const resolved = path.resolve(gameRoot, relativePath);
+  if (!resolved.startsWith(`${path.resolve(gameRoot)}${path.sep}`)) {
+    throw new Error(`Unsafe game path: ${relativePath}`);
   }
-
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0);
-  header.writeUInt32BE(height, 4);
-  header[8] = 8;
-  header[9] = 6;
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  return Buffer.concat([
-    signature,
-    pngChunk("IHDR", header),
-    pngChunk("tEXt", Buffer.from("Title\0SilverShadow nx.js Milestone 1", "latin1")),
-    pngChunk("IDAT", deflateSync(scanlines, { level: 9 })),
-    pngChunk("IEND", Buffer.alloc(0)),
-  ]);
+  return resolved;
 }
 
-function pngChunk(type, data) {
-  const typeBytes = Buffer.from(type, "ascii");
-  const length = Buffer.alloc(4);
-  length.writeUInt32BE(data.length);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])));
-  return Buffer.concat([length, typeBytes, data, crc]);
+async function writeJson(file, value) {
+  await writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function crc32(buffer) {
-  let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
+async function hashPaths(relativePaths) {
+  const hash = createHash("sha256");
+  for (const relativePath of relativePaths) {
+    await hashPath(hash, path.join(repositoryRoot, relativePath), relativePath);
   }
-  return (crc ^ 0xffffffff) >>> 0;
+  return hash.digest("hex");
+}
+
+async function hashPath(hash, absolutePath, relativePath) {
+  const info = await stat(absolutePath);
+  if (info.isDirectory()) {
+    const entries = await readdir(absolutePath, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      await hashPath(hash, path.join(absolutePath, entry.name), `${relativePath}/${entry.name}`);
+    }
+    return;
+  }
+  hash.update(`${relativePath.replaceAll("\\", "/")}\0`);
+  hash.update(await readFile(absolutePath));
+  hash.update("\0");
+}
+
+async function sha256File(file) {
+  const handle = await open(file, "r");
+  const hash = createHash("sha256");
+  try {
+    for await (const chunk of handle.readableWebStream()) {
+      hash.update(chunk);
+    }
+  } finally {
+    await handle.close();
+  }
+  return hash.digest("hex");
 }
 
 async function createZip(sourceDirectory, outputFile) {
-  const prefix = "switch/SilverShadow-PokeRogue";
-  const relativeFiles = [
-    "SilverShadow-PokeRogue.nro",
-    "config/defaults.json",
-    "game/assets/milestone1-test.png",
-    "game/manifest.json",
-    "game/version.json",
-    "logs/README.txt",
-    "saves/README.txt",
-  ];
-  const entries = {};
-  for (const relativePath of relativeFiles) {
-    entries[`${prefix}/${relativePath}`] = new Uint8Array(await readFile(new URL(relativePath, sourceDirectory)));
+  const files = await listFiles(sourceDirectory);
+  const output = createWriteStream(outputFile, { flags: "wx" });
+  let zipError;
+  const zip = new Zip((error, data, final) => {
+    if (error) {
+      zipError = error;
+      output.destroy(error);
+      return;
+    }
+    output.write(data);
+    if (final) {
+      output.end();
+    }
+  });
+
+  for (const relativePath of files) {
+    const absolutePath = path.join(sourceDirectory, relativePath);
+    const archivePath = `switch/SilverShadow-PokeRogue/${relativePath.replaceAll("\\", "/")}`;
+    const extension = path.extname(relativePath).toLowerCase();
+    const storeOnly = [".png", ".jpg", ".jpeg", ".webp", ".mp3", ".ogg", ".wav", ".zip", ".nro"].includes(extension);
+    const entry = storeOnly ? new ZipPassThrough(archivePath) : new ZipDeflate(archivePath, { level: 6 });
+    zip.add(entry);
+    const input = createReadStream(absolutePath, { highWaterMark: 1024 * 1024 });
+    for await (const chunk of input) {
+      entry.push(new Uint8Array(chunk), false);
+    }
+    entry.push(new Uint8Array(), true);
   }
-  await writeFile(outputFile, zipSync(entries, { level: 9 }));
+  zip.end();
+  await once(output, "close");
+  if (zipError) {
+    throw zipError;
+  }
+}
+
+async function listFiles(directory, prefix = "") {
+  const files = [];
+  const entries = await readdir(directory, { withFileTypes: true });
+  entries.sort((a, b) => a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    const relativePath = path.join(prefix, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listFiles(path.join(directory, entry.name), relativePath)));
+    } else if (entry.isFile()) {
+      files.push(relativePath);
+    }
+  }
+  return files;
 }

@@ -49,7 +49,7 @@ function rect(width: number, height: number): DOMRect {
 
 function elementStub(tagName: string): any {
   const attributes = new Map<string, string>();
-  return {
+  const element: any = {
     style: makeStyle(),
     classList: {
       add() {},
@@ -67,17 +67,37 @@ function elementStub(tagName: string): any {
     children: [],
     innerHTML: "",
     textContent: "",
-    appendChild(child: unknown) {
+    appendChild(child: any) {
+      if (child && typeof child === "object") {
+        child.parentNode = element;
+        child.parentElement = element;
+        element.childNodes.push(child);
+        element.children.push(child);
+      }
       return child;
     },
-    removeChild(child: unknown) {
+    removeChild(child: any) {
+      element.childNodes = element.childNodes.filter((value: unknown) => value !== child);
+      element.children = element.children.filter((value: unknown) => value !== child);
+      if (child && typeof child === "object") {
+        child.parentNode = null;
+        child.parentElement = null;
+      }
       return child;
     },
-    insertBefore(child: unknown) {
+    insertBefore(child: any, before: any) {
+      const index = element.children.indexOf(before);
+      if (index < 0) {
+        return element.appendChild(child);
+      }
+      child.parentNode = element;
+      child.parentElement = element;
+      element.children.splice(index, 0, child);
+      element.childNodes.splice(index, 0, child);
       return child;
     },
-    contains() {
-      return false;
+    contains(child: unknown) {
+      return child === element || element.children.includes(child);
     },
     setAttribute(name: string, value: string) {
       attributes.set(name, String(value));
@@ -96,9 +116,16 @@ function elementStub(tagName: string): any {
     getBoundingClientRect() {
       return rect(0, 0);
     },
+    querySelector(selector: string) {
+      if (selector === "canvas") {
+        return element.children.find((value: any) => value?.tagName === "CANVAS") ?? null;
+      }
+      return null;
+    },
     focus() {},
     blur() {},
   };
+  return element;
 }
 
 function patchImage(image: any): any {
@@ -146,54 +173,59 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
   return target as HTMLCanvasElement;
 }
 
-const global = globalThis as any;
-global.window = globalThis;
-global.self = globalThis;
-global.top = globalThis;
-global.parent = globalThis;
-global.innerWidth = SCREEN_WIDTH;
-global.innerHeight = SCREEN_HEIGHT;
-global.outerWidth = SCREEN_WIDTH;
-global.outerHeight = SCREEN_HEIGHT;
-global.devicePixelRatio = 1;
-global.scrollX = 0;
-global.scrollY = 0;
-global.pageXOffset = 0;
-global.pageYOffset = 0;
-global.focus ??= () => {};
-global.blur ??= () => {};
-global.close ??= () => {};
-global.scrollTo ??= () => {};
-global.getComputedStyle ??= (element: any) => element?.style ?? makeStyle();
-global.matchMedia ??= () => ({
+export function installDomShim(): void {
+  const global = globalThis as any;
+  if (global.__silverShadowDomShimInstalled) {
+    return;
+  }
+  global.__silverShadowDomShimInstalled = true;
+  global.window = globalThis;
+  global.self = globalThis;
+  global.top = globalThis;
+  global.parent = globalThis;
+  global.innerWidth = SCREEN_WIDTH;
+  global.innerHeight = SCREEN_HEIGHT;
+  global.outerWidth = SCREEN_WIDTH;
+  global.outerHeight = SCREEN_HEIGHT;
+  global.devicePixelRatio = 1;
+  global.scrollX = 0;
+  global.scrollY = 0;
+  global.pageXOffset = 0;
+  global.pageYOffset = 0;
+  global.focus ??= () => {};
+  global.blur ??= () => {};
+  global.close ??= () => {};
+  global.scrollTo ??= () => {};
+  global.getComputedStyle ??= (element: any) => element?.style ?? makeStyle();
+  global.matchMedia ??= () => ({
   matches: false,
   addListener() {},
   removeListener() {},
   addEventListener() {},
   removeEventListener() {},
-});
+  });
 
-global.HTMLElement ??= class HTMLElement {};
-global.Element ??= class Element {};
-global.Node ??= class Node {};
-global.Document ??= class Document {};
-global.HTMLDocument ??= global.Document;
-global.HTMLCanvasElement ??= class HTMLCanvasElement {};
-global.HTMLImageElement ??= Image;
-global.HTMLAudioElement ??= Audio;
-global.HTMLVideoElement ??= global.Video ?? class HTMLVideoElement {};
-global.HTMLDivElement ??= class HTMLDivElement {};
-global.CSSStyleDeclaration ??= class CSSStyleDeclaration {};
+  global.HTMLElement ??= class HTMLElement {};
+  global.Element ??= class Element {};
+  global.Node ??= class Node {};
+  global.Document ??= class Document {};
+  global.HTMLDocument ??= global.Document;
+  global.HTMLCanvasElement ??= class HTMLCanvasElement {};
+  global.HTMLImageElement ??= Image;
+  global.HTMLAudioElement ??= Audio;
+  global.HTMLVideoElement ??= global.Video ?? class HTMLVideoElement {};
+  global.HTMLDivElement ??= class HTMLDivElement {};
+  global.CSSStyleDeclaration ??= class CSSStyleDeclaration {};
 
-Object.defineProperty(global.HTMLCanvasElement, Symbol.hasInstance, {
+  Object.defineProperty(global.HTMLCanvasElement, Symbol.hasInstance, {
   configurable: true,
   value(instance: any) {
     return instance === screen || Boolean(instance?.getContext && instance?.tagName === "CANVAS");
   },
-});
+  });
 
-if (!global.MouseEvent) {
-  global.MouseEvent = class MouseEvent extends Event {
+  if (!global.MouseEvent) {
+    global.MouseEvent = class MouseEvent extends Event {
     clientX = 0;
     clientY = 0;
     pageX = 0;
@@ -215,39 +247,49 @@ if (!global.MouseEvent) {
       super(type, init);
       Object.assign(this, init);
     }
-  };
-}
+    };
+  }
 
-global.PointerEvent ??= class PointerEvent extends global.MouseEvent {
+  global.PointerEvent ??= class PointerEvent extends global.MouseEvent {
   pointerId = 0;
   pointerType = "mouse";
   width = 1;
   height = 1;
   pressure = 0;
   isPrimary = true;
-};
-global.WheelEvent ??= class WheelEvent extends global.MouseEvent {
+  };
+  global.WheelEvent ??= class WheelEvent extends global.MouseEvent {
   deltaX = 0;
   deltaY = 0;
   deltaZ = 0;
   deltaMode = 0;
-};
+  };
 
-const body = {
+  const body = {
   ...elementStub("body"),
   offsetWidth: SCREEN_WIDTH,
   offsetHeight: SCREEN_HEIGHT,
   clientWidth: SCREEN_WIDTH,
   clientHeight: SCREEN_HEIGHT,
   getBoundingClientRect: () => rect(SCREEN_WIDTH, SCREEN_HEIGHT),
-};
-const documentElement = {
+  };
+  const documentElement = {
   ...elementStub("html"),
   clientWidth: SCREEN_WIDTH,
   clientHeight: SCREEN_HEIGHT,
-};
+  };
+  const app = {
+    ...elementStub("div"),
+    id: "app",
+    clientWidth: SCREEN_WIDTH,
+    clientHeight: SCREEN_HEIGHT,
+    getBoundingClientRect: () => rect(SCREEN_WIDTH, SCREEN_HEIGHT),
+  };
+  const touchControls = { ...elementStub("div"), id: "touchControls" };
+  body.appendChild(app);
+  body.appendChild(touchControls);
 
-const documentShim: any = {
+  const documentShim: any = {
   readyState: "complete",
   title: "SilverShadow PokeRogue",
   documentElement,
@@ -259,6 +301,7 @@ const documentShim: any = {
   pointerLockElement: null,
   visibilityState: "visible",
   hidden: false,
+  cookie: "",
   createElement(tagName: string) {
     const tag = tagName.toLowerCase();
     if (tag === "canvas") {
@@ -279,10 +322,22 @@ const documentShim: any = {
     return documentShim.createElement(tagName);
   },
   getElementById(id: string) {
-    return id === "app" || id === "game" ? patchCanvas(screen) : null;
+    if (id === "app" || id === "game") {
+      return app;
+    }
+    if (id === "touchControls") {
+      return touchControls;
+    }
+    return null;
   },
   querySelector(selector: string) {
-    return selector === "#app" || selector === "canvas" ? patchCanvas(screen) : null;
+    if (selector === "#app") {
+      return app;
+    }
+    if (selector === "#touchControls") {
+      return touchControls;
+    }
+    return selector === "canvas" ? patchCanvas(screen) : null;
   },
   querySelectorAll() {
     return [];
@@ -308,10 +363,10 @@ const documentShim: any = {
     return Promise.resolve();
   },
   exitPointerLock() {},
-};
+  };
 
-global.document = documentShim;
-try {
+  global.document = documentShim;
+  try {
   Object.defineProperty(screen, "orientation", {
     configurable: true,
     value: {
@@ -328,11 +383,11 @@ try {
       unlock() {},
     },
   });
-} catch {
+  } catch {
   // Older and newer nx.js builds may expose different orientation descriptors.
-}
+  }
 
-try {
+  try {
   Object.defineProperty(navigator, "userAgent", {
     configurable: true,
     value: "Mozilla/5.0 (Nintendo Switch; nx.js V8) AppleWebKit/537.36",
@@ -341,8 +396,10 @@ try {
     configurable: true,
     value: 10,
   });
-} catch {
+  } catch {
   // The proof of concept can continue if these feature-detection hints are read-only.
-}
+  }
 
-patchCanvas(screen);
+  patchCanvas(screen);
+  app.appendChild(screen);
+}
