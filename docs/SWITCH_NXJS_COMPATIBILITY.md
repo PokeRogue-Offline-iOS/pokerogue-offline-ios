@@ -15,14 +15,13 @@
 
 ## Not resolved by release notes or API presence
 
-- Phaser 3.90.0 boot on nx.js V8.
-- Phaser Canvas renderer behavior after the V8/Skia migration.
+- Full PokéRogue behavior under the Phaser Canvas renderer.
 - Phaser WebGL renderer compatibility with nx.js's WebGL2-only screen context.
 - PokéRogue's custom WebGL pipelines and shaders.
 - Phaser Rex InputText, BBCode, transition-image, and UI plugins.
 - Vite dynamic chunk loading from `sdmc:`.
 - Full local image, atlas, JSON, font, music, and sound loading.
-- Gamepad mapping across paired/single Joy-Con and Pro Controller.
+- Gamepad mapping for docked, single Joy-Con, and Pro Controller arrangements.
 - Web Audio latency, decoding coverage, suspend, and resume.
 - SD-card-backed localStorage with atomic writes and recovery.
 - Switch software keyboard integration.
@@ -34,6 +33,58 @@ nx.js PR #317 proposed a Phaser 3.80 Canvas Breakout app and DOM shim. It was
 closed without merge. Its existence is not a compatibility guarantee. The
 Milestone 1 shim cites and adapts that experiment, pins Phaser 3.90.0, performs
 startup checks before Phaser evaluation, and records hardware results.
+
+## Milestone 1 hardware validation
+
+Validated on 2026-07-29 with:
+
+- Nintendo Switch OLED in handheld mode with attached controllers;
+- Atmosphere `1.11.2`;
+- Nintendo Switch system firmware `22.5.0`;
+- Hekate `6.5.3`;
+- `@nx.js/runtime@1.0.0-beta.6` and `@nx.js/nro@1.0.0-beta.6`;
+- V8 `15.0.243` and Skia `149`;
+- Phaser `3.90.0`;
+- the fat/self-contained NRO from commit `a9e203a`.
+
+The returned hardware log and photo verify:
+
+- the embedded nx.js runtime, V8, and Skia start successfully;
+- the external manifest and required-file checks pass;
+- Canvas resize followed by reuse of the existing 2D context passes;
+- cross-context font measurements remain stable;
+- the Phaser 3.90.0 ESM module evaluates;
+- the Phaser Canvas scene reaches `create()`;
+- the PNG is loaded from
+  `sdmc:/switch/SilverShadow-PokeRogue/game/assets/milestone1-test.png`;
+- requestAnimationFrame and Phaser tweens visibly animate rotation, scale, and
+  alpha;
+- attached handheld controllers are detected;
+- A-button presses update scene state and rendering, with 44 presses recorded
+  in the returned log;
+- append-only file logging records boot, diagnostics, asset loading, scene
+  creation, errors, and controller events.
+
+This validates the minimal Phaser Canvas proof of concept on the tested
+hardware and software combination. It does not validate PokéRogue itself,
+Phaser WebGL, custom shaders and pipelines, audio, saves, suspend/resume, or
+long-session memory behavior.
+
+Known Milestone 1 issues:
+
+- the on-screen multiline diagnostic text overlaps under the current text
+  layout;
+- the screen says that `+` exits, but exit handling is not implemented yet;
+- the log is append-only, so results from superseded builds remain until the
+  tester deletes `logs/milestone1.log`.
+
+Still unverified:
+
+- boot with Wi-Fi disabled;
+- the missing-game-folder error path;
+- docked output;
+- single Joy-Con and Pro Controller mappings;
+- suspend and resume.
 
 ## Hardware result template
 
@@ -48,16 +99,16 @@ Return `switch/SilverShadow-PokeRogue/logs/milestone1.log` with:
 - whether the missing `game` folder produced the readable error screen;
 - every crash screen or exception exactly as shown.
 
-Mark each item:
+Current result:
 
-- [ ] NRO appears in hbmenu with correct title.
-- [ ] Runtime reports nx.js `1.0.0-beta.6`.
-- [ ] Canvas resize/context reports PASS.
-- [ ] Cross-context font reports PASS.
-- [ ] Phaser `3.90.0` module evaluates.
-- [ ] Scene `create()` completes.
-- [ ] External checkerboard PNG is visible.
-- [ ] The tween visibly animates.
-- [ ] A-button count increments.
+- [x] NRO appears in hbmenu and launches.
+- [x] Runtime reports nx.js `1.0.0-beta.6`.
+- [x] Canvas resize/context reports PASS.
+- [x] Cross-context font reports PASS.
+- [x] Phaser `3.90.0` module evaluates.
+- [x] Scene `create()` completes.
+- [x] External checkerboard PNG is visible.
+- [x] The tweens visibly animate.
+- [x] A-button input changes scene state.
 - [ ] Wi-Fi-off boot succeeds.
 - [ ] Missing-game-folder error is readable and logged.

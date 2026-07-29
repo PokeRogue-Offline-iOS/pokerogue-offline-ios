@@ -2,10 +2,11 @@
 
 ## Status
 
-This branch implements Milestone 0 and a buildable Milestone 1 hardware proof
-of concept. It does not claim that Phaser or PokéRogue runs successfully on a
-Switch. Milestone 1 must be run in title-override/application-memory mode and
-its log returned before work begins on the full game bundle.
+This branch implements Milestone 0 and a hardware-validated Milestone 1 proof
+of concept. A minimal Phaser 3.90.0 Canvas scene, local PNG loading, animation,
+and handheld controller input run successfully on the tested Switch OLED
+configuration. This result does not claim that PokéRogue, Phaser WebGL, audio,
+storage, or lifecycle behavior works on Switch.
 
 The final architecture remains a direct nx.js NRO. It does not use the Android
 APK, Nintendo WebApplet, a browser applet, a local HTTP server, or Nintendo's
@@ -99,7 +100,9 @@ The lockfile, not these prose values, is the build authority.
 
 ## Phaser compatibility assessment
 
-Phaser compatibility is unresolved, not confirmed.
+Minimal Phaser Canvas compatibility is confirmed for the Milestone 1 scene on
+the tested Switch OLED configuration. Full Phaser and PokéRogue compatibility
+remain unresolved.
 
 The nx.js Canvas resize/context crash was reported as issue #318. PR #319
 added a regression fixture for Phaser's measure-resize-draw text pattern. The
@@ -162,16 +165,18 @@ docs/
 
 ## Next milestones
 
-Do not begin Milestone 2 until the Milestone 1 log confirms:
+The returned Milestone 1 log confirms:
 
 - exact nx.js version and V8 startup;
 - both Canvas diagnostics;
 - Phaser module evaluation and scene `create()`;
 - external PNG decode through the Phaser loader;
 - visible tween/requestAnimationFrame behavior;
-- Joy-Con or Pro Controller A-button input;
-- missing-game-folder error behavior;
-- successful boot with Wi-Fi disabled.
+- attached handheld controller A-button input.
+
+Boot with Wi-Fi disabled and the missing-game-folder error path remain
+unverified Milestone 1 checks. They should be completed alongside, but do not
+block starting, the first Milestone 2 integration work.
 
 Milestone 2 will then build the patched PokéRogue source, create a local URL
 resolver for Vite chunks and assets, disable API/update code, and attempt the

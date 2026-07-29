@@ -30,6 +30,12 @@ The screen should show nx.js, V8, and Phaser versions, two Canvas diagnostic
 results, the external checkerboard PNG, an animated rectangle, and controller
 status. Press A and confirm the counter increments.
 
+Known Milestone 1 display limitations:
+
+- the multiline diagnostic text may overlap;
+- `+` exit handling is not implemented even though the screen currently
+  advertises it.
+
 Then disable Wi-Fi and repeat. Finally, temporarily rename `game` to
 `game-disabled`, relaunch, and confirm a readable missing-files error appears.
 Restore the directory name afterward.
