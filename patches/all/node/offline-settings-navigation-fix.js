@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * Fix Offline settings tab navigation at the central UI input dispatcher.
+ * Fix Offline settings tab navigation on touchscreens and controllers.
  *
- * The custom mode is renamed from APP_SETTINGS to SETTINGS_OFFLINE so
- * touchscreen tab controls remain visible. While that mode is active,
- * CYCLE_FORM / CYCLE_SHINY are intercepted in UI.processInput() before
- * input is delegated to a handler. This avoids depending on the custom
- * handler's processInput path, which is not reliably receiving those tab
- * events in the generated Android build.
+ * Root causes:
+ *
+ * 1. Touch controls only display the settings-tab buttons when the active
+ *    UiMode name begins with "SETTINGS", so APP_SETTINGS is renamed to
+ *    SETTINGS_OFFLINE.
+ *
+ * 2. UiInputs.buttonCycleOption() only forwards CYCLE_FORM / CYCLE_SHINY
+ *    when the active handler is in a hardcoded whitelist. The custom
+ *    OfflineSettingsUiHandler was missing from that whitelist, so F/R and
+ *    LB/RB were discarded before reaching UI.processInput() or the handler.
  *
  * Apply after remove-google-drive.js.
  */
@@ -35,10 +39,10 @@ function writeFile(filePath, source) {
 }
 
 /*
- * Rename the custom mode so PokéRogue's touchscreen CSS continues treating
- * it as part of the Settings family.
+ * Rename the custom mode so the touch controls continue treating it as a
+ * member of the Settings UI family.
  */
-const generatedSourceFiles = [
+const modeReferenceFiles = [
   path.join("pokerogue-src", "src", "enums", "ui-mode.ts"),
   path.join("pokerogue-src", "src", "ui", "ui.ts"),
   path.join(
@@ -57,7 +61,7 @@ const generatedSourceFiles = [
   ),
 ];
 
-for (const filePath of generatedSourceFiles) {
+for (const filePath of modeReferenceFiles) {
   let source = readFile(filePath);
 
   if (source.includes("APP_SETTINGS")) {
@@ -69,8 +73,7 @@ for (const filePath of generatedSourceFiles) {
   }
 }
 
-const uiModePath = generatedSourceFiles[0];
-const uiModeSource = readFile(uiModePath);
+const uiModeSource = readFile(modeReferenceFiles[0]);
 
 if (!uiModeSource.includes("SETTINGS_OFFLINE")) {
   fail(
@@ -78,8 +81,7 @@ if (!uiModeSource.includes("SETTINGS_OFFLINE")) {
   );
 }
 
-const navigationPath = generatedSourceFiles[2];
-const navigationSource = readFile(navigationPath);
+const navigationSource = readFile(modeReferenceFiles[2]);
 
 if (!navigationSource.includes("UiMode.SETTINGS_OFFLINE")) {
   fail(
@@ -88,154 +90,69 @@ if (!navigationSource.includes("UiMode.SETTINGS_OFFLINE")) {
 }
 
 /*
- * Patch the central UI input dispatcher. This is the same entry point used
- * by touch controls and physical controllers before input reaches a handler.
+ * Add the custom handler to UiInputs.buttonCycleOption()'s whitelist.
+ * This is the required fix for both touchscreen F/R and controller LB/RB.
  */
-const uiPath = generatedSourceFiles[1];
-let uiSource = readFile(uiPath);
+const uiInputsPath = path.join(
+  "pokerogue-src",
+  "src",
+  "ui-inputs.ts",
+);
 
-if (uiSource.includes('import type { Button } from "#enums/buttons";')) {
-  uiSource = uiSource.replace(
-    'import type { Button } from "#enums/buttons";',
-    'import { Button } from "#enums/buttons";',
-  );
-}
+let uiInputsSource = readFile(uiInputsPath);
 
-if (!uiSource.includes('import { Button } from "#enums/buttons";')) {
-  fail("Could not enable the runtime Button enum import in ui.ts.");
-}
+const offlineImport =
+  'import { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";';
 
-if (!uiSource.includes("settings-offline-central-input-fix")) {
-  const processInputAnchor = `  processInput(button: Button): boolean {
-    if (this.overlayActive) {
-      return false;
-    }
-
-    const handler = this.getHandler();`;
-
-  if (!uiSource.includes(processInputAnchor)) {
-    fail(
-      "Could not find UI.processInput() in ui.ts. "
-        + "The upstream input dispatcher may have changed.",
-    );
-  }
-
-  const processInputReplacement = `  processInput(button: Button): boolean {
-    if (this.overlayActive) {
-      return false;
-    }
-
-    // settings-offline-central-input-fix
-    // Handle Settings tab changes before delegating to the active handler.
-    if (
-      this.mode === UiMode.SETTINGS_OFFLINE
-      && (
-        button === Button.CYCLE_FORM
-        || button === Button.CYCLE_SHINY
-      )
-    ) {
-      const navigationManager = NavigationManager.getInstance();
-      const modes = navigationManager.modes;
-      const currentIndex = modes.indexOf(
-        UiMode.SETTINGS_OFFLINE,
-      );
-
-      if (currentIndex < 0 || modes.length === 0) {
-        this.playError();
-        return false;
-      }
-
-      const direction =
-        button === Button.CYCLE_FORM ? -1 : 1;
-
-      const nextIndex =
-        (currentIndex + direction + modes.length)
-        % modes.length;
-
-      const nextMode = modes[nextIndex];
-
-      navigationManager.selectedMode = nextMode;
-      void this.setMode(nextMode);
-      navigationManager.updateNavigationMenus();
-      this.playSelect();
-      return true;
-    }
-
-    const handler = this.getHandler();`;
-
-  uiSource = uiSource.replace(
-    processInputAnchor,
-    processInputReplacement,
-  );
-}
-
-writeFile(uiPath, uiSource);
-
-/*
- * Keep the navbar selection synchronized whenever the Offline handler is
- * shown, but do not depend on the handler for tab-button processing.
- */
-const handlerPath = generatedSourceFiles[3];
-let handlerSource = readFile(handlerPath);
-
-if (
-  !handlerSource.includes(
-    'import { NavigationManager } from "#ui/navigation-menu";',
-  )
-) {
+if (!uiInputsSource.includes(offlineImport)) {
   const importAnchor =
-    'import { BaseSettingsUiHandler } from "#ui/base-settings-ui-handler";';
+    'import type { MessageUiHandler } from "#ui/message-ui-handler";';
 
-  if (!handlerSource.includes(importAnchor)) {
+  if (!uiInputsSource.includes(importAnchor)) {
     fail(
-      "Could not find the BaseSettingsUiHandler import "
-        + "in the Offline handler.",
+      "Could not find the MessageUiHandler import in ui-inputs.ts.",
     );
   }
 
-  handlerSource = handlerSource.replace(
+  uiInputsSource = uiInputsSource.replace(
     importAnchor,
     `${importAnchor}
-import { NavigationManager } from "#ui/navigation-menu";`,
+${offlineImport}`,
   );
 }
 
-if (!handlerSource.includes("settings-offline-show-sync")) {
-  const showAnchor = `  public override show(args: any[]): boolean {
-    const result = super.show(args);
-    this.refreshDailySeedInfo();
-    return result;
-  }`;
+if (!uiInputsSource.includes("offline-settings-cycle-whitelist")) {
+  const whitelistAnchor = `      SettingsGamepadUiHandler,
+      SettingsKeyboardUiHandler,
+    ];`;
 
-  const showReplacement = `  public override show(args: any[]): boolean {
-    const result = super.show(args);
-
-    // settings-offline-show-sync
-    const navigationManager = NavigationManager.getInstance();
-    navigationManager.selectedMode = UiMode.SETTINGS_OFFLINE;
-    navigationManager.updateNavigationMenus();
-
-    this.refreshDailySeedInfo();
-    return result;
-  }`;
-
-  if (!handlerSource.includes(showAnchor)) {
+  if (!uiInputsSource.includes(whitelistAnchor)) {
     fail(
-      "Could not find the Offline settings show() method.",
+      "Could not find the settings handler whitelist "
+        + "inside UiInputs.buttonCycleOption().",
     );
   }
 
-  handlerSource = handlerSource.replace(
-    showAnchor,
-    showReplacement,
+  const whitelistReplacement = `      SettingsGamepadUiHandler,
+      SettingsKeyboardUiHandler,
+      // offline-settings-cycle-whitelist
+      OfflineSettingsUiHandler,
+    ];`;
+
+  uiInputsSource = uiInputsSource.replace(
+    whitelistAnchor,
+    whitelistReplacement,
   );
 }
 
-writeFile(handlerPath, handlerSource);
+writeFile(uiInputsPath, uiInputsSource);
 
 console.log(
   "Offline settings mode renamed to SETTINGS_OFFLINE.",
 );
 console.log(
-  "Central touch/controller tab navigation fix applied successfully.",
+  "OfflineSettingsUiHandler added to the cycle-button whitelist.",
+);
+console.log(
+  "Touchscreen F/R and controller LB/RB navigation fix applied successfully.",
 );
