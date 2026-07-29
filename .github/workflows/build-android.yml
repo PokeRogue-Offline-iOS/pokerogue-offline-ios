@@ -224,7 +224,7 @@ jobs:
           echo "Contents of ${MANIFEST}"
           cat $MANIFEST
 
-      - name: Generate Android launcher icons
+      - name: Generate SilverShadow Android icons
         run: |
           if ! command -v convert >/dev/null 2>&1; then
             sudo apt-get update -qq
@@ -243,55 +243,175 @@ jobs:
           fi
 
           RES_DIR="pokerogue-src/android/app/src/main/res"
+          MANIFEST="pokerogue-src/android/app/src/main/AndroidManifest.xml"
 
-          # density:legacy-size:adaptive-layer-size
+          # Remove every generated/upstream launcher image so no stale
+          # PokéRogue launcher resource can be packaged accidentally.
+          find "$RES_DIR" -type f \
+            \( \
+              -name 'ic_launcher.*' \
+              -o -name 'ic_launcher_round.*' \
+              -o -name 'ic_launcher_foreground.*' \
+              -o -name 'silvershadow_launcher.*' \
+              -o -name 'silvershadow_launcher_round.*' \
+              -o -name 'silvershadow_launcher_foreground.*' \
+            \) \
+            -delete
+
+          # density:legacy-size:adaptive-canvas:safe-logo-size
           ICON_SIZES=(
-            "mdpi:48:108"
-            "hdpi:72:162"
-            "xhdpi:96:216"
-            "xxhdpi:144:324"
-            "xxxhdpi:192:432"
+            "mdpi:48:108:66"
+            "hdpi:72:162:99"
+            "xhdpi:96:216:132"
+            "xxhdpi:144:324:198"
+            "xxxhdpi:192:432:264"
           )
 
           for ICON_ENTRY in "${ICON_SIZES[@]}"; do
-            IFS=: read -r DENSITY LEGACY_SIZE ADAPTIVE_SIZE <<< "$ICON_ENTRY"
-            DEST_DIR="$RES_DIR/mipmap-$DENSITY"
+            IFS=: read -r DENSITY LEGACY_SIZE ADAPTIVE_SIZE SAFE_SIZE \
+              <<< "$ICON_ENTRY"
 
+            DEST_DIR="$RES_DIR/mipmap-$DENSITY"
             mkdir -p "$DEST_DIR"
 
-            # Standard launcher icon.
+            # Legacy icon used by older Android versions and some APK viewers.
             convert "$ICON_SRC" \
               -strip \
               -filter Lanczos \
               -resize "${LEGACY_SIZE}x${LEGACY_SIZE}!" \
+              "$DEST_DIR/silvershadow_launcher.png"
+
+            cp \
+              "$DEST_DIR/silvershadow_launcher.png" \
+              "$DEST_DIR/silvershadow_launcher_round.png"
+
+            # Also replace the conventional names for splash screens,
+            # launchers, or libraries that still reference ic_launcher.
+            cp \
+              "$DEST_DIR/silvershadow_launcher.png" \
               "$DEST_DIR/ic_launcher.png"
 
-            # Round launcher fallback.
-            cp "$DEST_DIR/ic_launcher.png" \
+            cp \
+              "$DEST_DIR/silvershadow_launcher.png" \
               "$DEST_DIR/ic_launcher_round.png"
 
-            # Android 8+ adaptive icon layer.
+            # Adaptive foreground. The complete design is reduced into the
+            # safe region so PR, SS, DEV, and the Poké Ball remain visible.
             convert "$ICON_SRC" \
               -strip \
               -filter Lanczos \
-              -resize "${ADAPTIVE_SIZE}x${ADAPTIVE_SIZE}!" \
+              -resize "${SAFE_SIZE}x${SAFE_SIZE}!" \
+              -gravity center \
+              -background none \
+              -extent "${ADAPTIVE_SIZE}x${ADAPTIVE_SIZE}" \
+              "$DEST_DIR/silvershadow_launcher_foreground.png"
+
+            cp \
+              "$DEST_DIR/silvershadow_launcher_foreground.png" \
               "$DEST_DIR/ic_launcher_foreground.png"
           done
 
-          # Enable adaptive icons on Android 8.0 and newer.
           mkdir -p "$RES_DIR/mipmap-anydpi-v26"
 
-          cp \
-            "${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher.xml" \
-            "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml"
+          cat > \
+            "$RES_DIR/mipmap-anydpi-v26/silvershadow_launcher.xml" \
+            <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@android:color/black" />
+              <foreground android:drawable="@mipmap/silvershadow_launcher_foreground" />
+          </adaptive-icon>
+          EOF
 
           cp \
-            "${{ github.workspace }}/configs/android/res/mipmap-anydpi-v26/ic_launcher_round.xml" \
+            "$RES_DIR/mipmap-anydpi-v26/silvershadow_launcher.xml" \
+            "$RES_DIR/mipmap-anydpi-v26/silvershadow_launcher_round.xml"
+
+          # Keep conventional adaptive-resource names custom as well.
+          cat > \
+            "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml" \
+            <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@android:color/black" />
+              <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+          </adaptive-icon>
+          EOF
+
+          cp \
+            "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml" \
             "$RES_DIR/mipmap-anydpi-v26/ic_launcher_round.xml"
 
-          echo "Generated launcher icons from: $ICON_SRC"
+          # Force the APK manifest to use the unique SilverShadow resource.
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest_path = Path(
+              "pokerogue-src/android/app/src/main/AndroidManifest.xml"
+          )
+          source = manifest_path.read_text(encoding="utf-8")
+
+          match = re.search(r"<application\b[^>]*>", source, re.DOTALL)
+
+          if not match:
+              raise SystemExit(
+                  "Could not find the <application> tag in AndroidManifest.xml"
+              )
+
+          application = match.group(0)
+
+          def set_attribute(tag: str, name: str, value: str) -> str:
+              pattern = rf'{re.escape(name)}="[^"]*"'
+
+              if re.search(pattern, tag):
+                  return re.sub(
+                      pattern,
+                      f'{name}="{value}"',
+                      tag,
+                      count=1,
+                  )
+
+              return tag.replace(
+                  "<application",
+                  f'<application\n        {name}="{value}"',
+                  1,
+              )
+
+          application = set_attribute(
+              application,
+              "android:icon",
+              "@mipmap/silvershadow_launcher",
+          )
+
+          application = set_attribute(
+              application,
+              "android:roundIcon",
+              "@mipmap/silvershadow_launcher_round",
+          )
+
+          source = (
+              source[:match.start()]
+              + application
+              + source[match.end():]
+          )
+
+          manifest_path.write_text(source, encoding="utf-8")
+          PY
+
+          echo "Icon source:"
           identify "$ICON_SRC"
 
+          echo "Manifest icon references:"
+          grep -E 'android:(icon|roundIcon)=' "$MANIFEST"
+
+          echo "Generated SilverShadow resources:"
+          find "$RES_DIR" \
+            -type f \
+            -name 'silvershadow_launcher*' \
+            -print \
+            | sort
+            
       - name: Set version in build.gradle
         working-directory: pokerogue-src/android/app
         run: |
@@ -333,6 +453,36 @@ jobs:
             -Pandroid.injected.signing.store.password=android \
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
+
+      - name: Verify packaged APK icon
+        working-directory: pokerogue-src/android
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          AAPT=$(
+            find "$ANDROID_HOME/build-tools" \
+              -type f \
+              -name aapt \
+              | sort -V \
+              | tail -n 1
+          )
+
+          if [ -z "$AAPT" ]; then
+            echo "::error::Could not locate aapt"
+            exit 1
+          fi
+
+          echo "APK application icon resources:"
+          "$AAPT" dump badging "$APK" \
+            | grep -E "application(-icon|-label)?"
+
+          if ! "$AAPT" dump resources "$APK" \
+            | grep -q "silvershadow_launcher"; then
+            echo "::error::SilverShadow launcher resource is missing from APK"
+            exit 1
+          fi
+
+          echo "SilverShadow launcher resource is packaged in the APK."  
 
       - name: Rename resulting APK
         run: |
