@@ -161,6 +161,7 @@ const manifest = {
   offlineRequired: true,
   compatibilityShims: [
     "minimal-dom",
+    "dom-tag-lookup",
     "sdmc-local-fetch",
     "remote-network-block",
     "persistent-local-storage-v1",

@@ -47,6 +47,33 @@ function rect(width: number, height: number): DOMRect {
   } as DOMRect;
 }
 
+function collectElementsByTagName(roots: any[], requestedTagName: string): any[] {
+  const tagName = String(requestedTagName).toUpperCase();
+  const matches: any[] = [];
+  const visited = new Set<any>();
+  const visit = (node: any): void => {
+    if (!node || typeof node !== "object" || visited.has(node)) {
+      return;
+    }
+    visited.add(node);
+    if (tagName === "*" || node.tagName === tagName) {
+      matches.push(node);
+    }
+    const children = Array.isArray(node.children)
+      ? node.children
+      : Array.isArray(node.childNodes)
+        ? node.childNodes
+        : [];
+    for (const child of children) {
+      visit(child);
+    }
+  };
+  for (const root of roots) {
+    visit(root);
+  }
+  return matches;
+}
+
 function elementStub(tagName: string): any {
   const attributes = new Map<string, string>();
   const element: any = {
@@ -126,6 +153,9 @@ function elementStub(tagName: string): any {
         return element.children.find((value: any) => value?.tagName === "CANVAS") ?? null;
       }
       return null;
+    },
+    getElementsByTagName(requestedTagName: string) {
+      return collectElementsByTagName(element.children, requestedTagName);
     },
     focus() {},
     blur() {},
@@ -283,6 +313,7 @@ export function installDomShim(): void {
   clientWidth: SCREEN_WIDTH,
   clientHeight: SCREEN_HEIGHT,
   };
+  const head = elementStub("head");
   const app = {
     ...elementStub("div"),
     id: "app",
@@ -298,7 +329,7 @@ export function installDomShim(): void {
   readyState: "complete",
   title: "SilverShadow PokeRogue",
   documentElement,
-  head: elementStub("head"),
+  head,
   body,
   fonts,
   defaultView: globalThis,
@@ -334,6 +365,9 @@ export function installDomShim(): void {
       return touchControls;
     }
     return null;
+  },
+  getElementsByTagName(tagName: string) {
+    return collectElementsByTagName([documentElement, head, body], tagName);
   },
   querySelector(selector: string) {
     if (selector === "#app") {
