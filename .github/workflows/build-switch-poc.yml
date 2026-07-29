@@ -1,57 +1,178 @@
-name: Build Switch Milestone 1
+name: Build Switch Milestone 2
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - "switch/**"
+      - "patches/all/**"
+      - "patches/switch/**"
+      - "new-files/**"
+      - "scripts/**"
+      - "docs/SWITCH_*.md"
       - ".github/workflows/build-switch-poc.yml"
   push:
     branches:
       - feature/switch-port
     paths:
       - "switch/**"
+      - "patches/all/**"
+      - "patches/switch/**"
+      - "new-files/**"
+      - "scripts/**"
       - ".github/workflows/build-switch-poc.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: switch-poc-${{ github.ref }}
+  group: switch-milestone2-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  SILVERSHADOW_CACHE_DIR: ${{ github.workspace }}/.cache/switch-build
+  UPSTREAM_COMMIT: 0d94c5bbbc7a4fc67014c480e31dab1cfdf7ceb4
+  UPSTREAM_LOCK_SHA256: b32e3cf6b90b63a9ba3b4cd76739557a99f32e423768769865625cf4fa93fb7d
+  ASSETS_COMMIT: 909b43612324622608023b3beb2f24f4ef159c1d
+  LOCALES_COMMIT: c2f9c794ce17f1445d14357a4995353447e9df55
+  NODE_VERSION: 24.9.0
+  PNPM_VERSION: 10.33.2
+  NXJS_VERSION: 1.0.0-beta.6
+  PHASER_VERSION: 3.90.0
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: switch
+    timeout-minutes: 90
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up pinned Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: switch/package-lock.json
+          node-version: 24.9.0
+          check-latest: false
 
-      - name: Install exact dependencies
-        run: npm ci
+      - name: Restore exact nx.js and npm downloads
+        id: npm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/switch-build/downloads/npm
+          key: ${{ runner.os }}-switch-npm-node${{ env.NODE_VERSION }}-nxjs${{ env.NXJS_VERSION }}-phaser${{ env.PHASER_VERSION }}-${{ hashFiles('switch/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-switch-npm-node${{ env.NODE_VERSION }}-nxjs${{ env.NXJS_VERSION }}-phaser${{ env.PHASER_VERSION }}-
 
-      - name: Build, package, and verify fat NRO
+      - name: Restore pnpm content-addressable store
+        id: pnpm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/switch-build/pnpm-store
+          key: ${{ runner.os }}-switch-pnpm${{ env.PNPM_VERSION }}-node${{ env.NODE_VERSION }}-${{ env.UPSTREAM_LOCK_SHA256 }}
+          restore-keys: |
+            ${{ runner.os }}-switch-pnpm${{ env.PNPM_VERSION }}-node${{ env.NODE_VERSION }}-
+
+      - name: Restore pinned upstream Git objects
+        id: upstream-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/switch-build/upstream
+          key: ${{ runner.os }}-switch-upstream-${{ env.UPSTREAM_COMMIT }}
+
+      - name: Restore immutable asset downloads
+        id: asset-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache/switch-build/downloads/assets-*
+            .cache/switch-build/downloads/locales-*
+            .cache/switch-build/assets
+          key: ${{ runner.os }}-switch-assets-${{ env.ASSETS_COMMIT }}-${{ env.LOCALES_COMMIT }}
+
+      - name: Restore exact compiled intermediate
+        id: compiled-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/switch-build/intermediate
+          key: ${{ runner.os }}-switch-compiled-v2-${{ env.UPSTREAM_COMMIT }}-${{ env.UPSTREAM_LOCK_SHA256 }}-node${{ env.NODE_VERSION }}-pnpm${{ env.PNPM_VERSION }}-nxjs${{ env.NXJS_VERSION }}-phaser${{ env.PHASER_VERSION }}-${{ hashFiles('patches/all/**', 'patches/switch/**', 'new-files/**', 'scripts/apply-patches.sh', 'scripts/apply-post-build-patches.sh', 'scripts/patch-lib.sh', 'switch/scripts/**', 'switch/src/**', 'switch/package.json', 'switch/package-lock.json') }}
+
+      - name: Install exact Switch dependencies
+        working-directory: switch
+        run: npm ci --cache "$SILVERSHADOW_CACHE_DIR/downloads/npm" --prefer-offline
+
+      - name: Build real game, fat NRO, release ZIP, and verify
+        working-directory: switch
         run: npm run package
 
-      - name: Upload SD-card-ready package
+      - name: Publish cache and build status
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Switch Milestone 2 cache status"
+            echo
+            echo "- npm download cache restored: ${{ steps.npm-cache.outputs.cache-hit == 'true' }}"
+            echo "- pnpm store restored: ${{ steps.pnpm-cache.outputs.cache-hit == 'true' }}"
+            echo "- upstream Git cache restored: ${{ steps.upstream-cache.outputs.cache-hit == 'true' }}"
+            echo "- immutable assets restored: ${{ steps.asset-cache.outputs.cache-hit == 'true' }}"
+            echo "- compiled intermediate restored: ${{ steps.compiled-cache.outputs.cache-hit == 'true' }}"
+            if [ -f switch/build/build-result.json ]; then
+              echo
+              echo '```json'
+              cat switch/build/build-result.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save exact nx.js and npm downloads
+        if: always() && steps.npm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/switch-build/downloads/npm
+          key: ${{ steps.npm-cache.outputs.cache-primary-key }}
+
+      - name: Save pnpm store
+        if: always() && steps.pnpm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/switch-build/pnpm-store
+          key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
+
+      - name: Save upstream Git objects
+        if: always() && steps.upstream-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/switch-build/upstream
+          key: ${{ steps.upstream-cache.outputs.cache-primary-key }}
+
+      - name: Save immutable assets
+        if: always() && steps.asset-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .cache/switch-build/downloads/assets-*
+            .cache/switch-build/downloads/locales-*
+            .cache/switch-build/assets
+          key: ${{ steps.asset-cache.outputs.cache-primary-key }}
+
+      - name: Save exact compiled intermediate
+        if: success() && steps.compiled-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/switch-build/intermediate
+          key: ${{ steps.compiled-cache.outputs.cache-primary-key }}
+
+      - name: Upload SD-card package and diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: SilverShadow-PokeRogue-Switch-Milestone1
+          name: SilverShadow-PokeRogue-Switch-Milestone2
           path: |
-            switch/release/SilverShadow-PokeRogue-Switch-Milestone1.zip
+            switch/release/SilverShadow-PokeRogue-Switch-Milestone2.zip
             switch/release/switch/SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro
             switch/release/switch/SilverShadow-PokeRogue/game/manifest.json
+            switch/release/switch/SilverShadow-PokeRogue/SHA256SUMS.txt
+            switch/release/milestone2-build.log
+            switch/release/symbols/
           if-no-files-found: error
           retention-days: 30

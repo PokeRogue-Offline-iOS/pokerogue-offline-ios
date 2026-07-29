@@ -1,15 +1,23 @@
 {
-  "name": "silvershadow-pokerogue-switch-poc",
-  "version": "0.1.0",
+  "name": "silvershadow-pokerogue-switch",
+  "version": "0.2.0",
   "private": true,
-  "description": "SilverShadow PokeRogue nx.js V8 / Phaser 3 Milestone 1 proof of concept",
+  "description": "SilverShadow PokeRogue nx.js V8 Milestone 2 real-game bootstrap",
   "type": "module",
   "scripts": {
-    "clean": "node scripts/clean.mjs",
+    "clean": "node scripts/build-game.mjs --clean-output",
+    "clean:output": "node scripts/build-game.mjs --clean-output",
+    "clean:intermediate": "node scripts/build-game.mjs --clean-intermediate",
+    "cache:clean": "node scripts/build-game.mjs --clean-all-cache",
+    "cache:clean:upstream": "node scripts/build-game.mjs --clean-upstream-cache",
+    "game:build": "node scripts/build-game.mjs",
+    "game:build:offline": "node scripts/build-game.mjs --offline",
+    "game:refresh": "node scripts/build-game.mjs --refresh-upstream --refresh-assets --force-clean-checkout --rebuild-intermediate",
     "typecheck": "tsc -p tsconfig.json",
-    "build": "npm run clean && node scripts/build.mjs",
+    "build": "node scripts/build.mjs",
     "nro": "nxjs-nro --fat",
-    "package": "npm run typecheck && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
+    "package": "npm run game:build && npm run typecheck && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
+    "package:offline": "npm run game:build:offline && npm run typecheck && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
     "check": "npm run typecheck && npm run build",
     "verify": "node scripts/verify-release.mjs"
   },
@@ -18,7 +26,7 @@
     "id": "01a5a17e5d010000",
     "title": "SilverShadow PokeRogue",
     "author": "SilverShadow",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "dependencies": {
     "phaser": "3.90.0"

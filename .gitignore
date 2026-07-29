@@ -3,6 +3,7 @@ node_modules/
 npm-debug.log*
 pnpm-debug.log*
 .pnpm-store/
+.cache/
 
 # ── PokeRogue source clone / build output ───────────────────────────────────
 # CI always clones pokerogue-src fresh; nothing under it should ever be committed.
