@@ -64,7 +64,7 @@ external beside it.
 
 Return:
 
-- `/switch/SilverShadow-PokeRogue/logs/milestone2.log`
+- the newest `/switch/SilverShadow-PokeRogue/logs/milestone2-*.log`
 - a photo of the screen
 - the console model and firmware
 - Atmosphère, Hekate, and hbmenu versions

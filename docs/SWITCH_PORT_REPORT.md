@@ -171,6 +171,6 @@ session and GitHub Actions use the documented default/explicit cache roots.
 ## Required hardware feedback
 
 Return the exact items in `docs/SWITCH_INSTALL.md`, especially
-`logs/milestone2.log`, the screen photo, console/runtime versions, title
+the newest `logs/milestone2-*.log`, the screen photo, console/runtime versions, title
 override state, controller arrangement, Wi-Fi state, the last startup stage,
 and whether storage and deliberate missing-file failures behaved as described.

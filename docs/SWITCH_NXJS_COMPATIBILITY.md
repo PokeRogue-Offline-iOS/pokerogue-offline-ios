@@ -150,4 +150,4 @@ Unknown first hardware blocker:
 - Desktop verification cannot prove nx.js async-function evaluation, WebGL,
   custom Phaser pipelines, GPU memory, or title-screen reach.
 - The authoritative next result is the last stage and full stack in
-  `logs/milestone2.log`.
+  the newest `logs/milestone2-*.log`.

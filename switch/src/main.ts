@@ -1,4 +1,4 @@
-import { GAME_ROOT, NXJS_VERSION, PHASER_VERSION } from "./constants";
+import { GAME_ROOT, LOG_PATH, NXJS_VERSION, PHASER_VERSION } from "./constants";
 import { appendLog } from "./logger";
 import { installPersistentStorage } from "./storage";
 import {
@@ -39,7 +39,7 @@ async function boot(): Promise<void> {
   });
   Switch.mkdirSync("sdmc:/switch/SilverShadow-PokeRogue/logs");
   setStartupStage("logging-initialized", {
-    log: "sdmc:/switch/SilverShadow-PokeRogue/logs/milestone2.log",
+    log: LOG_PATH,
   });
 
   const manifest = await validateStartup();

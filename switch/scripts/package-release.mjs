@@ -104,7 +104,7 @@ await writeFile(
 );
 await writeFile(
   path.join(appRoot, "logs", "README.txt"),
-  "Return milestone2.log and a photo of the screen when reporting hardware results.\n",
+  "Return the newest milestone2-*.log and a photo of the screen when reporting hardware results.\n",
 );
 
 const requiredDirectories = ["assets", "audio", "fonts", "images", "locales"];

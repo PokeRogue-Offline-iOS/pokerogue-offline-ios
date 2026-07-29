@@ -151,10 +151,11 @@ the reusable bare repository.
 Milestone 2 appends to:
 
 ```text
-sdmc:/switch/SilverShadow-PokeRogue/logs/milestone2.log
+sdmc:/switch/SilverShadow-PokeRogue/logs/milestone2-YYYYMMDDTHHMMSSmmmZ.log
 ```
 
-The log records explicit startup stages, local/blocked resource resolution,
+Each launch creates a new UTC-timestamped log. The log records explicit startup
+stages, local/blocked resource resolution,
 manifest and version information, full error stacks, active shims, requested
 paths, and memory information when available. Delete only the log between
 controlled test runs. Never delete `saves/`.

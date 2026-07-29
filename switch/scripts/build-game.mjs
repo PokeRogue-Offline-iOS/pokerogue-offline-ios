@@ -523,6 +523,11 @@ async function createSwitchEntry(distRoot) {
   if (!entryPath.startsWith(`${path.resolve(distRoot)}${path.sep}`) || !(await exists(entryPath))) {
     throw new Error(`Compiled Vite entry is unsafe or missing: ${originalEntryPoint}`);
   }
+  const regexRewriteCounts = [0, 0];
+  const compatibleEntrySource = rewriteNxjsUnsupportedRegex(
+    await readFile(entryPath, "utf8"),
+    regexRewriteCounts,
+  );
   const outputPath = path.join(distRoot, "switch-entry.js");
   const compiledFileLoader = {
     name: "compiled-file-loader",
@@ -531,16 +536,19 @@ async function createSwitchEntry(distRoot) {
         path: path.resolve(args.resolveDir, args.path),
         namespace: "compiled-file",
       }));
-      context.onLoad({ filter: /.*/, namespace: "compiled-file" }, async args => ({
-        contents: await readFile(args.path, "utf8"),
-        loader: "js",
-        resolveDir: path.dirname(args.path),
-      }));
+      context.onLoad({ filter: /.*/, namespace: "compiled-file" }, async args => {
+        const contents = rewriteNxjsUnsupportedRegex(await readFile(args.path, "utf8"), regexRewriteCounts);
+        return {
+          contents,
+          loader: "js",
+          resolveDir: path.dirname(args.path),
+        };
+      });
     },
   };
   const result = await esbuild({
     stdin: {
-      contents: await readFile(entryPath, "utf8"),
+      contents: compatibleEntrySource,
       sourcefile: originalEntryPoint,
       resolveDir: path.dirname(entryPath),
       loader: "js",
@@ -571,8 +579,30 @@ async function createSwitchEntry(distRoot) {
   if (!output || output.imports.length !== 0) {
     throw new Error("The Switch entry still contains unresolved JavaScript imports.");
   }
+  if (regexRewriteCounts.some(count => count !== 1)) {
+    throw new Error(
+      `Expected one occurrence of each nx.js-incompatible Unicode property regex, found ${regexRewriteCounts.join(", ")}.`,
+    );
+  }
+  if (/\\[pP]\{/.test(await readFile(outputPath, "utf8"))) {
+    throw new Error("The controlled Switch entry still contains unsupported Unicode property escapes.");
+  }
   await log(`compiled entry: ${originalEntryPoint} -> switch-entry.js (${output.bytes} bytes, no external imports)`);
   return originalEntryPoint;
+}
+
+function rewriteNxjsUnsupportedRegex(source, counts) {
+  const replacements = [
+    [String.raw`/([\p{Ll}\d])(\p{Lu})/gu`, String.raw`/([a-z\d])([A-Z])/g`],
+    [String.raw`/(\p{Lu})([\p{Lu}][\p{Ll}])/gu`, String.raw`/([A-Z])([A-Z][a-z])/g`],
+  ];
+  let compatible = source;
+  for (const [index, [unsupported, replacement]] of replacements.entries()) {
+    const occurrences = compatible.split(unsupported).length - 1;
+    counts[index] += occurrences;
+    compatible = compatible.replaceAll(unsupported, replacement);
+  }
+  return compatible;
 }
 
 async function validateRealGameOutput(distRoot) {

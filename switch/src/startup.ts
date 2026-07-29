@@ -278,7 +278,7 @@ export function showFatalError(error: unknown): void {
       .forEach((line, index) => context.fillText(line, 56, 190 + index * 28));
     context.fillStyle = "#aeb4c4";
     context.fillText("Return the log and a photo of this screen. Exit with HOME.", 56, 620);
-    context.fillText("Log: /switch/SilverShadow-PokeRogue/logs/milestone2.log", 56, 658);
+    context.fillText(`Log: ${LOG_PATH.replace(/^sdmc:/, "")}`, 56, 658);
   } catch (renderError) {
     console.error("Unable to render startup error:", renderError);
   }

@@ -273,7 +273,7 @@ Code-verified in Milestone 2:
 
 Hardware-verified remains limited to the Milestone 1 results above. The first
 real Milestone 2 compatibility blocker is not known until the new package is
-run on a Switch and `logs/milestone2.log` is returned. Do not infer title-screen
+run on a Switch and the newest `logs/milestone2-*.log` is returned. Do not infer title-screen
 or gameplay success from desktop build verification.
 
 ## Next milestones
