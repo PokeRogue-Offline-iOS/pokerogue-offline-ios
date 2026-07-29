@@ -26,7 +26,8 @@ The implementation is separated into logical local commits for:
 
 1. persistent cache and real-game build integration;
 2. runtime loader, packaging, metadata, and verification;
-3. Milestone 2 documentation and hardware-test instructions.
+3. Milestone 2 documentation and hardware-test instructions;
+4. final measured build and validation results.
 
 Exact hashes and messages are included in the final local handoff because a
 commit cannot record its own final hash.
@@ -42,9 +43,10 @@ switch/release/milestone2-build.log
 switch/release/symbols/SilverShadow-PokeRogue-switch-entry.js.map
 ```
 
-The verified package contains one 56,491,745-byte fat NRO, a
-610,691,406-byte ZIP, 34,116 ZIP entries, and 20 JavaScript files. Exact sizes
-may change after final metadata-only regeneration.
+The pre-report validation package contained one 56,492,289-byte fat NRO, a
+610,691,949-byte ZIP, 34,116 ZIP entries, and 20 JavaScript files. The final
+metadata-only regeneration can change the exact byte counts without changing
+the payload layout.
 
 ## Package layout
 
@@ -87,12 +89,16 @@ intermediate. Only package/download stores receive partial restore keys.
 
 ## Build timing and cache observations
 
-The final successful clean-cache and offline-rebuild timings are recorded after
-the last validation pass. During implementation, the exact compiled
-intermediate was reused in `0.046` seconds, and a complete cached NRO/ZIP
-package/verification pass completed in about `113` seconds. ZIP assembly is the
-dominant cached cost because the 610 MB-class external payload is deliberately
-recreated and reverified.
+Measured on the local Windows validation host:
+
+- clean-cache `npm ci` plus full package and verification: `309.310` seconds;
+- complete cached package and verification: `109.362` seconds;
+- exact compiled-intermediate reuse within that cached build: `0.053` seconds;
+- forced offline intermediate rebuild plus offline package and verification:
+  `263.306` seconds, including a `147.502`-second intermediate rebuild.
+
+ZIP assembly is the dominant cached cost because the 610 MB-class external
+payload is deliberately recreated and reverified.
 
 Observed cache-miss categories on the first real build:
 
@@ -130,15 +136,13 @@ Executed and passed:
 - NRO placement/duplication checks;
 - ZIP central-directory verification;
 - shell and Node syntax checks;
-- `git diff --check`.
-
-Still to run after the final documentation/code state:
-
 - successful measured clean-cache package build;
-- measured offline forced-intermediate rebuild;
+- measured cached package build and compiled-intermediate reuse;
+- measured forced offline intermediate rebuild and package build;
 - final Android/origin-main diff audit;
 - mojibake scan;
-- final clean worktree/branch confirmation.
+- `git diff --check`;
+- final clean branch/worktree confirmation.
 
 Requires real Switch hardware:
 
