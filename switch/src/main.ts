@@ -45,6 +45,10 @@ async function boot(): Promise<void> {
   setStartupStage("logging-initialized", {
     log: LOG_PATH,
   });
+  addEventListener("beforeunload", event => {
+    event.preventDefault();
+    appendLog("INFO", "Intercepted Plus-button exit request for game input");
+  });
 
   const manifest = await validateStartup();
   const diagnostics = runCanvasDiagnostics();

@@ -134,6 +134,11 @@ Implemented compatibility behavior:
 - logical 1920x1080 default-framebuffer viewport and scissor scaling to the
   physical 1280x720 nx.js screen while leaving offscreen render targets at
   their requested dimensions;
+- a zero-bound TextMetrics fallback that lets Phaser pixel-scan font ascent
+  and descent when nx.js reports both as zero despite drawing valid glyphs;
+- Nintendo controller identity adaptation so PokéRogue selects its built-in
+  Pro Controller mapping, plus cancellation of nx.js's default Plus-button
+  exit so Plus remains available as the in-game menu button;
 - nx.js `Video` format capability and element-method adaptation so Phaser can
   select the bundled MP4 assets;
 - fixed local `location`;

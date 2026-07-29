@@ -273,6 +273,74 @@ function installDefaultFramebufferScale(context: any): void {
   });
 }
 
+function installTextMetricsFallback(context: any): void {
+  if (context.__silverShadowTextMetricsFallbackInstalled) {
+    return;
+  }
+  context.__silverShadowTextMetricsFallbackInstalled = true;
+  const nativeMeasureText = context.measureText.bind(context);
+  let fallbackLogged = false;
+
+  context.measureText = (text: string) => {
+    const metrics = nativeMeasureText(text);
+    if (
+      Number(metrics.width) > 0 &&
+      Number(metrics.actualBoundingBoxAscent) === 0 &&
+      Number(metrics.actualBoundingBoxDescent) === 0
+    ) {
+      if (!fallbackLogged) {
+        fallbackLogged = true;
+        appendLog("INFO", "Activated zero-bound TextMetrics fallback", {
+          font: context.font,
+          sampleWidth: metrics.width,
+        });
+      }
+      // Phaser checks for the presence of actualBoundingBoxAscent before using
+      // it. Returning width-only metrics activates Phaser's existing
+      // getImageData pixel-scan path when nx.js reports unusable zero bounds.
+      return { width: metrics.width };
+    }
+    return metrics;
+  };
+}
+
+function installNintendoGamepadIdentity(): void {
+  const global = globalThis as any;
+  if (global.__silverShadowNintendoGamepadIdentityInstalled) {
+    return;
+  }
+  global.__silverShadowNintendoGamepadIdentityInstalled = true;
+  const nativeGetGamepads = navigator.getGamepads.bind(navigator);
+  const wrappers = new WeakMap<object, object>();
+
+  Object.defineProperty(navigator, "getGamepads", {
+    configurable: true,
+    value() {
+      return nativeGetGamepads().map(gamepad => {
+        if (!gamepad) {
+          return null;
+        }
+        let wrapped = wrappers.get(gamepad);
+        if (!wrapped) {
+          wrapped = new Proxy(gamepad, {
+            get(target, property) {
+              if (property === "id") {
+                // PokéRogue recognizes 057e:2009 as its Nintendo Pro
+                // Controller profile, which maps physical A/B and X/Y using
+                // Nintendo labels instead of the generic Xbox layout.
+                return `057e-2009 ${target.id}`;
+              }
+              return Reflect.get(target, property, target);
+            },
+          });
+          wrappers.set(gamepad, wrapped);
+        }
+        return wrapped;
+      });
+    },
+  });
+}
+
 function elementStub(tagName: string): any {
   const attributes = new Map<string, string>();
   const element: any = {
@@ -450,6 +518,9 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
       }
     }
     if (context) {
+      if (nativeKind === "2d") {
+        installTextMetricsFallback(context);
+      }
       if (nativeKind === "webgl2") {
         const global = globalThis as any;
         const firstAcquisition = !global.__SILVERSHADOW_SCREEN_CONTEXT_ACQUIRED__;
@@ -708,6 +779,7 @@ export function installDomShim(): void {
   // The proof of concept can continue if these feature-detection hints are read-only.
   }
 
+  installNintendoGamepadIdentity();
   patchCanvas(screen);
   app.appendChild(screen);
 }
