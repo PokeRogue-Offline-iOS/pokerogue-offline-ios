@@ -142,6 +142,8 @@ Implemented compatibility behavior:
 - recoverable SD-card-backed localStorage;
 - in-memory sessionStorage;
 - full staged file error reporting after Phaser owns the physical screen.
+- bounded GPU activity counters at 5, 15, and 30 seconds for diagnosing a
+  silent black screen without altering game assets or renderer configuration.
 
 Deliberately deferred until a log requires them:
 
