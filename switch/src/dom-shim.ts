@@ -186,7 +186,7 @@ function collectElementsByTagName(roots: any[], requestedTagName: string): any[]
       return;
     }
     visited.add(node);
-    if (tagName === "*" || node.tagName === tagName) {
+    if (tagName === "*" || String(node.tagName).toUpperCase() === tagName) {
       matches.push(node);
     }
     const children = Array.isArray(node.children)
@@ -202,6 +202,122 @@ function collectElementsByTagName(roots: any[], requestedTagName: string): any[]
     visit(root);
   }
   return matches;
+}
+
+function decodeXmlAttribute(value: string): string {
+  return value.replace(/&(?:quot|apos|lt|gt|amp|#\d+|#x[\da-f]+);/gi, entity => {
+    switch (entity.toLowerCase()) {
+      case "&quot;":
+        return '"';
+      case "&apos;":
+        return "'";
+      case "&lt;":
+        return "<";
+      case "&gt;":
+        return ">";
+      case "&amp;":
+        return "&";
+      default: {
+        const hexadecimal = entity.toLowerCase().startsWith("&#x");
+        const digits = entity.slice(hexadecimal ? 3 : 2, -1);
+        const codePoint = Number.parseInt(digits, hexadecimal ? 16 : 10);
+        return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity;
+      }
+    }
+  });
+}
+
+function xmlElement(tagName: string, attributes: Map<string, string>): any {
+  const element: any = {
+    nodeName: tagName,
+    tagName,
+    nodeType: 1,
+    parentNode: null,
+    parentElement: null,
+    childNodes: [],
+    children: [],
+    getAttribute(name: string) {
+      return attributes.get(String(name)) ?? null;
+    },
+    hasAttribute(name: string) {
+      return attributes.has(String(name));
+    },
+    getElementsByTagName(requestedTagName: string) {
+      return collectElementsByTagName(element.children, requestedTagName);
+    },
+  };
+  return element;
+}
+
+function parseXmlDocument(source: string): any {
+  const roots: any[] = [];
+  const stack: any[] = [];
+  let malformed = false;
+  const tokens = String(source).match(/<[^>]*>/g) ?? [];
+
+  for (const token of tokens) {
+    if (
+      token.startsWith("<?") ||
+      token.startsWith("<!") ||
+      token.startsWith("<![CDATA[")
+    ) {
+      continue;
+    }
+    if (token.startsWith("</")) {
+      const tagName = token.slice(2, -1).trim();
+      const current = stack.pop();
+      if (!current || current.tagName !== tagName) {
+        malformed = true;
+        break;
+      }
+      continue;
+    }
+
+    const selfClosing = /\/\s*>$/.test(token);
+    const content = token.slice(1, selfClosing ? token.lastIndexOf("/") : -1).trim();
+    const nameMatch = /^([^\s/>]+)/.exec(content);
+    if (!nameMatch) {
+      malformed = true;
+      break;
+    }
+
+    const tagName = nameMatch[1];
+    const attributes = new Map<string, string>();
+    const attributeSource = content.slice(nameMatch[0].length);
+    const attributePattern = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+    for (const match of attributeSource.matchAll(attributePattern)) {
+      attributes.set(match[1], decodeXmlAttribute(match[2] ?? match[3] ?? ""));
+    }
+
+    const element = xmlElement(tagName, attributes);
+    const parent = stack.at(-1);
+    if (parent) {
+      element.parentNode = parent;
+      element.parentElement = parent;
+      parent.childNodes.push(element);
+      parent.children.push(element);
+    } else {
+      roots.push(element);
+    }
+    if (!selfClosing) {
+      stack.push(element);
+    }
+  }
+
+  malformed ||= stack.length !== 0 || roots.length !== 1;
+  const parserError = malformed ? xmlElement("parsererror", new Map()) : null;
+  return {
+    nodeType: 9,
+    documentElement: malformed ? parserError : roots[0],
+    childNodes: malformed ? [parserError] : roots,
+    children: malformed ? [parserError] : roots,
+    getElementsByTagName(tagName: string) {
+      if (malformed) {
+        return String(tagName).toLowerCase() === "parsererror" ? [parserError] : [];
+      }
+      return collectElementsByTagName(roots, tagName);
+    },
+  };
 }
 
 function installDefaultFramebufferScale(context: any): void {
@@ -279,7 +395,6 @@ function installTextMetricsFallback(context: any): void {
   }
   context.__silverShadowTextMetricsFallbackInstalled = true;
   const nativeMeasureText = context.measureText.bind(context);
-  let fallbackLogged = false;
 
   context.measureText = (text: string) => {
     const metrics = nativeMeasureText(text);
@@ -288,8 +403,9 @@ function installTextMetricsFallback(context: any): void {
       Number(metrics.actualBoundingBoxAscent) === 0 &&
       Number(metrics.actualBoundingBoxDescent) === 0
     ) {
-      if (!fallbackLogged) {
-        fallbackLogged = true;
+      const global = globalThis as any;
+      if (!global.__SILVERSHADOW_TEXT_METRICS_FALLBACK_LOGGED__) {
+        global.__SILVERSHADOW_TEXT_METRICS_FALLBACK_LOGGED__ = true;
         appendLog("INFO", "Activated zero-bound TextMetrics fallback", {
           font: context.font,
           sampleWidth: metrics.width,
@@ -585,6 +701,11 @@ export function installDomShim(): void {
   global.Node ??= class Node {};
   global.Document ??= class Document {};
   global.HTMLDocument ??= global.Document;
+  global.DOMParser ??= class DOMParser {
+    parseFromString(source: string, _mimeType: string) {
+      return parseXmlDocument(source);
+    }
+  };
   global.HTMLCanvasElement ??= class HTMLCanvasElement {};
   global.HTMLImageElement ??= Image;
   global.HTMLAudioElement ??= Audio;
