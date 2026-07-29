@@ -1,18 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Fix Offline settings tab navigation on touchscreens and controllers.
+ * Fix Offline settings tab navigation at the central UI input dispatcher.
  *
- * Root cause:
- * PokéRogue's touch-control CSS exposes the previous/next-tab buttons only
- * when the active UiMode name begins with "SETTINGS". The original custom
- * mode was named APP_SETTINGS, so entering it changed data-ui-mode to
- * APP_SETTINGS and the F/R tab controls were hidden.
- *
- * This patch:
- *   1. Renames the generated mode from APP_SETTINGS to SETTINGS_OFFLINE.
- *   2. Synchronizes NavigationManager when the Offline handler is shown.
- *   3. Handles CYCLE_FORM / CYCLE_SHINY directly as a controller fallback.
+ * The custom mode is renamed from APP_SETTINGS to SETTINGS_OFFLINE so
+ * touchscreen tab controls remain visible. While that mode is active,
+ * CYCLE_FORM / CYCLE_SHINY are intercepted in UI.processInput() before
+ * input is delegated to a handler. This avoids depending on the custom
+ * handler's processInput path, which is not reliably receiving those tab
+ * events in the generated Android build.
  *
  * Apply after remove-google-drive.js.
  */
@@ -38,6 +34,10 @@ function writeFile(filePath, source) {
   console.log(`Written: ${filePath}`);
 }
 
+/*
+ * Rename the custom mode so PokéRogue's touchscreen CSS continues treating
+ * it as part of the Settings family.
+ */
 const generatedSourceFiles = [
   path.join("pokerogue-src", "src", "enums", "ui-mode.ts"),
   path.join("pokerogue-src", "src", "ui", "ui.ts"),
@@ -87,25 +87,96 @@ if (!navigationSource.includes("UiMode.SETTINGS_OFFLINE")) {
   );
 }
 
-const handlerPath = generatedSourceFiles[3];
-let handlerSource = readFile(handlerPath);
+/*
+ * Patch the central UI input dispatcher. This is the same entry point used
+ * by touch controls and physical controllers before input reaches a handler.
+ */
+const uiPath = generatedSourceFiles[1];
+let uiSource = readFile(uiPath);
 
-if (!handlerSource.includes('import { Button } from "#enums/buttons";')) {
-  const importAnchor =
-    'import { globalScene } from "#app/global-scene";';
+if (uiSource.includes('import type { Button } from "#enums/buttons";')) {
+  uiSource = uiSource.replace(
+    'import type { Button } from "#enums/buttons";',
+    'import { Button } from "#enums/buttons";',
+  );
+}
 
-  if (!handlerSource.includes(importAnchor)) {
+if (!uiSource.includes('import { Button } from "#enums/buttons";')) {
+  fail("Could not enable the runtime Button enum import in ui.ts.");
+}
+
+if (!uiSource.includes("settings-offline-central-input-fix")) {
+  const processInputAnchor = `  processInput(button: Button): boolean {
+    if (this.overlayActive) {
+      return false;
+    }
+
+    const handler = this.getHandler();`;
+
+  if (!uiSource.includes(processInputAnchor)) {
     fail(
-      "Could not find the globalScene import in the Offline handler.",
+      "Could not find UI.processInput() in ui.ts. "
+        + "The upstream input dispatcher may have changed.",
     );
   }
 
-  handlerSource = handlerSource.replace(
-    importAnchor,
-    `${importAnchor}
-import { Button } from "#enums/buttons";`,
+  const processInputReplacement = `  processInput(button: Button): boolean {
+    if (this.overlayActive) {
+      return false;
+    }
+
+    // settings-offline-central-input-fix
+    // Handle Settings tab changes before delegating to the active handler.
+    if (
+      this.mode === UiMode.SETTINGS_OFFLINE
+      && (
+        button === Button.CYCLE_FORM
+        || button === Button.CYCLE_SHINY
+      )
+    ) {
+      const navigationManager = NavigationManager.getInstance();
+      const modes = navigationManager.modes;
+      const currentIndex = modes.indexOf(
+        UiMode.SETTINGS_OFFLINE,
+      );
+
+      if (currentIndex < 0 || modes.length === 0) {
+        this.playError();
+        return false;
+      }
+
+      const direction =
+        button === Button.CYCLE_FORM ? -1 : 1;
+
+      const nextIndex =
+        (currentIndex + direction + modes.length)
+        % modes.length;
+
+      const nextMode = modes[nextIndex];
+
+      navigationManager.selectedMode = nextMode;
+      void this.setMode(nextMode);
+      navigationManager.updateNavigationMenus();
+      this.playSelect();
+      return true;
+    }
+
+    const handler = this.getHandler();`;
+
+  uiSource = uiSource.replace(
+    processInputAnchor,
+    processInputReplacement,
   );
 }
+
+writeFile(uiPath, uiSource);
+
+/*
+ * Keep the navbar selection synchronized whenever the Offline handler is
+ * shown, but do not depend on the handler for tab-button processing.
+ */
+const handlerPath = generatedSourceFiles[3];
+let handlerSource = readFile(handlerPath);
 
 if (
   !handlerSource.includes(
@@ -117,7 +188,8 @@ if (
 
   if (!handlerSource.includes(importAnchor)) {
     fail(
-      "Could not find the BaseSettingsUiHandler import.",
+      "Could not find the BaseSettingsUiHandler import "
+        + "in the Offline handler.",
     );
   }
 
@@ -128,67 +200,6 @@ import { NavigationManager } from "#ui/navigation-menu";`,
   );
 }
 
-/*
- * Remove the earlier v1 processInput override, if present. The old patch used
- * the marker below and was inserted immediately after the constructor.
- */
-const oldOverridePattern =
-  /\n\s*\/\*\*[\s\S]*?offline-settings-navigation-fix:[\s\S]*?public override processInput\(button: Button\): boolean \{[\s\S]*?\n\s*\}\n(?=\s*private rowIndex)/;
-
-if (oldOverridePattern.test(handlerSource)) {
-  handlerSource = handlerSource.replace(
-    oldOverridePattern,
-    "\n",
-  );
-}
-
-if (!handlerSource.includes("settings-offline-navigation-v2")) {
-  const constructorPattern =
-    /  constructor\(mode: UiMode \| null = null\) \{[\s\S]*?^  \}/m;
-  const constructorMatch = handlerSource.match(constructorPattern);
-
-  if (!constructorMatch) {
-    fail(
-      "Could not find the OfflineSettingsUiHandler constructor.",
-    );
-  }
-
-  const navigationMethods = `
-
-  /**
-   * settings-offline-navigation-v2:
-   * Keep the custom Offline mode synchronized with the shared settings-tab
-   * navigation manager and handle shoulder/tab inputs directly.
-   */
-  public override processInput(button: Button): boolean {
-    if (
-      button !== Button.CYCLE_FORM
-      && button !== Button.CYCLE_SHINY
-    ) {
-      return super.processInput(button);
-    }
-
-    const navigationManager = NavigationManager.getInstance();
-
-    navigationManager.selectedMode = UiMode.SETTINGS_OFFLINE;
-    navigationManager.navigate(
-      button === Button.CYCLE_FORM ? "LEFT" : "RIGHT",
-    );
-
-    globalScene.ui.playSelect();
-    return true;
-  }`;
-
-  handlerSource = handlerSource.replace(
-    constructorMatch[0],
-    constructorMatch[0] + navigationMethods,
-  );
-}
-
-/*
- * Synchronize the selected tab whenever Offline is shown. This also makes the
- * navbar highlight reliable when entering from either direction.
- */
 if (!handlerSource.includes("settings-offline-show-sync")) {
   const showAnchor = `  public override show(args: any[]): boolean {
     const result = super.show(args);
@@ -220,17 +231,11 @@ if (!handlerSource.includes("settings-offline-show-sync")) {
   );
 }
 
-if (handlerSource.includes("UiMode.APP_SETTINGS")) {
-  fail(
-    "The old APP_SETTINGS mode still remains in the Offline handler.",
-  );
-}
-
 writeFile(handlerPath, handlerSource);
 
 console.log(
   "Offline settings mode renamed to SETTINGS_OFFLINE.",
 );
 console.log(
-  "Touch and controller tab navigation fix applied successfully.",
+  "Central touch/controller tab navigation fix applied successfully.",
 );
