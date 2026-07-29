@@ -336,14 +336,19 @@ jobs:
 
       - name: Rename resulting APK
         run: |
-          UNSIGNED="pokerogue-src/android/app/build/outputs/apk/debug/app-debug.apk"
+          SOURCE_APK="pokerogue-src/android/app/build/outputs/apk/debug/app-debug.apk"
+          BUILD_NUM="${{ inputs.build_number || github.run_number }}"
+          POKEROGUE_VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          SILVER_VERSION="${{ env.SILVERSHADOW_VERSION }}"
+
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="PokeRogueSilverShadow-dev.apk"
+            OUTPUT="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVER_VERSION}-build${BUILD_NUM}-dev.apk"
           else
-            OUTPUT="PokeRogueSilverShadow.apk"
+            OUTPUT="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVER_VERSION}-build${BUILD_NUM}.apk"
           fi
-          cp -v $UNSIGNED $OUTPUT
-          echo "APK_NAME=$OUTPUT" >> $GITHUB_ENV
+
+          cp -v "$SOURCE_APK" "$OUTPUT"
+          echo "APK_NAME=$OUTPUT" >> "$GITHUB_ENV"
 
       - name: Upload APK directly
         uses: actions/upload-artifact@v7
