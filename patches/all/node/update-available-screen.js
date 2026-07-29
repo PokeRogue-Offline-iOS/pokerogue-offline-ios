@@ -4,14 +4,14 @@
  *
  * Registers the "Update Available" screen (paginated, scrollable changelog
  * viewer) as a new UiMode. This is the display half of the update-checker
- * feature; update-check.js (which must run before this, so APP_SETTINGS/
+ * feature; update-check.js (which must run before this, so SETTINGS_OFFLINE/
  * GACHA_CALENDAR already exist as the enum's/handlers array's last entries)
  * is what actually calls `globalScene.ui.setOverlayMode(UiMode.UPDATE_AVAILABLE, releases)`.
  *
  * Sub-patches, applied in order:
  *
  *   1. src/enums/ui-mode.ts
- *        Append UPDATE_AVAILABLE (after APP_SETTINGS, the last entry).
+ *        Append UPDATE_AVAILABLE after the custom Offline settings mode.
  *
  *   2. src/ui/utils/markdown-to-bbcode.ts  (new file, plus its test)
  *        Small markdown-subset -> BBCode converter used to render the
@@ -28,7 +28,6 @@
  * No menu-ui-handler.ts changes - this screen is only ever opened
  * programmatically from the update checker, never from the pause menu.
  */
-
 const fs = require("fs");
 const path = require("path");
 
@@ -70,9 +69,22 @@ let uiModeSrc = readFile(UI_MODE_PATH);
 if (uiModeSrc.includes("UPDATE_AVAILABLE")) {
   console.log("SKIP ui-mode.ts — UPDATE_AVAILABLE already present");
 } else {
-  const ANCHOR = "APP_SETTINGS,";
-  requireAnchor(uiModeSrc, ANCHOR, "APP_SETTINGS in ui-mode.ts");
-  uiModeSrc = uiModeSrc.replace(ANCHOR, `${ANCHOR}\n  UPDATE_AVAILABLE,`);
+  const offlineModeName = uiModeSrc.includes("SETTINGS_OFFLINE,")
+    ? "SETTINGS_OFFLINE"
+    : "APP_SETTINGS";
+  const anchor = `${offlineModeName},`;
+
+  requireAnchor(
+    uiModeSrc,
+    anchor,
+    `${offlineModeName} in ui-mode.ts`,
+  );
+
+  uiModeSrc = uiModeSrc.replace(
+    anchor,
+    `${anchor}\n  UPDATE_AVAILABLE,`,
+  );
+
   writeFile(UI_MODE_PATH, uiModeSrc);
 }
 
@@ -80,21 +92,51 @@ if (uiModeSrc.includes("UPDATE_AVAILABLE")) {
 // Sub-patch 2: src/ui/utils/markdown-to-bbcode.ts  (new file)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MARKDOWN_UTIL_PATH = path.join("pokerogue-src", "src", "ui", "utils", "markdown-to-bbcode.ts");
+const MARKDOWN_UTIL_PATH = path.join(
+  "pokerogue-src",
+  "src",
+  "ui",
+  "utils",
+  "markdown-to-bbcode.ts",
+);
 
 if (fs.existsSync(MARKDOWN_UTIL_PATH)) {
   console.log("SKIP markdown-to-bbcode.ts — already exists");
 } else {
-  const src = fs.readFileSync(path.join(NEW_FILES_DIR, "src", "ui", "utils", "markdown-to-bbcode.ts"), "utf8");
+  const src = fs.readFileSync(
+    path.join(
+      NEW_FILES_DIR,
+      "src",
+      "ui",
+      "utils",
+      "markdown-to-bbcode.ts",
+    ),
+    "utf8",
+  );
   writeFile(MARKDOWN_UTIL_PATH, src);
 }
 
-const MARKDOWN_UTIL_TEST_PATH = path.join("pokerogue-src", "test", "tests", "ui", "utils", "markdown-to-bbcode.test.ts");
+const MARKDOWN_UTIL_TEST_PATH = path.join(
+  "pokerogue-src",
+  "test",
+  "tests",
+  "ui",
+  "utils",
+  "markdown-to-bbcode.test.ts",
+);
+
 if (fs.existsSync(MARKDOWN_UTIL_TEST_PATH)) {
   console.log("SKIP markdown-to-bbcode.test.ts — already exists");
 } else {
   const src = fs.readFileSync(
-    path.join(NEW_FILES_DIR, "test", "tests", "ui", "utils", "markdown-to-bbcode.test.ts"),
+    path.join(
+      NEW_FILES_DIR,
+      "test",
+      "tests",
+      "ui",
+      "utils",
+      "markdown-to-bbcode.test.ts",
+    ),
     "utf8",
   );
   writeFile(MARKDOWN_UTIL_TEST_PATH, src);
@@ -104,13 +146,25 @@ if (fs.existsSync(MARKDOWN_UTIL_TEST_PATH)) {
 // Sub-patch 3: src/ui/handlers/update-available-ui-handler.ts  (new file)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HANDLER_PATH = path.join("pokerogue-src", "src", "ui", "handlers", "update-available-ui-handler.ts");
+const HANDLER_PATH = path.join(
+  "pokerogue-src",
+  "src",
+  "ui",
+  "handlers",
+  "update-available-ui-handler.ts",
+);
 
 if (fs.existsSync(HANDLER_PATH)) {
   console.log("SKIP update-available-ui-handler.ts — already exists");
 } else {
   const src = fs.readFileSync(
-    path.join(NEW_FILES_DIR, "src", "ui", "handlers", "update-available-ui-handler.ts"),
+    path.join(
+      NEW_FILES_DIR,
+      "src",
+      "ui",
+      "handlers",
+      "update-available-ui-handler.ts",
+    ),
     "utf8",
   );
   writeFile(HANDLER_PATH, src);
@@ -128,38 +182,62 @@ if (uiSrc.includes("UpdateAvailableUiHandler")) {
 } else {
   // Import line is inserted in alphabetical order (biome organizeImports),
   // which is independent from the handlers array below - that array's
-  // order is NOT stylistic, it's a functional requirement (see next comment).
-  const IMPORT_ANCHOR = `import { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";`;
+  // order is NOT stylistic, it's a functional requirement.
+  const IMPORT_ANCHOR =
+    `import { OfflineSettingsUiHandler } from "#ui/offline-settings-ui-handler";`;
+
   if (uiSrc.includes(IMPORT_ANCHOR)) {
     uiSrc = uiSrc.replace(
       IMPORT_ANCHOR,
       `${IMPORT_ANCHOR}\nimport { UpdateAvailableUiHandler } from "#ui/update-available-ui-handler";`,
     );
   } else {
-    // Fall back to anchoring on the FightUiHandler import (present since before
-    // this fork's patches), inserting our import at the end of the import block
-    // instead of alphabetically - functionally equivalent, since import order
-    // doesn't matter at runtime.
-    const FALLBACK_IMPORT_ANCHOR = `import { FightUiHandler } from "#ui/fight-ui-handler";`;
-    requireAnchor(uiSrc, FALLBACK_IMPORT_ANCHOR, "FightUiHandler import in ui.ts");
+    const FALLBACK_IMPORT_ANCHOR =
+      `import { FightUiHandler } from "#ui/fight-ui-handler";`;
+
+    requireAnchor(
+      uiSrc,
+      FALLBACK_IMPORT_ANCHOR,
+      "FightUiHandler import in ui.ts",
+    );
+
     uiSrc = uiSrc.replace(
       FALLBACK_IMPORT_ANCHOR,
       `${FALLBACK_IMPORT_ANCHOR}\nimport { UpdateAvailableUiHandler } from "#ui/update-available-ui-handler";`,
     );
   }
 
-  // Ui.getHandler() does `this.handlers[this.mode]` - the handlers array is
-  // indexed positionally by UiMode's numeric enum value, NOT looked up by
-  // type. Since UPDATE_AVAILABLE is appended as the LAST UiMode entry, its
-  // handler instance MUST also be the last element of this array, matching
-  // enum order exactly - not alphabetical, not import order.
+  // Ui.getHandler() indexes this array by UiMode's numeric enum value.
+  // UPDATE_AVAILABLE is appended as the final UiMode, so its handler must
+  // also be appended after the final custom handler.
   const HANDLER_ANCHOR = `new OfflineSettingsUiHandler(),`;
-  requireAnchor(uiSrc, HANDLER_ANCHOR, "new OfflineSettingsUiHandler() in ui.ts");
-  uiSrc = uiSrc.replace(HANDLER_ANCHOR, `${HANDLER_ANCHOR}\n      new UpdateAvailableUiHandler(),`);
 
-  const NO_TRANSITION_ANCHOR = `UiMode.APP_SETTINGS,`;
-  requireAnchor(uiSrc, NO_TRANSITION_ANCHOR, "UiMode.APP_SETTINGS in noTransitionModes");
-  uiSrc = uiSrc.replace(NO_TRANSITION_ANCHOR, `${NO_TRANSITION_ANCHOR}\n  UiMode.UPDATE_AVAILABLE,`);
+  requireAnchor(
+    uiSrc,
+    HANDLER_ANCHOR,
+    "new OfflineSettingsUiHandler() in ui.ts",
+  );
+
+  uiSrc = uiSrc.replace(
+    HANDLER_ANCHOR,
+    `${HANDLER_ANCHOR}\n      new UpdateAvailableUiHandler(),`,
+  );
+
+  const offlineModeName = uiSrc.includes("UiMode.SETTINGS_OFFLINE,")
+    ? "SETTINGS_OFFLINE"
+    : "APP_SETTINGS";
+  const noTransitionAnchor = `UiMode.${offlineModeName},`;
+
+  requireAnchor(
+    uiSrc,
+    noTransitionAnchor,
+    `UiMode.${offlineModeName} in noTransitionModes`,
+  );
+
+  uiSrc = uiSrc.replace(
+    noTransitionAnchor,
+    `${noTransitionAnchor}\n  UiMode.UPDATE_AVAILABLE,`,
+  );
 
   writeFile(UI_PATH, uiSrc);
 }
