@@ -11,6 +11,7 @@ const path = require("path");
 
 const mainPath = path.join("pokerogue-src", "src", "main.ts");
 const titlePath = path.join("pokerogue-src", "src", "ui", "handlers", "title-ui-handler.ts");
+const touchControlsPath = path.join("pokerogue-src", "src", "touch-controls.ts");
 
 function fail(message) {
   console.error(`ERROR: ${message}`);
@@ -85,5 +86,27 @@ for (const [placeholder, replacement] of [
   title = title.replaceAll(placeholder, replacement);
 }
 write(titlePath, title);
+
+let touchControls = read(touchControlsPath);
+const observerAnchor = `    const classObserver = new MutationObserver(() => {`;
+const observerReplacement = `    const classObserver = typeof MutationObserver === "undefined"
+      ? null
+      : new MutationObserver(() => {`;
+if (touchControls.includes(observerReplacement)) {
+  console.log("nx.js optional touch-control observer guard already applied.");
+} else if (touchControls.includes(observerAnchor)) {
+  touchControls = touchControls.replace(observerAnchor, observerReplacement);
+} else {
+  fail("Could not find the touch-control MutationObserver anchor");
+}
+const observeAnchor = `    classObserver.observe(touchControls, {`;
+const observeReplacement = `    classObserver?.observe(touchControls, {`;
+if (!touchControls.includes(observeReplacement)) {
+  if (!touchControls.includes(observeAnchor)) {
+    fail("Could not find the touch-control observer call anchor");
+  }
+  touchControls = touchControls.replace(observeAnchor, observeReplacement);
+}
+write(touchControlsPath, touchControls);
 
 console.log("Applied the narrow nx.js real-game bootstrap patch.");

@@ -58,6 +58,11 @@ function elementStub(tagName: string): any {
         return false;
       },
     },
+    relList: {
+      supports(feature: string) {
+        return tagName.toLowerCase() === "link" && feature === "modulepreload";
+      },
+    },
     nodeName: tagName.toUpperCase(),
     tagName: tagName.toUpperCase(),
     nodeType: 1,
