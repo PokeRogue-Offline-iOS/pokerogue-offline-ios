@@ -53,6 +53,7 @@ async function boot(): Promise<void> {
   installLocationShim();
   installPersistentStorage();
   installOfflineFetch();
+  installFontFaceShim();
   installFonts();
   setStartupStage("compatibility-shims-installed", {
     active: manifest.compatibilityShims,
@@ -190,6 +191,70 @@ function resolveLocalRequest(input: string): {
     throw new TypeError(`Local path traversal is blocked: ${input}`);
   }
   return { url: resolved, kind: "sd-card" };
+}
+
+function installFontFaceShim(): void {
+  const global = globalThis as any;
+  if (global.__silverShadowFontFaceShimInstalled) {
+    return;
+  }
+  global.__silverShadowFontFaceShimInstalled = true;
+
+  const NativeFontFace = global.FontFace as typeof FontFace;
+  const nativePrototype = NativeFontFace.prototype;
+  const nativeLoad = Object.getOwnPropertyDescriptor(nativePrototype, "load");
+  if (nativeLoad?.configurable !== false) {
+    Object.defineProperty(nativePrototype, "load", {
+      configurable: true,
+      value(this: FontFace) {
+        return this.status === "loaded"
+          ? Promise.resolve(this)
+          : Promise.reject(new Error(`Font "${this.family}" could not be loaded from its local buffer.`));
+      },
+      writable: true,
+    });
+  }
+
+  const CompatibleFontFace = function (
+    this: FontFace,
+    family: string,
+    source: string | BufferSource,
+    descriptors?: FontFaceDescriptors,
+  ): FontFace {
+    if (typeof source !== "string") {
+      return new NativeFontFace(family, source, descriptors);
+    }
+    const match = /^\s*url\(\s*(["']?)(.*?)\1\s*\)\s*$/i.exec(source);
+    if (!match?.[2]) {
+      throw new Error(`Unsupported Switch FontFace source for "${family}": ${source}`);
+    }
+    const resolution = resolveLocalRequest(match[2]);
+    if (resolution.kind !== "sd-card") {
+      throw new Error(`Switch FontFace URL must resolve inside the game folder: ${source}`);
+    }
+    setRequestedResource(resolution.url, resolution.kind);
+    const data = Switch.readFileSync(resolution.url);
+    if (data === null) {
+      throw new Error(`Switch FontFace file is missing: ${resolution.url}`);
+    }
+    const face = new NativeFontFace(family, data, descriptors);
+    appendLog("INFO", "Mapped game FontFace URL to local buffer", {
+      family,
+      requested: source,
+      resolved: resolution.url,
+      bytes: data.byteLength,
+      status: face.status,
+    });
+    return face;
+  } as unknown as typeof FontFace;
+  CompatibleFontFace.prototype = nativePrototype;
+  Object.setPrototypeOf(CompatibleFontFace, NativeFontFace);
+  Object.defineProperty(global, "FontFace", {
+    configurable: true,
+    value: CompatibleFontFace,
+    writable: true,
+  });
+  appendLog("INFO", "Installed local FontFace URL compatibility");
 }
 
 function installFonts(): void {

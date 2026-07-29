@@ -167,6 +167,7 @@ const manifest = {
     "memory-session-storage",
     "location",
     "external-fonts",
+    "local-font-url-to-buffer",
     "nxjs-screen-canvas",
   ],
   manifest: {},
