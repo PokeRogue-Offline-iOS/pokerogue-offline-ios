@@ -6,6 +6,7 @@ set -e
 #   ./apply-patches.sh            # all platforms (default)
 #   ./apply-patches.sh mobile     # all + mobile (iOS + Android)
 #   ./apply-patches.sh android    # all + mobile + android
+#   ./apply-patches.sh switch     # all + switch
 
 PLATFORM="${1:-all}"
 
@@ -40,6 +41,15 @@ fi
 if [[ "$PLATFORM" == "android" ]]; then
 
   apply_patch "fix-android-image-paths.js"  android
+
+fi
+
+# â”€â”€ Switch only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if [[ "$PLATFORM" == "switch" ]]; then
+
+  # Milestone 1 tests Phaser independently. Add source-level PokéRogue
+  # compatibility patches here once Milestone 2 identifies exact blockers.
+  :
 
 fi
 

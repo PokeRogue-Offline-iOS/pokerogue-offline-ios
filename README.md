@@ -103,6 +103,17 @@ During each build, the workflow:
 
 The main and development builds contain the same gameplay changes but use separate Android package identities.
 
+## Nintendo Switch proof of concept
+
+The `feature/switch-port` work adds an isolated nx.js V8 / Phaser 3 Milestone 1
+proof without changing existing platform builds. It uses exactly
+`@nx.js/runtime@1.0.0-beta.6`, `@nx.js/nro@1.0.0-beta.6`, Phaser `3.90.0`, and
+fat/self-contained NRO packaging.
+
+This is not yet a playable PokéRogue port. Read
+[`docs/SWITCH_PORT.md`](docs/SWITCH_PORT.md) for the feasibility assessment and
+[`docs/SWITCH_INSTALL.md`](docs/SWITCH_INSTALL.md) for hardware test steps.
+
 ## Save Data Warning
 
 > [!WARNING]
