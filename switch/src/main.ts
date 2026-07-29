@@ -53,7 +53,7 @@ async function boot(): Promise<void> {
   installLocationShim();
   installPersistentStorage();
   installOfflineFetch();
-  await installFonts();
+  installFonts();
   setStartupStage("compatibility-shims-installed", {
     active: manifest.compatibilityShims,
   });
@@ -192,7 +192,7 @@ function resolveLocalRequest(input: string): {
   return { url: resolved, kind: "sd-card" };
 }
 
-async function installFonts(): Promise<void> {
+function installFonts(): void {
   for (const [family, file] of [
     ["emerald", "pokemon-emerald-pro.ttf"],
     ["pkmnems", "pkmnems.ttf"],
@@ -205,9 +205,13 @@ async function installFonts(): Promise<void> {
       continue;
     }
     const face = new FontFace(family, data);
-    await face.load();
     fonts.add(face);
-    appendLog("INFO", "Loaded external game font", { family, path, bytes: data.byteLength });
+    appendLog("INFO", "Registered external game font", {
+      family,
+      path,
+      bytes: data.byteLength,
+      status: face.status,
+    });
   }
 }
 
