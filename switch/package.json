@@ -1,0 +1,36 @@
+{
+  "name": "silvershadow-pokerogue-switch-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SilverShadow PokeRogue nx.js V8 / Phaser 3 Milestone 1 proof of concept",
+  "type": "module",
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "npm run clean && node scripts/build.mjs",
+    "nro": "nxjs-nro --fat",
+    "package": "npm run typecheck && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
+    "check": "npm run typecheck && npm run build",
+    "verify": "node scripts/verify-release.mjs"
+  },
+  "license": "MIT",
+  "nacp": {
+    "id": "01a5a17e5d010000",
+    "title": "SilverShadow PokeRogue",
+    "author": "SilverShadow",
+    "version": "0.1.0"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "@nx.js/nro": "1.0.0-beta.6",
+    "@nx.js/runtime": "1.0.0-beta.6",
+    "esbuild": "0.28.1",
+    "fflate": "0.8.2",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=24.9.0"
+  }
+}

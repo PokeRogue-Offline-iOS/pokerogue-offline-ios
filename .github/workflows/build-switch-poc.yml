@@ -1,0 +1,57 @@
+name: Build Switch Milestone 1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "switch/**"
+      - ".github/workflows/build-switch-poc.yml"
+  push:
+    branches:
+      - feature/switch-port
+    paths:
+      - "switch/**"
+      - ".github/workflows/build-switch-poc.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: switch-poc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: switch
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: switch/package-lock.json
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Build, package, and verify fat NRO
+        run: npm run package
+
+      - name: Upload SD-card-ready package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilverShadow-PokeRogue-Switch-Milestone1
+          path: |
+            switch/release/SilverShadow-PokeRogue-Switch-Milestone1.zip
+            switch/release/switch/SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro
+            switch/release/switch/SilverShadow-PokeRogue/game/manifest.json
+          if-no-files-found: error
+          retention-days: 30
