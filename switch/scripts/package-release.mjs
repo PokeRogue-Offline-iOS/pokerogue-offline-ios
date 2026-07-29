@@ -163,6 +163,7 @@ const manifest = {
     "minimal-dom",
     "dom-tag-lookup",
     "dom-classlist-toggle",
+    "dom-css-properties",
     "sdmc-local-fetch",
     "fetch-backed-xmlhttprequest",
     "phaser-audio-listener",

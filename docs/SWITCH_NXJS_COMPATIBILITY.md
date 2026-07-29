@@ -125,7 +125,7 @@ function.
 Implemented compatibility behavior:
 
 - Milestone 1 DOM and nx.js screen-canvas adaptation, including stateful
-  `classList` operations used by PokéRogue settings;
+  `classList` and CSS custom-property operations used by PokéRogue settings;
 - a source-level Phaser `canvas: globalThis.screen` handoff;
 - a narrow `webgl`/`experimental-webgl` context alias to nx.js `webgl2`,
   validated through Phaser game creation and PokéRogue asset preloading on

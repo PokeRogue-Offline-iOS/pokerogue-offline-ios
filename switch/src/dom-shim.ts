@@ -8,14 +8,71 @@
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "./constants";
 import { appendLog } from "./logger";
 
-function makeStyle(): Record<string, string> {
-  return new Proxy(
-    {},
-    {
-      get: (target, property) => Reflect.get(target, property) ?? "",
-      set: (target, property, value) => Reflect.set(target, property, String(value)),
+function makeStyle(): CSSStyleDeclaration {
+  const values = new Map<string, { value: string; priority: string }>();
+  const target: any = {
+    setProperty(name: string, value: string | null, priority = "") {
+      values.set(String(name), {
+        value: value === null ? "" : String(value),
+        priority: String(priority),
+      });
     },
-  );
+    getPropertyValue(name: string) {
+      return values.get(String(name))?.value ?? "";
+    },
+    getPropertyPriority(name: string) {
+      return values.get(String(name))?.priority ?? "";
+    },
+    removeProperty(name: string) {
+      const property = String(name);
+      const previous = values.get(property)?.value ?? "";
+      values.delete(property);
+      return previous;
+    },
+    item(index: number) {
+      return [...values.keys()][index] ?? "";
+    },
+    get length() {
+      return values.size;
+    },
+    get cssText() {
+      return [...values]
+        .map(([name, entry]) => `${name}: ${entry.value}${entry.priority ? ` !${entry.priority}` : ""};`)
+        .join(" ");
+    },
+    set cssText(text: string) {
+      values.clear();
+      for (const declaration of String(text).split(";")) {
+        const separator = declaration.indexOf(":");
+        if (separator < 0) {
+          continue;
+        }
+        const name = declaration.slice(0, separator).trim();
+        const rawValue = declaration.slice(separator + 1).trim();
+        if (name) {
+          target.setProperty(name, rawValue.replace(/\s*!important\s*$/i, ""), /!important\s*$/i.test(rawValue) ? "important" : "");
+        }
+      }
+    },
+  };
+  return new Proxy(target, {
+    get(current, property) {
+      if (Reflect.has(current, property)) {
+        return Reflect.get(current, property);
+      }
+      return typeof property === "string" ? values.get(property)?.value ?? "" : undefined;
+    },
+    set(current, property, value) {
+      if (property === "cssText") {
+        return Reflect.set(current, property, String(value));
+      }
+      if (typeof property === "string") {
+        current.setProperty(property, String(value));
+        return true;
+      }
+      return Reflect.set(current, property, value);
+    },
+  }) as CSSStyleDeclaration;
 }
 
 function makeClassList(): DOMTokenList {
