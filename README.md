@@ -76,14 +76,30 @@ All sandbox options:
 | **Max Luck (SSS)** | Sets effective party luck to 14, the maximum SSS value used by the luck and reward systems. |
 | **100x Pokémon Candy** | Multiplies species or starter candy awards by 100 while preserving the normal maximum candy cap. |
 | **60 Starter Points** | Raises the starter selection point limit to 60. |
+| **Allow Duplicate Starters** | Allows up to six independent copies of a species when point and challenge rules permit it. |
+| **Starting Level** | Overrides the centralized starting level with a value from 10 through 100. |
+| **Shiny Rate** | Multiplies normal generated player/wild shiny rolls from 1x through 100x. |
+| **Always Shiny** | Forces shiny for newly generated Pokémon that use the normal shiny-roll path. |
+| **Rare Eggs** | Uses Futuba's tier-weighted gacha odds: 12.5% Common, 25% Rare, 25% Epic, and 37.5% Legendary before machine offsets and guarantees. |
+| **Instant Hatch** | Schedules eligible eggs for the normal hatch flow at the next egg-lapse opportunity. |
+| **Form Change Items** | Adds Rebalanced or Abundant reward-pool access for transformation-related items. |
+| **Unlock Starter on Select** | Persistently grants minimum ownership data when Action is pressed on a locked starter. |
 
 ### Sandbox Notes
 
 - **Guaranteed Capture** does not bypass encounters where Poké Balls cannot normally be used, including Trainer battles and other restricted encounters.
 - **100x Pokémon Candy** affects the species candy used for starter upgrades, egg purchases, passive abilities, and similar unlocks. It does not modify Rare Candy battle items.
-- **60 Starter Points** changes the point limit only. It does not currently allow duplicate copies of the same Pokémon to be selected as starters.
+- **60 Starter Points** changes the point limit only. Combine it with **Allow Duplicate Starters** when selecting costly duplicate teams.
 - **Claim All Rewards** works especially well with **Free Rerolls**, since each reroll generates a fresh reward set.
-- All current sandbox options have been tested while enabled simultaneously.
+- **Always Shiny** and **Shiny Rate** do not replace the separate egg shiny roll or retroactively change existing Pokémon.
+- **Unlock Starter on Select** permanently changes save data. Export your save before using it; disabling the option does not remove prior unlocks.
+- Futuba's **Pandemic** option is intentionally not included because its recovered implementation creates 5,000 Pokérus selections and UI cursors.
+- The options share the existing Offline override system and are designed to be
+  enabled together; the full on-device combination remains part of the manual
+  Android checklist.
+
+Technical behavior, version differences, validation results, and the manual test
+matrix are documented in [Futuba Cheat Analysis](docs/FUTABA_CHEAT_ANALYSIS.md).
 
 ## Additional Quality-of-Life Features
 
