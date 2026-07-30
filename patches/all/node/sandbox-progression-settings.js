@@ -280,32 +280,14 @@ if (
     "const candyMultiplier = activeOverrides.STARTER_CANDY_MULTIPLIER_OVERRIDE;",
   )
 ) {
-  const candyAnchor = `  public addStarterCandy(speciesId: SpeciesId, numCandiesToAdd: number): boolean {
-    const { candyCount } = this.starterData[speciesId];
-    if (candyCount >= MAX_STARTER_CANDY_COUNT) {
-      return false;
-    }
+  const candyAnchor = `    this.starterData[speciesId].candyCount = Math.min(candyCount + numCandiesToAdd, MAX_STARTER_CANDY_COUNT);
+    globalScene.candyBar.showStarterSpeciesCandy(speciesId, numCandiesToAdd);`;
 
-    this.starterData[speciesId].candyCount = Math.min(candyCount + numCandiesToAdd, MAX_STARTER_CANDY_COUNT);
-    globalScene.candyBar.showStarterSpeciesCandy(speciesId, numCandiesToAdd);
-
-    return true;
-  }`;
-
-  const candyReplacement = `  public addStarterCandy(speciesId: SpeciesId, numCandiesToAdd: number): boolean {
-    const { candyCount } = this.starterData[speciesId];
-    if (candyCount >= MAX_STARTER_CANDY_COUNT) {
-      return false;
-    }
-
-    const candyMultiplier = activeOverrides.STARTER_CANDY_MULTIPLIER_OVERRIDE;
+  const candyReplacement = `    const candyMultiplier = activeOverrides.STARTER_CANDY_MULTIPLIER_OVERRIDE;
     const candiesToAdd = numCandiesToAdd * candyMultiplier;
 
     this.starterData[speciesId].candyCount = Math.min(candyCount + candiesToAdd, MAX_STARTER_CANDY_COUNT);
-    globalScene.candyBar.showStarterSpeciesCandy(speciesId, candiesToAdd);
-
-    return true;
-  }`;
+    globalScene.candyBar.showStarterSpeciesCandy(speciesId, candiesToAdd);`;
 
   gameDataSource = replaceRequired(
     gameDataSource,
