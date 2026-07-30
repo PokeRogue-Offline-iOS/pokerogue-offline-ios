@@ -1592,17 +1592,23 @@ const claimAllCompleteReplacement = `  private completeClaimAllReward(
     this.claimedRewardIndices.add(rewardIndex);
     const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
     const markedInPlace = uiHandler.markRewardClaimed(rewardIndex);
+    // The party/move callback has already returned to MODIFIER_SELECT here.
+    // UI.setMode() short-circuits when the requested mode is already active,
+    // so call the handler's active-show path directly to restore its callback.
+    uiHandler.show([
+      this.isPlayer(),
+      this.typeOptions,
+      modifierSelectCallback,
+      this.getRerollCost(globalScene.lockModifierTiers),
+      [...this.claimedRewardIndices],
+    ]);
     (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:claim-reused-ui", {
       rewardIndex,
       claimedRewardCount: this.claimedRewardIndices.size,
       rewardCount: this.typeOptions.length,
       markedInPlace,
+      inputRearmed: true,
     }, true);
-
-    // Re-arm the same callback after both immediate rewards and party-targeted
-    // rewards. ModifierSelectUiHandler.show() updates an active handler without
-    // rebuilding its cards, shop rows, or text canvases.
-    this.resetModifierSelect(modifierSelectCallback);
   }`;
 if (!selectModifierPhase.includes(claimAllCompleteReplacement)) {
   if (!selectModifierPhase.includes(claimAllCompleteAnchor)) {
