@@ -1060,7 +1060,10 @@ const bgmConstructorReplacement = `    this.key = key;
           loop,
           durationSeconds: this.sound.duration,
         }, true);`;
-if (!backgroundMusic.includes(bgmConstructorReplacement)) {
+if (
+  !backgroundMusic.includes(bgmConstructorReplacement)
+  && !backgroundMusic.includes('"bgm-created"')
+) {
   if (!backgroundMusic.includes(bgmConstructorAnchor)) {
     fail("Could not find the BackgroundMusic constructor diagnostic anchor");
   }
@@ -1096,6 +1099,50 @@ if (!backgroundMusic.includes(bgmEndListenerReplacement)) {
     fail("Could not find the BackgroundMusic end-listener diagnostic anchor");
   }
   backgroundMusic = backgroundMusic.replace(bgmEndListenerAnchor, bgmEndListenerReplacement);
+}
+
+const bgmNativeLoopAnchor = `        this.sound = globalScene.sound.add(key, { loop });
+        switchDiagnostics?.audio?.("bgm-sound-created", {
+          key,
+          loop,
+          durationSeconds: this.sound.duration,
+        }, true);
+        if (loop) {
+          this.sound.on("looped", () => {
+            if (!this.destroyed) {
+              this.sound?.play({ seek: loopPoint });
+            }
+          });
+        } else {`;
+const bgmNativeLoopReplacement = `        // nx.js does not reliably advance Phaser's native WebAudio loop source.
+        // Drive looping from the ordinary completion event so a finished BGM
+        // cannot remain silently registered as the current track.
+        this.sound = globalScene.sound.add(key, { loop: false });
+        switchDiagnostics?.audio?.("bgm-sound-created", {
+          key,
+          loop,
+          nativeLoop: false,
+          durationSeconds: this.sound.duration,
+        }, true);
+        if (loop) {
+          this.sound.on("complete", () => {
+            if (this.destroyed || !this.sound) {
+              return;
+            }
+            const restarted = this.sound.play({ seek: loopPoint });
+            switchDiagnostics?.audio?.("bgm-loop-restarted", {
+              key,
+              loopPoint,
+              restarted,
+              durationSeconds: this.sound.duration,
+            }, true);
+          });
+        } else {`;
+if (!backgroundMusic.includes(bgmNativeLoopReplacement)) {
+  if (!backgroundMusic.includes(bgmNativeLoopAnchor)) {
+    fail("Could not find the BackgroundMusic native-loop anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmNativeLoopAnchor, bgmNativeLoopReplacement);
 }
 
 const bgmPlayAnchor = `      if (!sound.isPlaying) {
@@ -1367,7 +1414,10 @@ const rerollRequestReplacement = `    const switchApi = (globalThis as any).Swit
     }, true);
     globalScene.phaseManager.unshiftNew(
       "SelectModifierPhase",`;
-if (!selectModifierPhase.includes(rerollRequestReplacement)) {
+if (
+  !selectModifierPhase.includes(rerollRequestReplacement)
+  && !selectModifierPhase.includes('"reward:reroll-requested"')
+) {
   if (!selectModifierPhase.includes(rerollRequestAnchor)) {
     fail("Could not find the SelectModifierPhase reroll diagnostic anchor");
   }
@@ -1471,7 +1521,10 @@ const rerollPhaseTransitionReplacement = `    const switchDiagnostics = (globalT
         : null,
     }, true);
     return false;`;
-if (!selectModifierPhase.includes(rerollPhaseTransitionReplacement)) {
+if (
+  !selectModifierPhase.includes(rerollPhaseTransitionReplacement)
+  && !selectModifierPhase.includes('"reward:ui-reuse-complete"')
+) {
   if (!selectModifierPhase.includes(rerollPhaseTransitionAnchor)) {
     fail("Could not find the SelectModifierPhase reroll phase-transition anchor");
   }
@@ -1479,6 +1532,94 @@ if (!selectModifierPhase.includes(rerollPhaseTransitionReplacement)) {
     rerollPhaseTransitionAnchor,
     rerollPhaseTransitionReplacement,
   );
+}
+
+const rerollCopiedSettingsAnchor = `    this.claimedRewardIndices.clear();
+    clearPendingClaimAllReward();
+    regenerateModifierPoolThresholds(globalScene.getPlayerParty(), this.getPoolType(), this.rerollCount);`;
+const rerollCopiedSettingsReplacement = `    this.claimedRewardIndices.clear();
+    clearPendingClaimAllReward();
+    if (this.isCopy) {
+      // Claim All copies pin their current rewards as guaranteed options so a
+      // deferred party/move selection can return safely. A real reroll must
+      // leave that copied state or it will regenerate the same three rewards.
+      this.isCopy = false;
+      this.customModifierSettings = undefined;
+    }
+    regenerateModifierPoolThresholds(globalScene.getPlayerParty(), this.getPoolType(), this.rerollCount);`;
+if (!selectModifierPhase.includes(rerollCopiedSettingsReplacement)) {
+  if (!selectModifierPhase.includes(rerollCopiedSettingsAnchor)) {
+    fail("Could not find the SelectModifierPhase copied-settings reroll anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(
+    rerollCopiedSettingsAnchor,
+    rerollCopiedSettingsReplacement,
+  );
+}
+
+const claimAllReturnAnchor = `    return cost === -1;
+  }
+
+  // Reroll rewards`;
+const claimAllReturnReplacement = `    return cost === -1
+      && !(activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE && !(modifierType instanceof PokemonModifierType));
+  }
+
+  // Reroll rewards`;
+if (!selectModifierPhase.includes(claimAllReturnReplacement)) {
+  if (!selectModifierPhase.includes(claimAllReturnAnchor)) {
+    fail("Could not find the SelectModifierPhase Claim All callback-result anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(claimAllReturnAnchor, claimAllReturnReplacement);
+}
+
+const claimAllCompleteAnchor = `  private completeClaimAllReward(rewardIndex: number): void {
+    const nextClaimedRewardIndices = new Set(this.claimedRewardIndices);
+    nextClaimedRewardIndices.add(rewardIndex);
+
+    globalScene.ui.clearText();
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.phaseManager.unshiftPhase(
+      this.copy(nextClaimedRewardIndices),
+    );
+
+    super.end();
+  }`;
+const claimAllCompleteReplacement = `  private completeClaimAllReward(
+    rewardIndex: number,
+    modifierSelectCallback: ModifierSelectCallback,
+  ): void {
+    this.claimedRewardIndices.add(rewardIndex);
+    const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
+    const markedInPlace = uiHandler.markRewardClaimed(rewardIndex);
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:claim-reused-ui", {
+      rewardIndex,
+      claimedRewardCount: this.claimedRewardIndices.size,
+      rewardCount: this.typeOptions.length,
+      markedInPlace,
+    }, true);
+
+    // Re-arm the same callback after both immediate rewards and party-targeted
+    // rewards. ModifierSelectUiHandler.show() updates an active handler without
+    // rebuilding its cards, shop rows, or text canvases.
+    this.resetModifierSelect(modifierSelectCallback);
+  }`;
+if (!selectModifierPhase.includes(claimAllCompleteReplacement)) {
+  if (!selectModifierPhase.includes(claimAllCompleteAnchor)) {
+    fail("Could not find the SelectModifierPhase Claim All completion anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(claimAllCompleteAnchor, claimAllCompleteReplacement);
+}
+
+const claimAllCompleteCallAnchor = `      this.completeClaimAllReward(rewardIndex!);
+      return;`;
+const claimAllCompleteCallReplacement = `      this.completeClaimAllReward(rewardIndex!, modifierSelectCallback!);
+      return;`;
+if (!selectModifierPhase.includes(claimAllCompleteCallReplacement)) {
+  if (!selectModifierPhase.includes(claimAllCompleteCallAnchor)) {
+    fail("Could not find the SelectModifierPhase Claim All completion-call anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(claimAllCompleteCallAnchor, claimAllCompleteCallReplacement);
 }
 write(selectModifierPhasePath, selectModifierPhase);
 
@@ -1564,6 +1705,31 @@ if (!modifierSelectUi.includes(modifierReuseMethodsReplacement)) {
     fail("Could not find the modifier-select UI reuse-method anchor");
   }
   modifierSelectUi = modifierSelectUi.replace(modifierReuseMethodsAnchor, modifierReuseMethodsReplacement);
+}
+
+const modifierClaimReuseMethodAnchor = `  setRerollCost(rerollCost: number): void {
+    this.rerollCost = rerollCost;
+  }`;
+const modifierClaimReuseMethodReplacement = `  markRewardClaimed(rewardIndex: number): boolean {
+    const option = this.options[rewardIndex];
+    if (!this.active || !option) {
+      return false;
+    }
+    option.markClaimed();
+    return true;
+  }
+
+  setRerollCost(rerollCost: number): void {
+    this.rerollCost = rerollCost;
+  }`;
+if (!modifierSelectUi.includes(modifierClaimReuseMethodReplacement)) {
+  if (!modifierSelectUi.includes(modifierClaimReuseMethodAnchor)) {
+    fail("Could not find the modifier-select claimed-card reuse anchor");
+  }
+  modifierSelectUi = modifierSelectUi.replace(
+    modifierClaimReuseMethodAnchor,
+    modifierClaimReuseMethodReplacement,
+  );
 }
 
 const modifierClaimedFieldsAnchor = `  private itemText: Phaser.GameObjects.Text;
