@@ -651,6 +651,7 @@ export function patchCanvas(canvas: OffscreenCanvas | Screen): HTMLCanvasElement
             provided: nativeKind,
           });
         }
+        global.__SILVERSHADOW_DIAGNOSTICS__?.attachWebGlContext?.(target, context);
         installDefaultFramebufferScale(context);
       }
       safeSet(context, "canvas", target);

@@ -8,6 +8,7 @@ import {
   SCREEN_WIDTH,
   SWITCH_PLATFORM_VERSION,
 } from "./constants";
+import { readMemorySnapshot } from "./diagnostics";
 import { appendLog } from "./logger";
 
 interface RequiredFile {
@@ -261,7 +262,7 @@ export function showFatalError(error: unknown): void {
     phaserVersion: activeManifest?.phaserVersion ?? null,
     manifestVersion: activeManifest?.schemaVersion ?? null,
     compatibilityShims: activeManifest?.compatibilityShims ?? [],
-    memory: readMemoryInfo(),
+    memory: readMemorySnapshot(),
   };
   appendLog("ERROR", "Fatal startup failure", diagnostics);
 
@@ -294,21 +295,6 @@ export function showFatalError(error: unknown): void {
     context.fillText(`Log: ${LOG_PATH.replace(/^sdmc:/, "")}`, 56, 658);
   } catch (renderError) {
     console.error("Unable to render startup error:", renderError);
-  }
-}
-
-function readMemoryInfo(): unknown {
-  try {
-    const memory = (performance as any).memory;
-    return memory
-      ? {
-          jsHeapSizeLimit: memory.jsHeapSizeLimit,
-          totalJSHeapSize: memory.totalJSHeapSize,
-          usedJSHeapSize: memory.usedJSHeapSize,
-        }
-      : "performance.memory unavailable";
-  } catch {
-    return "memory API unavailable";
   }
 }
 

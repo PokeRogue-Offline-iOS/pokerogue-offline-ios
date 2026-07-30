@@ -1,5 +1,6 @@
 import { GAME_ROOT, LOG_PATH, NXJS_VERSION, PHASER_VERSION } from "./constants";
 import { installAudioListenerShim } from "./audio-shim";
+import { captureMemorySnapshot, installRuntimeDiagnostics } from "./diagnostics";
 import { appendLog } from "./logger";
 import { installPersistentStorage } from "./storage";
 import { installXmlHttpRequestShim } from "./xhr-shim";
@@ -45,9 +46,15 @@ async function boot(): Promise<void> {
   setStartupStage("logging-initialized", {
     log: LOG_PATH,
   });
+  installRuntimeDiagnostics();
   addEventListener("beforeunload", event => {
     event.preventDefault();
-    appendLog("INFO", "Intercepted Plus-button exit request for game input");
+    appendLog("INFO", "Intercepted Plus-button exit request for game input", {
+      memory: (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__
+        ? "captured-in-following-snapshot"
+        : "diagnostics-unavailable",
+    });
+    captureMemorySnapshot("plus-button-exit-request");
   });
 
   const manifest = await validateStartup();
@@ -69,6 +76,7 @@ async function boot(): Promise<void> {
   setStartupStage("compatibility-shims-installed", {
     active: manifest.compatibilityShims,
   });
+  captureMemorySnapshot("compatibility-shims-installed");
 
   const entryPath = `${GAME_ROOT}/${manifest.compiledEntryPoint}`;
   setRequestedResource(entryPath, "sd-card");
@@ -82,6 +90,7 @@ async function boot(): Promise<void> {
     bytes: entryData.byteLength,
     evaluationMode: manifest.evaluationMode,
   });
+  captureMemorySnapshot("compiled-entry-resolved", { bytes: entryData.byteLength });
 
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (
     ...args: string[]
@@ -95,6 +104,7 @@ async function boot(): Promise<void> {
     bootstrapStarted: Boolean((globalThis as any).__SILVERSHADOW_WEB_BOOTSTRAP_STARTED__),
     bootstrapResolved: Boolean((globalThis as any).__SILVERSHADOW_WEB_BOOTSTRAP_RESOLVED__),
   });
+  captureMemorySnapshot("compiled-entry-evaluated");
 
   const gameStage = (globalThis as any).__SILVERSHADOW_POKEROGUE_STAGE__;
   if (gameStage === "phaser-game-created") {
