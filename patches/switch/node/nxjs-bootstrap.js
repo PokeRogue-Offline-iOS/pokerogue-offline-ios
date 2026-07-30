@@ -1373,6 +1373,113 @@ if (!selectModifierPhase.includes(rerollRequestReplacement)) {
   }
   selectModifierPhase = selectModifierPhase.replace(rerollRequestAnchor, rerollRequestReplacement);
 }
+
+const rerollPhaseTransitionAnchor = `    globalScene.reroll = true;
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:reroll-requested", {
+      rerollCount: this.rerollCount,
+      nextRerollCount: this.rerollCount + 1,
+      rewardCount: this.typeOptions.length,
+      lockModifierTiers: globalScene.lockModifierTiers,
+      rerollCost,
+    }, true);
+    globalScene.phaseManager.unshiftNew(
+      "SelectModifierPhase",
+      this.rerollCount + 1,
+      this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
+    );
+    globalScene.ui.clearText();
+    globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+    if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
+      globalScene.money -= rerollCost;
+      globalScene.updateMoneyText();
+      globalScene.animateMoneyChanged(false);
+    }
+    audioManager.playSound("se/buy");
+    return true;`;
+const rerollPhaseTransitionReplacement = `    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    const nextRerollCount = this.rerollCount + 1;
+    const nextModifierTiers =
+      this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[];
+    const modifierCount = this.getModifierCount();
+    const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
+
+    switchDiagnostics?.checkpoint?.("reward:reroll-requested", {
+      rerollCount: this.rerollCount,
+      nextRerollCount,
+      rewardCount: this.typeOptions.length,
+      lockModifierTiers: globalScene.lockModifierTiers,
+      rerollCost,
+      reuseEligible: uiHandler.canReuseRewardOptions(modifierCount),
+    }, true);
+
+    if (!uiHandler.canReuseRewardOptions(modifierCount)) {
+      globalScene.reroll = true;
+      switchDiagnostics?.checkpoint?.("reward:ui-reuse-fallback", {
+        rerollCount: this.rerollCount,
+        nextRerollCount,
+        currentRewardCount: this.typeOptions.length,
+        nextRewardCount: modifierCount,
+      }, true);
+      globalScene.phaseManager.unshiftNew(
+        "SelectModifierPhase",
+        nextRerollCount,
+        nextModifierTiers,
+      );
+      globalScene.ui.clearText();
+      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
+        globalScene.money -= rerollCost;
+        globalScene.updateMoneyText();
+        globalScene.animateMoneyChanged(false);
+      }
+      audioManager.playSound("se/buy");
+      return true;
+    }
+
+    globalScene.reroll = true;
+    this.modifierTiers = nextModifierTiers;
+    this.rerollCount = nextRerollCount;
+    this.claimedRewardIndices.clear();
+    clearPendingClaimAllReward();
+    regenerateModifierPoolThresholds(globalScene.getPlayerParty(), this.getPoolType(), this.rerollCount);
+    this.typeOptions = this.getModifierTypeOptions(modifierCount);
+
+    if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
+      globalScene.money -= rerollCost;
+      globalScene.updateMoneyText();
+      globalScene.animateMoneyChanged(false);
+    }
+
+    uiHandler.reuseRewardOptions(
+      this.typeOptions,
+      this.getRerollCost(globalScene.lockModifierTiers),
+    );
+    globalScene.reroll = false;
+    audioManager.playSound("se/buy");
+
+    const memoryAfterReuse =
+      typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
+    switchDiagnostics?.checkpoint?.("reward:ui-reuse-complete", {
+      rerollCount: this.rerollCount,
+      rewardCount: this.typeOptions.length,
+      shopOptionCount: uiHandler.shopOptionsRows.flat().length,
+      nativeUsedMiB: memoryAfterReuse
+        ? Math.round((memoryAfterReuse.nativeHeapUsed / 1048576) * 100) / 100
+        : null,
+      nativeFreeMiB: memoryAfterReuse
+        ? Math.round((memoryAfterReuse.nativeHeapFree / 1048576) * 100) / 100
+        : null,
+    }, true);
+    return false;`;
+if (!selectModifierPhase.includes(rerollPhaseTransitionReplacement)) {
+  if (!selectModifierPhase.includes(rerollPhaseTransitionAnchor)) {
+    fail("Could not find the SelectModifierPhase reroll phase-transition anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(
+    rerollPhaseTransitionAnchor,
+    rerollPhaseTransitionReplacement,
+  );
+}
 write(selectModifierPhasePath, selectModifierPhase);
 
 let modifierSelectUi = read(modifierSelectUiPath);
@@ -1420,6 +1527,140 @@ if (!modifierSelectUi.includes(modifierDestroyedReplacement)) {
     fail("Could not find the modifier-select UI destroyed diagnostic anchor");
   }
   modifierSelectUi = modifierSelectUi.replace(modifierDestroyedAnchor, modifierDestroyedReplacement);
+}
+
+const modifierReuseMethodsAnchor = `  setRerollCost(rerollCost: number): void {
+    this.rerollCost = rerollCost;
+  }`;
+const modifierReuseMethodsReplacement = `  canReuseRewardOptions(rewardOptionCount: number): boolean {
+    return this.active && this.options.length === rewardOptionCount;
+  }
+
+  /**
+   * Rebind reward data to the existing Phaser objects on Switch rerolls.
+   *
+   * Shop rows, controls, cursor, and text canvases remain allocated. This is
+   * intentionally synchronous so processInput can immediately restore the
+   * existing callback after rerollModifiers returns false.
+   */
+  reuseRewardOptions(typeOptions: ModifierTypeOption[], rerollCost: number): void {
+    if (!this.canReuseRewardOptions(typeOptions.length)) {
+      throw new Error("Reward option reuse count mismatch");
+    }
+
+    for (let index = 0; index < typeOptions.length; index++) {
+      this.options[index].reuse(typeOptions[index]);
+    }
+
+    this.rerollCost = rerollCost;
+    this.updateCostText();
+  }
+
+  setRerollCost(rerollCost: number): void {
+    this.rerollCost = rerollCost;
+  }`;
+if (!modifierSelectUi.includes(modifierReuseMethodsReplacement)) {
+  if (!modifierSelectUi.includes(modifierReuseMethodsAnchor)) {
+    fail("Could not find the modifier-select UI reuse-method anchor");
+  }
+  modifierSelectUi = modifierSelectUi.replace(modifierReuseMethodsAnchor, modifierReuseMethodsReplacement);
+}
+
+const modifierClaimedFieldsAnchor = `  private itemText: Phaser.GameObjects.Text;
+  private itemCostText: Phaser.GameObjects.Text;`;
+const modifierClaimedFieldsReplacement = `  private itemText: Phaser.GameObjects.Text;
+  private itemCostText: Phaser.GameObjects.Text;
+  private claimedBackground?: Phaser.GameObjects.Rectangle;
+  private claimedText?: Phaser.GameObjects.Text;`;
+if (!modifierSelectUi.includes(modifierClaimedFieldsReplacement)) {
+  if (!modifierSelectUi.includes(modifierClaimedFieldsAnchor)) {
+    fail("Could not find the ModifierOption claimed-field anchor");
+  }
+  modifierSelectUi = modifierSelectUi.replace(modifierClaimedFieldsAnchor, modifierClaimedFieldsReplacement);
+}
+
+const modifierMarkClaimedAnchor = `  markClaimed(): void {
+    this.item.setTint(0x666666);
+    this.itemText.setTint(0x777777);
+    this.pb?.setTint(0x555555);
+
+    const claimedBackground = globalScene.add.rectangle(
+      0,
+      62,
+      96,
+      18,
+      0x000000,
+      0.9,
+    );
+    claimedBackground.setStrokeStyle(2, 0xff3030, 1);
+    this.add(claimedBackground);
+
+    const claimedText = addTextObject(
+      0,
+      56,
+      "CLAIMED",
+      TextStyle.PARTY_RED,
+      {
+        align: "center",
+      },
+    );
+    claimedText.setOrigin(0.5, 0);
+    this.add(claimedText);
+  }`;
+const modifierMarkClaimedReplacement = `  reuse(modifierTypeOption: ModifierTypeOption): void {
+    this.modifierTypeOption = modifierTypeOption;
+    this.item.setTexture("items", modifierTypeOption.type?.iconImage);
+    this.item.clearTint();
+
+    this.itemText.setText(modifierTypeOption.type?.name ?? "");
+    this.itemText.clearTint();
+    if (modifierTypeOption.type?.tier) {
+      this.itemText.setTint(getModifierTierTextTint(modifierTypeOption.type.tier));
+    }
+
+    this.claimedBackground?.setVisible(false);
+    this.claimedText?.setVisible(false);
+  }
+
+  markClaimed(): void {
+    this.item.setTint(0x666666);
+    this.itemText.setTint(0x777777);
+    this.pb?.setTint(0x555555);
+
+    if (!this.claimedBackground) {
+      this.claimedBackground = globalScene.add.rectangle(
+        0,
+        62,
+        96,
+        18,
+        0x000000,
+        0.9,
+      );
+      this.claimedBackground.setStrokeStyle(2, 0xff3030, 1);
+      this.add(this.claimedBackground);
+    }
+    this.claimedBackground.setVisible(true);
+
+    if (!this.claimedText) {
+      this.claimedText = addTextObject(
+        0,
+        56,
+        "CLAIMED",
+        TextStyle.PARTY_RED,
+        {
+          align: "center",
+        },
+      );
+      this.claimedText.setOrigin(0.5, 0);
+      this.add(this.claimedText);
+    }
+    this.claimedText.setVisible(true);
+  }`;
+if (!modifierSelectUi.includes(modifierMarkClaimedReplacement)) {
+  if (!modifierSelectUi.includes(modifierMarkClaimedAnchor)) {
+    fail("Could not find the ModifierOption claimed-state reuse anchor");
+  }
+  modifierSelectUi = modifierSelectUi.replace(modifierMarkClaimedAnchor, modifierMarkClaimedReplacement);
 }
 write(modifierSelectUiPath, modifierSelectUi);
 
