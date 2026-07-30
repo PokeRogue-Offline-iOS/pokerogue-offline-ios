@@ -63,25 +63,38 @@ const settingsTarget = path.join(
 let settingsSource = readFile(settingsTarget);
 
 if (!settingsSource.includes("Offline_Claim_All_Rewards")) {
-  const keyAnchor =
-    '  Offline_Guaranteed_Capture: "OFFLINE_GUARANTEED_CAPTURE",\n'
-    + "};";
+  const keyAnchor = settingsSource.includes("Offline_Starter_Points_60")
+    ? '  Offline_Starter_Points_60: "OFFLINE_STARTER_POINTS_60",\n};'
+    : '  Offline_Guaranteed_Capture: "OFFLINE_GUARANTEED_CAPTURE",\n};';
 
-  const keyReplacement =
-    '  Offline_Guaranteed_Capture: "OFFLINE_GUARANTEED_CAPTURE",\n'
-    + '  Offline_Claim_All_Rewards: "OFFLINE_CLAIM_ALL_REWARDS",\n'
-    + "};";
+  const keyReplacement = keyAnchor.replace(
+    "\n};",
+    '\n  Offline_Claim_All_Rewards: "OFFLINE_CLAIM_ALL_REWARDS",\n};',
+  );
 
   settingsSource = replaceRequired(
     settingsSource,
     keyAnchor,
     keyReplacement,
-    "the Guaranteed Capture setting key",
+    "the final Offline sandbox setting key",
   );
 }
 
 if (!settingsSource.includes('label: "Claim All Rewards"')) {
-  const rowAnchor = `  {
+  const rowAnchor = settingsSource.includes('label: "60 Starter Points"')
+    ? `  {
+    key: SettingKeys.Offline_Starter_Points_60,
+    label: "60 Starter Points",
+    options: [
+      { value: "0", label: "Off" },
+      { value: "1", label: "On" },
+    ],
+    default: 0,
+    type: SettingType.APP,
+    requireReload: true,
+  },
+];`
+    : `  {
     key: SettingKeys.Offline_Guaranteed_Capture,
     label: "Guaranteed Capture",
     options: [
@@ -94,18 +107,7 @@ if (!settingsSource.includes('label: "Claim All Rewards"')) {
   },
 ];`;
 
-  const rowReplacement = `  {
-    key: SettingKeys.Offline_Guaranteed_Capture,
-    label: "Guaranteed Capture",
-    options: [
-      { value: "0", label: "Off" },
-      { value: "1", label: "On" },
-    ],
-    default: 0,
-    type: SettingType.APP,
-    requireReload: true,
-  },
-  {
+  const claimAllRow = `  {
     key: SettingKeys.Offline_Claim_All_Rewards,
     label: "Claim All Rewards",
     options: [
@@ -115,27 +117,24 @@ if (!settingsSource.includes('label: "Claim All Rewards"')) {
     default: 0,
     type: SettingType.APP,
     requireReload: true,
-  },
-];`;
+  },`;
+
+  const rowReplacement = rowAnchor.replace(
+    "\n];",
+    `\n${claimAllRow}\n];`,
+  );
 
   settingsSource = replaceRequired(
     settingsSource,
     rowAnchor,
     rowReplacement,
-    "the Guaranteed Capture Offline settings row",
+    "the final Offline sandbox settings row",
   );
 }
 
 if (!settingsSource.includes("case SettingKeys.Offline_Claim_All_Rewards:")) {
-  const switchAnchor = `    case SettingKeys.Offline_Guaranteed_Capture:
-      activeOverrides.GUARANTEED_CAPTURE_OVERRIDE = value === 1;
-      break;
-    case SettingKeys.Language:`;
-
-  const switchReplacement = `    case SettingKeys.Offline_Guaranteed_Capture:
-      activeOverrides.GUARANTEED_CAPTURE_OVERRIDE = value === 1;
-      break;
-    case SettingKeys.Offline_Claim_All_Rewards:
+  const switchAnchor = "    case SettingKeys.Language:";
+  const switchReplacement = `    case SettingKeys.Offline_Claim_All_Rewards:
       activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE = value === 1;
       break;
     case SettingKeys.Language:`;
@@ -144,7 +143,7 @@ if (!settingsSource.includes("case SettingKeys.Offline_Claim_All_Rewards:")) {
     settingsSource,
     switchAnchor,
     switchReplacement,
-    "the Guaranteed Capture settings switch case",
+    "the Language settings switch case",
   );
 }
 
