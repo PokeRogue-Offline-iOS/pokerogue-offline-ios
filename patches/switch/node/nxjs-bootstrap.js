@@ -76,6 +76,54 @@ if (!main.includes(startReplacement)) {
   main = main.replace(startAnchor, startReplacement);
 }
 
+const audioEndedGuardAnchor = `  const game = new Phaser.Game({`;
+const audioEndedGuardReplacement = `  const webAudioSoundPrototype = (Phaser.Sound as any).WebAudioSound?.prototype;
+  if (
+    webAudioSoundPrototype
+    && !webAudioSoundPrototype.__silverShadowLateEndedGuardInstalled
+  ) {
+    const createBufferSource = webAudioSoundPrototype.createBufferSource;
+    webAudioSoundPrototype.createBufferSource = function (this: any, ...args: any[]) {
+      const source = createBufferSource.apply(this, args);
+      const onended = source?.onended;
+      if (typeof onended === "function") {
+        source.onended = (event: Event) => {
+          // nx.js can dispatch a delayed ended event after Phaser has destroyed
+          // the sound and cleared currentConfig. Phaser's stock handler reads
+          // currentConfig.loop unconditionally, which otherwise terminates the
+          // game during ordinary BGM transitions.
+          if (!this.currentConfig) {
+            (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.(
+              "late-ended-ignored",
+              {
+                key: this.key ?? null,
+                destroyed: this.pendingRemove ?? null,
+              },
+              true,
+            );
+            return;
+          }
+          onended.call(source, event);
+        };
+      }
+      return source;
+    };
+    webAudioSoundPrototype.__silverShadowLateEndedGuardInstalled = true;
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.(
+      "late-ended-guard-installed",
+      null,
+      true,
+    );
+  }
+
+  const game = new Phaser.Game({`;
+if (!main.includes(audioEndedGuardReplacement)) {
+  if (!main.includes(audioEndedGuardAnchor)) {
+    fail("Could not find the Phaser WebAudio late-ended guard anchor in src/main.ts");
+  }
+  main = main.replace(audioEndedGuardAnchor, audioEndedGuardReplacement);
+}
+
 const createdAnchor = `  game.sound.pauseOnBlur = false;`;
 const previousCreatedReplacement = `  game.sound.pauseOnBlur = false;
   (globalThis as Record<string, unknown>).__SILVERSHADOW_POKEROGUE_STAGE__ = "phaser-game-created";`;
