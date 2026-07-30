@@ -165,6 +165,100 @@ function audioBufferDetail(buffer: any): Record<string, number | null> {
 let decodeSequence = 0;
 const instrumentedAudioContexts = new WeakSet<object>();
 
+interface AudioFactoryProbe {
+  available: boolean;
+  error?: string;
+  supported: boolean;
+}
+
+function probeAudioFactory(context: any, factoryName: string): AudioFactoryProbe {
+  const factory = context?.[factoryName];
+  if (typeof factory !== "function") {
+    return {
+      available: false,
+      supported: false,
+    };
+  }
+
+  try {
+    const node = factory.call(context);
+    try {
+      node?.disconnect?.();
+    } catch {
+      // A newly created, unconnected node may reject disconnect(). The factory
+      // itself still succeeded, which is the compatibility result we need.
+    }
+    return {
+      available: true,
+      supported: true,
+    };
+  } catch (error) {
+    return {
+      available: true,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      supported: false,
+    };
+  }
+}
+
+function installSupportedAudioFactories(context: any): any {
+  const factoryNames = [
+    "createGain",
+    "createBufferSource",
+    "createPanner",
+    "createStereoPanner",
+  ] as const;
+  const probes = Object.fromEntries(
+    factoryNames.map(factoryName => [factoryName, probeAudioFactory(context, factoryName)]),
+  ) as Record<(typeof factoryNames)[number], AudioFactoryProbe>;
+  const unsupportedFactories = new Set(
+    factoryNames.filter(factoryName => probes[factoryName].available && !probes[factoryName].supported),
+  );
+
+  reportAudioDiagnostic("node-factory-probe", probes, true);
+  appendLog(
+    unsupportedFactories.size > 0 ? "WARN" : "INFO",
+    "Probed nx.js Web Audio node factories",
+    {
+      probes,
+      disabledForPhaser: [...unsupportedFactories],
+    },
+  );
+
+  if (unsupportedFactories.size === 0) {
+    return context;
+  }
+
+  for (const factoryName of unsupportedFactories) {
+    try {
+      Object.defineProperty(context, factoryName, {
+        configurable: true,
+        value: undefined,
+      });
+    } catch {
+      // The Proxy below also masks unsupported prototype methods when an own
+      // property cannot be installed on the native context.
+    }
+  }
+
+  if ([...unsupportedFactories].every(factoryName => typeof context[factoryName] !== "function")) {
+    return context;
+  }
+
+  return new Proxy(context, {
+    get(target, property) {
+      if (typeof property === "string" && unsupportedFactories.has(property as any)) {
+        return undefined;
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+    set(target, property, value) {
+      return Reflect.set(target, property, value, target);
+    },
+  });
+}
+
 function instrumentAudioContext(context: any): void {
   if (instrumentedAudioContexts.has(context)) {
     return;
@@ -274,15 +368,15 @@ function installAudioListenerShim(): void {
     const context = Reflect.construct(NativeAudioContext, args) as Record<PropertyKey, unknown>;
     instrumentAudioContext(context);
     const listener = makeAudioListener();
+    let compatibleContext: any = context;
     try {
       Object.defineProperty(context, "listener", {
         configurable: true,
         enumerable: true,
         value: listener,
       });
-      return context;
     } catch {
-      return new Proxy(context, {
+      compatibleContext = new Proxy(context, {
         get(target, property) {
           if (property === "listener") {
             return listener;
@@ -295,6 +389,7 @@ function installAudioListenerShim(): void {
         },
       });
     }
+    return installSupportedAudioFactories(compatibleContext);
   };
   CompatibleAudioContext.prototype = NativeAudioContext.prototype;
   Object.setPrototypeOf(CompatibleAudioContext, NativeAudioContext);

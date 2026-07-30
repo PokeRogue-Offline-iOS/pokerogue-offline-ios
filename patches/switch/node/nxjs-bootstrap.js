@@ -19,7 +19,9 @@ const backgroundMusicPath = path.join("pokerogue-src", "src", "audio", "backgrou
 const attemptCapturePhasePath = path.join("pokerogue-src", "src", "phases", "attempt-capture-phase.ts");
 const encounterPhasePath = path.join("pokerogue-src", "src", "phases", "encounter-phase.ts");
 const partyHealPhasePath = path.join("pokerogue-src", "src", "phases", "party-heal-phase.ts");
+const selectModifierPhasePath = path.join("pokerogue-src", "src", "phases", "select-modifier-phase.ts");
 const switchBiomePhasePath = path.join("pokerogue-src", "src", "phases", "switch-biome-phase.ts");
+const modifierSelectUiPath = path.join("pokerogue-src", "src", "ui", "handlers", "modifier-select-ui-handler.ts");
 const titlePath = path.join("pokerogue-src", "src", "ui", "handlers", "title-ui-handler.ts");
 const touchControlsPath = path.join("pokerogue-src", "src", "touch-controls.ts");
 
@@ -125,6 +127,46 @@ if (!loadingScene.includes(loadingCreateReplacement)) {
     fail("Could not find the LoadingScene create diagnostic anchor");
   }
   loadingScene = loadingScene.replace(loadingCreateAnchor, loadingCreateReplacement);
+}
+
+const loadingScreenModeAnchor = `  private loadLoadingScreen() {
+    const mobile = isMobile();`;
+const loadingScreenModeReplacement = `  private loadLoadingScreen() {
+    // The desktop path hides all progress UI behind an intro video. nx.js can
+    // load that video but did not present it during hardware testing, leaving
+    // the display black for the entire preload. Keep the existing progress UI
+    // visible immediately on Switch and skip the decorative intro.
+    const mobile = true;`;
+if (!loadingScene.includes(loadingScreenModeReplacement)) {
+  if (!loadingScene.includes(loadingScreenModeAnchor)) {
+    fail("Could not find the Switch loading-screen mode anchor");
+  }
+  loadingScene = loadingScene.replace(loadingScreenModeAnchor, loadingScreenModeReplacement);
+}
+
+const loadingIntroAnchor = `    this.load
+      .once(this.LOAD_EVENTS.START, () => {
+        // videos do not need to be preloaded
+        intro.loadURL("images/intro_dark.mp4", true);
+        if (mobile) {
+          intro.video?.setAttribute("webkit-playsinline", "webkit-playsinline");
+          intro.video?.setAttribute("playsinline", "playsinline");
+        }
+        intro.play();
+      })`;
+const loadingIntroReplacement = `    this.load
+      .once(this.LOAD_EVENTS.START, () => {
+        intro.setVisible(false);
+        switchDiagnostics?.checkpoint?.("loading-scene:progress-visible", {
+          scene: LoadingScene.KEY,
+          introSkipped: true,
+        }, true);
+      })`;
+if (!loadingScene.includes(loadingIntroReplacement)) {
+  if (!loadingScene.includes(loadingIntroAnchor)) {
+    fail("Could not find the Switch loading intro anchor");
+  }
+  loadingScene = loadingScene.replace(loadingIntroAnchor, loadingIntroReplacement);
 }
 write(loadingScenePath, loadingScene);
 
@@ -363,6 +405,112 @@ if (!battleScene.includes(biomeClearEndReplacement)) {
     fail("Could not find the biome cleanup completion diagnostic anchor in BattleScene");
   }
   battleScene = battleScene.replace(biomeClearEndAnchor, biomeClearEndReplacement);
+}
+
+const resetStartAnchor = `  reset(clearScene = false, clearData = false, reloadI18n = false): void {
+    if (clearData) {`;
+const resetStartReplacement = `  reset(clearScene = false, clearData = false, reloadI18n = false): void {
+    const switchResetStartedAt = performance.now();
+    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    switchDiagnostics?.checkpoint?.("scene-reset:start", {
+      clearScene,
+      clearData,
+      reloadI18n,
+      children: this.children?.list?.length ?? null,
+      uiChildren: this.uiContainer?.list?.length ?? null,
+    }, true);
+    if (clearData) {`;
+if (!battleScene.includes(resetStartReplacement)) {
+  if (!battleScene.includes(resetStartAnchor)) {
+    fail("Could not find the BattleScene reset start diagnostic anchor");
+  }
+  battleScene = battleScene.replace(resetStartAnchor, resetStartReplacement);
+}
+
+const resetClearSceneAnchor = `    if (clearScene) {
+      // Reload variant data in case sprite set has changed
+      this.initVariantData();
+
+      audioManager.fadeOutBgm(250);`;
+const resetClearSceneReplacement = `    if (clearScene) {
+      switchDiagnostics?.checkpoint?.("scene-reset:clear-scene-start", {
+        elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+      }, true);
+      // Reload variant data in case sprite set has changed
+      this.initVariantData();
+      switchDiagnostics?.checkpoint?.("scene-reset:variant-data-requested", {
+        elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+      }, true);
+
+      audioManager.fadeOutBgm(250);`;
+if (!battleScene.includes(resetClearSceneReplacement)) {
+  if (!battleScene.includes(resetClearSceneAnchor)) {
+    fail("Could not find the BattleScene clear-scene diagnostic anchor");
+  }
+  battleScene = battleScene.replace(resetClearSceneAnchor, resetClearSceneReplacement);
+}
+
+const resetDestroyAnchor = `        onComplete: () => {
+          this.ui.freeUIData();
+          this.uiContainer.remove(this.ui, true);
+          this.uiContainer.destroy();
+          this.children.removeAll(true);
+          // TODO: Do we even need this?
+          this.game.domContainer.innerHTML = "";
+          // TODO: \`launchBattle\` calls \`reset(false, false, true)\`
+          this.launchBattle();
+        },`;
+const resetDestroyReplacement = `        onComplete: () => {
+          switchDiagnostics?.checkpoint?.("scene-reset:destroy-start", {
+            elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+            children: this.children?.list?.length ?? null,
+            uiChildren: this.uiContainer?.list?.length ?? null,
+          }, true);
+          this.ui.freeUIData();
+          this.uiContainer.remove(this.ui, true);
+          this.uiContainer.destroy();
+          this.children.removeAll(true);
+          // TODO: Do we even need this?
+          this.game.domContainer.innerHTML = "";
+          switchDiagnostics?.checkpoint?.("scene-reset:destroy-complete", {
+            elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+            children: this.children?.list?.length ?? null,
+          }, true);
+          // TODO: \`launchBattle\` calls \`reset(false, false, true)\`
+          this.launchBattle();
+          switchDiagnostics?.checkpoint?.("scene-reset:launch-returned", {
+            elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+          }, true);
+        },`;
+if (!battleScene.includes(resetDestroyReplacement)) {
+  if (!battleScene.includes(resetDestroyAnchor)) {
+    fail("Could not find the BattleScene destroy diagnostic anchor");
+  }
+  battleScene = battleScene.replace(resetDestroyAnchor, resetDestroyReplacement);
+}
+
+const resetEndAnchor = `      });
+    }
+  }
+
+  // TODO: Invert the chances for this`;
+const resetEndReplacement = `      });
+    } else {
+      switchDiagnostics?.checkpoint?.("scene-reset:complete", {
+        clearScene,
+        clearData,
+        reloadI18n,
+        elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+      }, true);
+    }
+  }
+
+  // TODO: Invert the chances for this`;
+if (!battleScene.includes(resetEndReplacement)) {
+  if (!battleScene.includes(resetEndAnchor)) {
+    fail("Could not find the BattleScene reset completion diagnostic anchor");
+  }
+  battleScene = battleScene.replace(resetEndAnchor, resetEndReplacement);
 }
 write(battleScenePath, battleScene);
 
@@ -890,6 +1038,8 @@ const bgmEndListenerReplacement = `        } else {
         switchDiagnostics?.audio?.("bgm-load-rejected", {
           key,
           message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : null,
+          stack: error instanceof Error ? error.stack ?? null : null,
         }, true);
         this.destroy();
       });`;
@@ -1073,9 +1223,142 @@ if (!partyHealPhase.includes(partyHealReplacement)) {
 }
 write(partyHealPhasePath, partyHealPhase);
 
+let selectModifierPhase = read(selectModifierPhasePath);
+const rerollDelayFieldAnchor = `  private claimedRewardIndices: Set<number>;
+
+  private typeOptions: ModifierTypeOption[];`;
+const rerollDelayFieldReplacement = `  private claimedRewardIndices: Set<number>;
+  private switchRerollCleanupDelayComplete = false;
+
+  private typeOptions: ModifierTypeOption[];`;
+if (!selectModifierPhase.includes(rerollDelayFieldReplacement)) {
+  if (!selectModifierPhase.includes(rerollDelayFieldAnchor)) {
+    fail("Could not find the SelectModifierPhase cleanup-delay field anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(rerollDelayFieldAnchor, rerollDelayFieldReplacement);
+}
+
+const rerollStartAnchor = `  start() {
+    super.start();
+
+    // A retry phase begins only after the TM / Memory phase has completed.`;
+const rerollStartReplacement = `  start() {
+    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    const switchApi = (globalThis as any).Switch;
+    const memory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
+    const nativeUsedMiB = memory ? memory.nativeHeapUsed / 1048576 : 0;
+    if (this.rerollCount > 0 && !this.switchRerollCleanupDelayComplete && nativeUsedMiB >= 2250) {
+      this.switchRerollCleanupDelayComplete = true;
+      let gcRequested = false;
+      try {
+        if (typeof (globalThis as any).gc === "function") {
+          (globalThis as any).gc();
+          gcRequested = true;
+        }
+      } catch (error) {
+        switchDiagnostics?.checkpoint?.("reward:reroll-gc-failed", {
+          rerollCount: this.rerollCount,
+          message: error instanceof Error ? error.message : String(error),
+        }, true);
+      }
+      switchDiagnostics?.checkpoint?.("reward:reroll-pressure-cooldown", {
+        rerollCount: this.rerollCount,
+        delayMs: 750,
+        nativeUsedMiB: Math.round(nativeUsedMiB * 100) / 100,
+        nativeFreeMiB: memory ? Math.round((memory.nativeHeapFree / 1048576) * 100) / 100 : null,
+        gcRequested,
+      }, true);
+      globalScene.time.delayedCall(750, () => {
+        switchDiagnostics?.checkpoint?.("reward:reroll-pressure-resume", {
+          rerollCount: this.rerollCount,
+        }, true);
+        this.start();
+      });
+      return;
+    }
+
+    super.start();
+
+    // A retry phase begins only after the TM / Memory phase has completed.`;
+if (!selectModifierPhase.includes(rerollStartReplacement)) {
+  if (!selectModifierPhase.includes(rerollStartAnchor)) {
+    fail("Could not find the SelectModifierPhase cleanup-delay start anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(rerollStartAnchor, rerollStartReplacement);
+}
+
+const rerollRequestAnchor = `    globalScene.reroll = true;
+    globalScene.phaseManager.unshiftNew(
+      "SelectModifierPhase",`;
+const rerollRequestReplacement = `    globalScene.reroll = true;
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:reroll-requested", {
+      rerollCount: this.rerollCount,
+      nextRerollCount: this.rerollCount + 1,
+      rewardCount: this.typeOptions.length,
+      lockModifierTiers: globalScene.lockModifierTiers,
+      rerollCost,
+    }, true);
+    globalScene.phaseManager.unshiftNew(
+      "SelectModifierPhase",`;
+if (!selectModifierPhase.includes(rerollRequestReplacement)) {
+  if (!selectModifierPhase.includes(rerollRequestAnchor)) {
+    fail("Could not find the SelectModifierPhase reroll diagnostic anchor");
+  }
+  selectModifierPhase = selectModifierPhase.replace(rerollRequestAnchor, rerollRequestReplacement);
+}
+write(selectModifierPhasePath, selectModifierPhase);
+
+let modifierSelectUi = read(modifierSelectUiPath);
+const modifierCleanupAnchor = `    const options = this.options.concat(this.shopOptionsRows.flat());
+    this.options.splice(0, this.options.length);
+    this.shopOptionsRows.splice(0, this.shopOptionsRows.length);
+
+    globalScene.tweens.add({`;
+const modifierCleanupReplacement = `    const options = this.options.concat(this.shopOptionsRows.flat());
+    const rewardOptionCount = this.options.length;
+    const shopOptionCount = this.shopOptionsRows.flat().length;
+    this.options.splice(0, this.options.length);
+    this.shopOptionsRows.splice(0, this.shopOptionsRows.length);
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:ui-cleanup-start", {
+      rewardOptionCount,
+      shopOptionCount,
+      totalOptionCount: options.length,
+    }, true);
+
+    globalScene.tweens.add({`;
+if (!modifierSelectUi.includes(modifierCleanupReplacement)) {
+  if (!modifierSelectUi.includes(modifierCleanupAnchor)) {
+    fail("Could not find the modifier-select UI cleanup diagnostic anchor");
+  }
+  modifierSelectUi = modifierSelectUi.replace(modifierCleanupAnchor, modifierCleanupReplacement);
+}
+
+const modifierDestroyedAnchor = `        options.forEach(o => {
+          o.destroy();
+        });
+      },
+    });`;
+const modifierDestroyedReplacement = `        options.forEach(o => {
+          o.destroy();
+        });
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:ui-cleanup-complete", {
+          rewardOptionCount,
+          shopOptionCount,
+          totalOptionCount: options.length,
+        }, true);
+      },
+    });`;
+if (!modifierSelectUi.includes(modifierDestroyedReplacement)) {
+  if (!modifierSelectUi.includes(modifierDestroyedAnchor)) {
+    fail("Could not find the modifier-select UI destroyed diagnostic anchor");
+  }
+  modifierSelectUi = modifierSelectUi.replace(modifierDestroyedAnchor, modifierDestroyedReplacement);
+}
+write(modifierSelectUiPath, modifierSelectUi);
+
 let title = read(titlePath);
 for (const [placeholder, replacement] of [
-  ["SILVERSHADOW_VERSION_PLACEHOLDER", "1.12.0.10"],
+  ["SILVERSHADOW_VERSION_PLACEHOLDER", "1.0.2"],
   ["BUILD_NUMBER_PLACEHOLDER", "Switch M2"],
 ]) {
   if (!title.includes(placeholder)) {

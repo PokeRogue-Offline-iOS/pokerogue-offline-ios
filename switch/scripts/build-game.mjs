@@ -27,6 +27,7 @@ import {
   NXJS_VERSION,
   PHASER_VERSION,
   PNPM_VERSION,
+  SILVERSHADOW_VERSION,
   SWITCH_PLATFORM_VERSION,
   UPSTREAM_COMMIT,
   UPSTREAM_URL,
@@ -140,6 +141,7 @@ await writeFile(
       createdAt: new Date().toISOString(),
       upstreamCommit: UPSTREAM_COMMIT,
       upstreamVersion: UPSTREAM_VERSION,
+      silverShadowVersion: SILVERSHADOW_VERSION,
       originalEntryPoint,
       nodeVersion: process.version,
       expectedNodeVersion: NODE_VERSION,
@@ -170,6 +172,7 @@ async function calculateInputHash() {
     NXJS_VERSION,
     NXJS_NRO_VERSION,
     PHASER_VERSION,
+    SILVERSHADOW_VERSION,
     SWITCH_PLATFORM_VERSION,
     String(MANIFEST_SCHEMA_VERSION),
   ]) {
