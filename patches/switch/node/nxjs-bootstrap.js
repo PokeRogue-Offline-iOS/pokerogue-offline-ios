@@ -1297,6 +1297,7 @@ const rerollStartReplacement = `  start() {
     const nativeUsedMiB = memory ? memory.nativeHeapUsed / 1048576 : 0;
     if (this.rerollCount > 0 && !this.switchRerollCleanupDelayComplete && nativeUsedMiB >= 2250) {
       this.switchRerollCleanupDelayComplete = true;
+      const delayMs = nativeUsedMiB >= 2600 ? 2500 : nativeUsedMiB >= 2450 ? 1500 : 1000;
       let gcRequested = false;
       try {
         if (typeof (globalThis as any).gc === "function") {
@@ -1311,17 +1312,18 @@ const rerollStartReplacement = `  start() {
       }
       switchDiagnostics?.checkpoint?.("reward:reroll-pressure-cooldown", {
         rerollCount: this.rerollCount,
-        delayMs: 750,
+        delayMs,
+        clock: "wall",
         nativeUsedMiB: Math.round(nativeUsedMiB * 100) / 100,
         nativeFreeMiB: memory ? Math.round((memory.nativeHeapFree / 1048576) * 100) / 100 : null,
         gcRequested,
       }, true);
-      globalScene.time.delayedCall(750, () => {
+      globalThis.setTimeout(() => {
         switchDiagnostics?.checkpoint?.("reward:reroll-pressure-resume", {
           rerollCount: this.rerollCount,
         }, true);
         this.start();
-      });
+      }, delayMs);
       return;
     }
 
@@ -1338,7 +1340,24 @@ if (!selectModifierPhase.includes(rerollStartReplacement)) {
 const rerollRequestAnchor = `    globalScene.reroll = true;
     globalScene.phaseManager.unshiftNew(
       "SelectModifierPhase",`;
-const rerollRequestReplacement = `    globalScene.reroll = true;
+const rerollRequestReplacement = `    const switchApi = (globalThis as any).Switch;
+    const switchMemory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
+    const switchNativeUsedMiB = switchMemory ? switchMemory.nativeHeapUsed / 1048576 : 0;
+    const switchRerollSafetyLimitMiB = 2625;
+    if (switchNativeUsedMiB >= switchRerollSafetyLimitMiB) {
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:reroll-blocked-memory", {
+        rerollCount: this.rerollCount,
+        nativeUsedMiB: Math.round(switchNativeUsedMiB * 100) / 100,
+        nativeFreeMiB: switchMemory
+          ? Math.round((switchMemory.nativeHeapFree / 1048576) * 100) / 100
+          : null,
+        safetyLimitMiB: switchRerollSafetyLimitMiB,
+      }, true);
+      globalScene.ui.playError();
+      return false;
+    }
+
+    globalScene.reroll = true;
     (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:reroll-requested", {
       rerollCount: this.rerollCount,
       nextRerollCount: this.rerollCount + 1,
