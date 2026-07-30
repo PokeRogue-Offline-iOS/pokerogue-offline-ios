@@ -809,7 +809,26 @@ export function installDomShim(): void {
       return patchImage(new Image());
     }
     if (tag === "audio") {
-      return new Audio();
+      const audio = new Audio() as any;
+      if (typeof audio.canPlayType === "function") {
+        return audio;
+      }
+      const canPlayType = global.__SILVERSHADOW_CAN_PLAY_AUDIO_TYPE__;
+      if (typeof canPlayType !== "function") {
+        return audio;
+      }
+      return new Proxy(audio, {
+        get(target, property) {
+          if (property === "canPlayType") {
+            return canPlayType;
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+        set(target, property, value) {
+          return Reflect.set(target, property, value, target);
+        },
+      });
     }
     if (tag === "video" && global.Video) {
       return patchVideo(new global.Video());

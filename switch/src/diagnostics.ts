@@ -4,6 +4,9 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_LOADER_SAMPLES = 8;
 const MAX_MISSING_TEXTURES = 20;
 const MAX_PHASE_HISTORY = 24;
+const MAX_AUDIO_LOG_SAMPLES = 32;
+const MAX_AUDIO_RECENT_EVENTS = 32;
+const MAX_AUDIO_CACHE_SAMPLES = 12;
 const IMAGE_FILE_TYPES = new Set(["atlasimage", "image", "spritesheet", "svg"]);
 const CRITICAL_PHASES = new Set([
   "AttemptCapturePhase",
@@ -62,6 +65,12 @@ interface PhaseEvent {
   detail: unknown;
 }
 
+interface AudioEvent {
+  event: string;
+  at: number;
+  detail: unknown;
+}
+
 let previousMemory: MemoryValues | null = null;
 let loaderBatchSequence = 0;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -81,6 +90,21 @@ let lastGameCheckpoint: { name: string; detail: unknown; at: number } | null = n
 let phaseHistory: PhaseEvent[] = [];
 let gameStateProvider: (() => unknown) | null = null;
 let webGlContext: any = null;
+let audioCapabilities: unknown = "game-unavailable";
+let audioContextState: unknown = "context-unavailable";
+let audioLoggedSamples = 0;
+let audioSuppressedSamples = 0;
+let audioEventCounts: Record<string, number> = {};
+let audioRecentEvents: AudioEvent[] = [];
+const decodedAudioBuffers = new Map<
+  string,
+  {
+    bytes: number | null;
+    channels: number | null;
+    durationSeconds: number | null;
+    sampleRate: number | null;
+  }
+>();
 
 function round(value: number, digits = 2): number {
   const factor = 10 ** digits;
@@ -207,6 +231,138 @@ function readWebGlHealth(includeError = false): unknown {
   }
 }
 
+function normalizeAudioBuffer(buffer: any): {
+  bytes: number | null;
+  channels: number | null;
+  durationSeconds: number | null;
+  sampleRate: number | null;
+} {
+  const channels = Number(buffer?.numberOfChannels);
+  const frames = Number(buffer?.length);
+  const sampleRate = Number(buffer?.sampleRate);
+  const durationSeconds = Number(buffer?.duration);
+  return {
+    bytes:
+      Number.isFinite(channels) && Number.isFinite(frames)
+        ? channels * frames * 4
+        : null,
+    channels: Number.isFinite(channels) ? channels : null,
+    durationSeconds: Number.isFinite(durationSeconds) ? round(durationSeconds, 3) : null,
+    sampleRate: Number.isFinite(sampleRate) ? sampleRate : null,
+  };
+}
+
+function audio(event: string, detail?: unknown, important = false): void {
+  audioEventCounts[event] = (audioEventCounts[event] ?? 0) + 1;
+  const audioEvent: AudioEvent = {
+    event,
+    at: Date.now(),
+    detail: detail ?? null,
+  };
+  audioRecentEvents.push(audioEvent);
+  if (audioRecentEvents.length > MAX_AUDIO_RECENT_EVENTS) {
+    audioRecentEvents.shift();
+  }
+
+  if (important || audioLoggedSamples < MAX_AUDIO_LOG_SAMPLES) {
+    if (!important) {
+      audioLoggedSamples++;
+    }
+    appendLog(
+      event.includes("fail") || event.includes("error") || event.includes("timeout")
+        ? "ERROR"
+        : "INFO",
+      "Audio diagnostic",
+      audioEvent,
+    );
+  } else {
+    audioSuppressedSamples++;
+  }
+}
+
+function readAudioSnapshot(): unknown {
+  const buffers = [...decodedAudioBuffers.entries()]
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((left, right) => (right.bytes ?? 0) - (left.bytes ?? 0));
+  const totalEstimatedBytes = buffers.reduce((sum, buffer) => sum + (buffer.bytes ?? 0), 0);
+  return {
+    capabilities: audioCapabilities,
+    context: audioContextState,
+    events: {
+      counts: audioEventCounts,
+      loggedSamples: audioLoggedSamples,
+      suppressedSamples: audioSuppressedSamples,
+      recent: audioRecentEvents,
+    },
+    decodedCache: {
+      entries: buffers.length,
+      totalEstimatedBytes,
+      totalEstimatedMiB: bytesToMiB(totalEstimatedBytes),
+      largest: buffers.slice(0, MAX_AUDIO_CACHE_SAMPLES),
+      largestTruncated: buffers.length > MAX_AUDIO_CACHE_SAMPLES,
+    },
+  };
+}
+
+function instrumentSound(sound: any, key: string): void {
+  if (!sound || sound.__silverShadowAudioDiagnosticsInstalled) {
+    return;
+  }
+  sound.__silverShadowAudioDiagnosticsInstalled = true;
+  const detail = () => ({
+    key,
+    durationSeconds: Number.isFinite(Number(sound.duration)) ? round(Number(sound.duration), 3) : null,
+    loop: Boolean(sound.loop),
+    mute: Boolean(sound.mute),
+    rate: Number.isFinite(Number(sound.rate)) ? Number(sound.rate) : null,
+    seekSeconds: Number.isFinite(Number(sound.seek)) ? round(Number(sound.seek), 3) : null,
+    volume: Number.isFinite(Number(sound.volume)) ? Number(sound.volume) : null,
+  });
+  for (const event of ["play", "pause", "resume", "stop", "complete", "looped", "destroy"]) {
+    sound.on?.(event, () => audio(`sound-${event}`, detail()));
+  }
+}
+
+function instrumentSoundManager(game: any): void {
+  const manager = game?.sound;
+  if (!manager || manager.__silverShadowAudioDiagnosticsInstalled) {
+    return;
+  }
+  manager.__silverShadowAudioDiagnosticsInstalled = true;
+  const nativeAdd = manager.add?.bind(manager);
+  if (nativeAdd) {
+    manager.add = (key: string, config?: unknown) => {
+      const sound = nativeAdd(key, config);
+      instrumentSound(sound, String(key));
+      audio("sound-created", {
+        key: String(key),
+        loop: Boolean((config as any)?.loop),
+      });
+      return sound;
+    };
+  }
+
+  const audioCache = game?.cache?.audio;
+  if (audioCache && !audioCache.__silverShadowAudioDiagnosticsInstalled) {
+    audioCache.__silverShadowAudioDiagnosticsInstalled = true;
+    const nativeRemove = audioCache.remove?.bind(audioCache);
+    if (nativeRemove) {
+      audioCache.remove = (key: string) => {
+        const normalizedKey = String(key);
+        const knownBuffer = decodedAudioBuffers.get(normalizedKey) ?? null;
+        const result = nativeRemove(key);
+        decodedAudioBuffers.delete(normalizedKey);
+        audio("cache-remove", {
+          key: normalizedKey,
+          decoded: knownBuffer,
+          remainingEntries: decodedAudioBuffers.size,
+        });
+        return result;
+      };
+    }
+  }
+}
+
 function normalizeLoaderFile(file: any): Record<string, unknown> {
   return {
     key: file?.key ?? null,
@@ -231,6 +387,20 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
   }
   loader.__silverShadowDiagnosticsInstalled = true;
   let activeBatch: LoaderBatch | null = null;
+  const queuedAudioFiles = new Map<string, any>();
+
+  loader.on("addfile", (key: unknown, type: unknown, _activeLoader: any, file: any) => {
+    if (String(type) !== "audio") {
+      return;
+    }
+    const normalizedKey = String(key);
+    queuedAudioFiles.set(normalizedKey, file);
+    audio("loader-queued", {
+      scene: sceneName,
+      key: normalizedKey,
+      file: normalizeLoaderFile(file),
+    });
+  });
 
   loader.on("start", (activeLoader: any) => {
     activeBatch = {
@@ -252,12 +422,25 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
     });
   });
 
-  loader.on("filecomplete", (key: unknown, type: unknown) => {
+  loader.on("filecomplete", (key: unknown, type: unknown, data: unknown) => {
+    const normalizedKey = String(key);
+    const normalizedType = String(type);
+    if (normalizedType === "audio") {
+      const file = queuedAudioFiles.get(normalizedKey);
+      const decoded = normalizeAudioBuffer(data);
+      decodedAudioBuffers.set(normalizedKey, decoded);
+      audio("loader-complete", {
+        scene: sceneName,
+        key: normalizedKey,
+        compressedBytes: Number(file?.xhrLoader?.response?.byteLength) || null,
+        decoded,
+        decodedCacheEntries: decodedAudioBuffers.size,
+      });
+      queuedAudioFiles.delete(normalizedKey);
+    }
     if (!activeBatch) {
       return;
     }
-    const normalizedKey = String(key);
-    const normalizedType = String(type);
     activeBatch.completedByType[normalizedType] = (activeBatch.completedByType[normalizedType] ?? 0) + 1;
     const sample = `${normalizedType}:${normalizedKey}`;
     if (activeBatch.firstCompleted.length < MAX_LOADER_SAMPLES) {
@@ -279,6 +462,19 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
       file: normalizeLoaderFile(file),
       memory: readMemorySnapshot(),
     });
+    if (String(file?.type) === "audio") {
+      const key = String(file?.key ?? "unknown");
+      queuedAudioFiles.delete(key);
+      audio(
+        "loader-failed",
+        {
+          scene: sceneName,
+          key,
+          file: normalizeLoaderFile(file),
+        },
+        true,
+      );
+    }
   });
 
   loader.on("complete", (_activeLoader: any, totalComplete: number, totalFailed: number) => {
@@ -356,6 +552,19 @@ function attachPhaserGame(game: any): void {
   game.events.on("postrender", () => {
     counters.renderCount++;
     counters.lastRenderAt = Date.now();
+  });
+  audioCapabilities = game.device?.audio ?? "unavailable";
+  audioContextState = {
+    manager: game.sound?.constructor?.name ?? null,
+    contextState: game.sound?.context?.state ?? null,
+    sampleRate: Number(game.sound?.context?.sampleRate) || null,
+    noAudio: Boolean(game.config?.audio?.noAudio),
+    disableWebAudio: Boolean(game.config?.audio?.disableWebAudio),
+  };
+  instrumentSoundManager(game);
+  appendLog("INFO", "Phaser audio capabilities", {
+    device: audioCapabilities,
+    runtime: audioContextState,
   });
   appendLog("INFO", "Installed Phaser frame diagnostics");
 }
@@ -446,6 +655,7 @@ function heartbeat(): void {
       lastRenderAgeMs: current.lastRenderAt === null ? null : now - current.lastRenderAt,
     },
     webgl: readWebGlHealth(true),
+    audio: readAudioSnapshot(),
     memory: readMemorySnapshot(),
   });
   lastHeartbeatCounters = current;
@@ -457,12 +667,14 @@ export function installRuntimeDiagnostics(): void {
     return;
   }
   global.__SILVERSHADOW_DIAGNOSTICS__ = {
+    audio,
     attachPhaserGame,
     attachWebGlContext,
     checkpoint,
     instrumentLoader,
     memory: captureMemorySnapshot,
     phase,
+    readAudio: readAudioSnapshot,
     setGameStateProvider,
   };
   captureMemorySnapshot("diagnostics-installed");
@@ -472,6 +684,9 @@ export function installRuntimeDiagnostics(): void {
     loaderSampleLimit: MAX_LOADER_SAMPLES,
     missingTextureLimit: MAX_MISSING_TEXTURES,
     phaseHistoryLimit: MAX_PHASE_HISTORY,
+    audioLogSampleLimit: MAX_AUDIO_LOG_SAMPLES,
+    audioRecentEventLimit: MAX_AUDIO_RECENT_EVENTS,
+    audioCacheSampleLimit: MAX_AUDIO_CACHE_SAMPLES,
     criticalPhases: [...CRITICAL_PHASES],
   });
 }

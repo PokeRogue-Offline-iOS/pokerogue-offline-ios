@@ -168,6 +168,7 @@ const manifest = {
     "zero-bound-text-metrics-fallback",
     "sdmc-local-fetch",
     "fetch-backed-xmlhttprequest",
+    "nxjs-audio-codec-detection",
     "phaser-audio-listener",
     "remote-network-block",
     "persistent-local-storage-v1",

@@ -1,5 +1,5 @@
 import { GAME_ROOT, LOG_PATH, NXJS_VERSION, PHASER_VERSION } from "./constants";
-import { installAudioListenerShim } from "./audio-shim";
+import { installAudioCompatibilityShims } from "./audio-shim";
 import { captureMemorySnapshot, installRuntimeDiagnostics } from "./diagnostics";
 import { appendLog } from "./logger";
 import { installPersistentStorage } from "./storage";
@@ -69,7 +69,7 @@ async function boot(): Promise<void> {
   installPersistentStorage();
   installOfflineFetch();
   installXmlHttpRequestShim();
-  installAudioListenerShim();
+  installAudioCompatibilityShims();
   installFontFaceShim();
   installFonts();
   logFontMetrics();

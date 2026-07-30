@@ -14,8 +14,11 @@ const battleScenePath = path.join("pokerogue-src", "src", "battle-scene.ts");
 const loadingScenePath = path.join("pokerogue-src", "src", "loading-scene.ts");
 const phasePath = path.join("pokerogue-src", "src", "phase.ts");
 const phaseManagerPath = path.join("pokerogue-src", "src", "phase-manager.ts");
+const sceneBasePath = path.join("pokerogue-src", "src", "scene-base.ts");
+const backgroundMusicPath = path.join("pokerogue-src", "src", "audio", "background-music.ts");
 const attemptCapturePhasePath = path.join("pokerogue-src", "src", "phases", "attempt-capture-phase.ts");
 const encounterPhasePath = path.join("pokerogue-src", "src", "phases", "encounter-phase.ts");
+const partyHealPhasePath = path.join("pokerogue-src", "src", "phases", "party-heal-phase.ts");
 const switchBiomePhasePath = path.join("pokerogue-src", "src", "phases", "switch-biome-phase.ts");
 const titlePath = path.join("pokerogue-src", "src", "ui", "handlers", "title-ui-handler.ts");
 const touchControlsPath = path.join("pokerogue-src", "src", "touch-controls.ts");
@@ -741,6 +744,334 @@ if (!switchBiomePhase.includes(switchBiomeClearReplacement)) {
   switchBiomePhase = switchBiomePhase.replace(switchBiomeClearAnchor, switchBiomeClearReplacement);
 }
 write(switchBiomePhasePath, switchBiomePhase);
+
+let sceneBase = read(sceneBasePath);
+const loadBgmAnchor = `    this.load.audio(key, getCachedUrl(\`audio/bgm/\${key}.mp3\`));
+    await new Promise<void>((resolve, reject) => {
+      const onError = (file: Phaser.Loader.File) => {
+        if (file.key === key) {
+          this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+          reject(new Error(\`Failed to load BGM: \${key}\`));
+        }
+      };
+      this.load.once(\`filecomplete-audio-\${key}\`, () => {
+        this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+        resolve();
+      });
+      this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+      this.load.start();
+    });`;
+const loadBgmReplacement = `    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    const url = getCachedUrl(\`audio/bgm/\${key}.mp3\`);
+    switchDiagnostics?.audio?.("bgm-load-requested", {
+      key,
+      url,
+      cacheHit: false,
+      loaderActive: this.load.isLoading(),
+    }, true);
+
+    let queued = false;
+    const onAdd = (fileKey: string, type: string) => {
+      if (fileKey === key && type === "audio") {
+        queued = true;
+      }
+    };
+    this.load.on(Phaser.Loader.Events.ADD, onAdd);
+    this.load.audio(key, url);
+    this.load.off(Phaser.Loader.Events.ADD, onAdd);
+    if (!queued && !this.cache.audio.exists(key)) {
+      switchDiagnostics?.audio?.("bgm-not-queued", {
+        key,
+        url,
+        deviceAudio: this.game.device?.audio ?? null,
+      }, true);
+      throw new Error(\`BGM was not queued for this device: \${key}\`);
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const onError = (file: Phaser.Loader.File) => {
+        if (file.key === key) {
+          this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+          switchDiagnostics?.audio?.("bgm-load-failed", {
+            key,
+            url,
+            state: file.state,
+          }, true);
+          reject(new Error(\`Failed to load BGM: \${key}\`));
+        }
+      };
+      this.load.once(\`filecomplete-audio-\${key}\`, () => {
+        this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+        switchDiagnostics?.audio?.("bgm-load-complete", {
+          key,
+          url,
+          cached: this.cache.audio.exists(key),
+        }, true);
+        resolve();
+      });
+      this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+      this.load.start();
+      switchDiagnostics?.audio?.("bgm-loader-started", {
+        key,
+        loaderActive: this.load.isLoading(),
+        totalToLoad: this.load.totalToLoad,
+      }, true);
+    });`;
+if (!sceneBase.includes(loadBgmReplacement)) {
+  if (!sceneBase.includes(loadBgmAnchor)) {
+    fail("Could not find the SceneBase BGM loading diagnostic anchor");
+  }
+  sceneBase = sceneBase.replace(loadBgmAnchor, loadBgmReplacement);
+}
+write(sceneBasePath, sceneBase);
+
+let backgroundMusic = read(backgroundMusicPath);
+const bgmConstructorAnchor = `    this.key = key;
+    BackgroundMusic.refCounts.set(key, (BackgroundMusic.refCounts.get(key) ?? 0) + 1);
+
+    globalScene
+      .loadBgm(key)
+      .then(() => {
+        if (this.destroyed) {
+          return;
+        }
+        this.sound = globalScene.sound.add(key, { loop });`;
+const bgmConstructorReplacement = `    this.key = key;
+    BackgroundMusic.refCounts.set(key, (BackgroundMusic.refCounts.get(key) ?? 0) + 1);
+    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    switchDiagnostics?.audio?.("bgm-created", {
+      key,
+      loop,
+      loopPoint,
+      refCount: BackgroundMusic.refCounts.get(key) ?? 0,
+    }, true);
+
+    globalScene
+      .loadBgm(key)
+      .then(() => {
+        switchDiagnostics?.audio?.("bgm-ready", {
+          key,
+          loop,
+          destroyed: this.destroyed,
+          cached: globalScene.cache.audio.exists(key),
+        }, true);
+        if (this.destroyed) {
+          return;
+        }
+        this.sound = globalScene.sound.add(key, { loop });
+        switchDiagnostics?.audio?.("bgm-sound-created", {
+          key,
+          loop,
+          durationSeconds: this.sound.duration,
+        }, true);`;
+if (!backgroundMusic.includes(bgmConstructorReplacement)) {
+  if (!backgroundMusic.includes(bgmConstructorAnchor)) {
+    fail("Could not find the BackgroundMusic constructor diagnostic anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmConstructorAnchor, bgmConstructorReplacement);
+}
+
+const bgmEndListenerAnchor = `        } else {
+          this.sound.once("complete", () => this.triggerEnd());
+          // Defensive, "complete" should be the right event but Phaser docs aren't very clear
+          this.sound.once("stop", () => this.triggerEnd());
+        }
+        this.runPendingCalls();
+      })
+      .catch(() => this.destroy());`;
+const bgmEndListenerReplacement = `        } else {
+          this.sound.once("complete", () => this.triggerEnd("complete"));
+          // Defensive, "complete" should be the right event but Phaser docs aren't very clear
+          this.sound.once("stop", () => this.triggerEnd("stop"));
+        }
+        this.runPendingCalls();
+      })
+      .catch(error => {
+        switchDiagnostics?.audio?.("bgm-load-rejected", {
+          key,
+          message: error instanceof Error ? error.message : String(error),
+        }, true);
+        this.destroy();
+      });`;
+if (!backgroundMusic.includes(bgmEndListenerReplacement)) {
+  if (!backgroundMusic.includes(bgmEndListenerAnchor)) {
+    fail("Could not find the BackgroundMusic end-listener diagnostic anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmEndListenerAnchor, bgmEndListenerReplacement);
+}
+
+const bgmPlayAnchor = `      if (!sound.isPlaying) {
+        sound.play();
+      }`;
+const bgmPlayReplacement = `      if (!sound.isPlaying) {
+        const started = sound.play();
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-play", {
+          key: this.key,
+          started,
+          durationSeconds: sound.duration,
+          loop: sound.loop,
+          volume: sound.volume,
+        }, true);
+      }`;
+if (!backgroundMusic.includes(bgmPlayReplacement)) {
+  if (!backgroundMusic.includes(bgmPlayAnchor)) {
+    fail("Could not find the BackgroundMusic play diagnostic anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmPlayAnchor, bgmPlayReplacement);
+}
+
+const bgmTriggerEndAnchor = `  private triggerEnd(): void {
+    if (this.ended) {
+      return;
+    }
+    this.ended = true;
+    const callbacks = this.endCallbacks.splice(0);`;
+const bgmTriggerEndReplacement = `  private triggerEnd(reason: "complete" | "stop" | "destroy"): void {
+    if (this.ended) {
+      return;
+    }
+    this.ended = true;
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-ended", {
+      key: this.key,
+      reason,
+      callbackCount: this.endCallbacks.length,
+      destroyed: this.destroyed,
+    }, true);
+    const callbacks = this.endCallbacks.splice(0);`;
+if (!backgroundMusic.includes(bgmTriggerEndReplacement)) {
+  if (!backgroundMusic.includes(bgmTriggerEndAnchor)) {
+    fail("Could not find the BackgroundMusic end diagnostic anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmTriggerEndAnchor, bgmTriggerEndReplacement);
+}
+
+const bgmDestroyAnchor = `    this.destroyed = true;
+    this.pendingCalls.length = 0;
+    this.triggerEnd();
+    if (this.sound?.isPlaying) {`;
+const bgmDestroyReplacement = `    this.destroyed = true;
+    this.pendingCalls.length = 0;
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-destroy", {
+      key: this.key,
+      wasPlaying: this.sound?.isPlaying ?? false,
+      cached: globalScene.cache.audio.exists(this.key),
+      refCountBefore: BackgroundMusic.refCounts.get(this.key) ?? 0,
+    }, true);
+    this.triggerEnd("destroy");
+    if (this.sound?.isPlaying) {`;
+if (!backgroundMusic.includes(bgmDestroyReplacement)) {
+  if (!backgroundMusic.includes(bgmDestroyAnchor)) {
+    fail("Could not find the BackgroundMusic destroy diagnostic anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmDestroyAnchor, bgmDestroyReplacement);
+}
+
+const bgmCacheRemoveAnchor = `    if (remaining <= 0) {
+      BackgroundMusic.refCounts.delete(this.key);
+      globalScene.cache.audio.remove(this.key);
+    } else {`;
+const bgmCacheRemoveReplacement = `    if (remaining <= 0) {
+      BackgroundMusic.refCounts.delete(this.key);
+      globalScene.cache.audio.remove(this.key);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-cache-removed", {
+        key: this.key,
+        remaining,
+      }, true);
+    } else {`;
+if (!backgroundMusic.includes(bgmCacheRemoveReplacement)) {
+  if (!backgroundMusic.includes(bgmCacheRemoveAnchor)) {
+    fail("Could not find the BackgroundMusic cache-removal diagnostic anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmCacheRemoveAnchor, bgmCacheRemoveReplacement);
+}
+write(backgroundMusicPath, backgroundMusic);
+
+let partyHealPhase = read(partyHealPhasePath);
+const partyHealAnchor = `      const healSound = this.resumeBgm
+        ? audioManager.replaceBgmUntilEnd("bw/heal")
+        : audioManager.playBgm("bw/heal", false, false);
+      if (healSound == null) {
+        this.end();
+      } else {
+        healSound.onEnd(() => this.end());
+      }`;
+const partyHealReplacement = `      const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+      let completed = false;
+      let watchdog: ReturnType<typeof setTimeout> | null = null;
+      const finish = (reason: "audio-ended" | "sound-unavailable" | "watchdog-timeout") => {
+        if (completed) {
+          return;
+        }
+        completed = true;
+        if (watchdog !== null) {
+          clearTimeout(watchdog);
+          watchdog = null;
+        }
+        switchDiagnostics?.checkpoint?.("party-heal:finish", {
+          reason,
+          resumeBgm: this.resumeBgm,
+          wave: globalScene.currentBattle?.waveIndex ?? null,
+          biome: globalScene.arena?.biomeId ?? null,
+        }, true);
+        this.end();
+      };
+
+      switchDiagnostics?.checkpoint?.("party-heal:audio-request", {
+        key: "bw/heal",
+        resumeBgm: this.resumeBgm,
+        cached: globalScene.cache.audio.exists("bw/heal"),
+      }, true);
+      const healSound = this.resumeBgm
+        ? audioManager.replaceBgmUntilEnd("bw/heal")
+        : audioManager.playBgm("bw/heal", false, false);
+      if (healSound == null) {
+        finish("sound-unavailable");
+      } else {
+        healSound.onEnd(() => finish("audio-ended"));
+        if (!completed) {
+          watchdog = setTimeout(() => {
+            switchDiagnostics?.audio?.("party-heal-watchdog-timeout", {
+              key: "bw/heal",
+              resumeBgm: this.resumeBgm,
+              cached: globalScene.cache.audio.exists("bw/heal"),
+              isPlaying: healSound.isPlaying,
+            }, true);
+            finish("watchdog-timeout");
+          }, 5000);
+        }
+      }`;
+if (!partyHealPhase.includes(partyHealReplacement)) {
+  const previousWatchdogTail = `        healSound.onEnd(() => finish("audio-ended"));
+        watchdog = setTimeout(() => {
+          switchDiagnostics?.audio?.("party-heal-watchdog-timeout", {
+            key: "bw/heal",
+            resumeBgm: this.resumeBgm,
+            cached: globalScene.cache.audio.exists("bw/heal"),
+            isPlaying: healSound.isPlaying,
+          }, true);
+          finish("watchdog-timeout");
+        }, 5000);`;
+  const watchdogTail = `        healSound.onEnd(() => finish("audio-ended"));
+        if (!completed) {
+          watchdog = setTimeout(() => {
+            switchDiagnostics?.audio?.("party-heal-watchdog-timeout", {
+              key: "bw/heal",
+              resumeBgm: this.resumeBgm,
+              cached: globalScene.cache.audio.exists("bw/heal"),
+              isPlaying: healSound.isPlaying,
+            }, true);
+            finish("watchdog-timeout");
+          }, 5000);
+        }`;
+  if (partyHealPhase.includes(previousWatchdogTail)) {
+    partyHealPhase = partyHealPhase.replace(previousWatchdogTail, watchdogTail);
+  } else if (!partyHealPhase.includes(partyHealAnchor)) {
+    fail("Could not find the PartyHealPhase audio watchdog anchor");
+  } else {
+    partyHealPhase = partyHealPhase.replace(partyHealAnchor, partyHealReplacement);
+  }
+}
+write(partyHealPhasePath, partyHealPhase);
 
 let title = read(titlePath);
 for (const [placeholder, replacement] of [
