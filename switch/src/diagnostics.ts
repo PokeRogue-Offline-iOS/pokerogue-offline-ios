@@ -3,7 +3,20 @@ import { appendLog } from "./logger";
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_LOADER_SAMPLES = 8;
 const MAX_MISSING_TEXTURES = 20;
+const MAX_PHASE_HISTORY = 24;
 const IMAGE_FILE_TYPES = new Set(["atlasimage", "image", "spritesheet", "svg"]);
+const CRITICAL_PHASES = new Set([
+  "AttemptCapturePhase",
+  "BattleEndPhase",
+  "ModifierRewardPhase",
+  "NewBattlePhase",
+  "NewBiomeEncounterPhase",
+  "PartyHealPhase",
+  "SelectBiomePhase",
+  "SelectModifierPhase",
+  "SwitchBiomePhase",
+  "VictoryPhase",
+]);
 
 interface MemoryValues {
   totalHeapSize: number;
@@ -42,6 +55,13 @@ interface RuntimeCounters {
   lastRenderAt: number | null;
 }
 
+interface PhaseEvent {
+  event: "start" | "end";
+  name: string;
+  at: number;
+  detail: unknown;
+}
+
 let previousMemory: MemoryValues | null = null;
 let loaderBatchSequence = 0;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -58,6 +78,8 @@ let counters: RuntimeCounters = {
   lastRenderAt: null,
 };
 let lastGameCheckpoint: { name: string; detail: unknown; at: number } | null = null;
+let phaseHistory: PhaseEvent[] = [];
+let gameStateProvider: (() => unknown) | null = null;
 let webGlContext: any = null;
 
 function round(value: number, digits = 2): number {
@@ -338,6 +360,56 @@ function attachPhaserGame(game: any): void {
   appendLog("INFO", "Installed Phaser frame diagnostics");
 }
 
+function readGameState(): unknown {
+  if (!gameStateProvider) {
+    return "provider-unavailable";
+  }
+  try {
+    return gameStateProvider();
+  } catch (error) {
+    return {
+      unavailable: true,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function setGameStateProvider(provider: unknown): void {
+  if (typeof provider !== "function") {
+    appendLog("WARN", "Rejected invalid game-state diagnostics provider", {
+      type: typeof provider,
+    });
+    return;
+  }
+  gameStateProvider = provider as () => unknown;
+  appendLog("INFO", "Installed live game-state diagnostics provider", {
+    state: readGameState(),
+  });
+}
+
+function phase(event: "start" | "end", name: string, detail?: unknown): void {
+  const phaseEvent: PhaseEvent = {
+    event,
+    name,
+    at: Date.now(),
+    detail: detail ?? null,
+  };
+  phaseHistory.push(phaseEvent);
+  if (phaseHistory.length > MAX_PHASE_HISTORY) {
+    phaseHistory.shift();
+  }
+
+  if (CRITICAL_PHASES.has(name)) {
+    appendLog("INFO", "Critical phase event", {
+      ...phaseEvent,
+      state: readGameState(),
+      memory: readMemorySnapshot(),
+      webgl: readWebGlHealth(true),
+      frames: counters,
+    });
+  }
+}
+
 function checkpoint(name: string, detail?: unknown, includeMemory = false): void {
   lastGameCheckpoint = {
     name,
@@ -347,6 +419,7 @@ function checkpoint(name: string, detail?: unknown, includeMemory = false): void
   appendLog("INFO", "Game checkpoint", {
     name,
     detail: detail ?? null,
+    state: readGameState(),
     memory: includeMemory ? readMemorySnapshot() : "not-sampled",
     webgl: readWebGlHealth(includeMemory),
     frames: counters,
@@ -360,6 +433,11 @@ function heartbeat(): void {
   appendLog("INFO", "Runtime heartbeat", {
     uptimeMs: Math.round(performance.now()),
     game: lastGameCheckpoint,
+    state: readGameState(),
+    phases: {
+      currentEvent: phaseHistory.at(-1) ?? null,
+      recent: phaseHistory,
+    },
     frames: {
       ...current,
       stepsSincePrevious: current.stepCount - previous.stepCount,
@@ -384,6 +462,8 @@ export function installRuntimeDiagnostics(): void {
     checkpoint,
     instrumentLoader,
     memory: captureMemorySnapshot,
+    phase,
+    setGameStateProvider,
   };
   captureMemorySnapshot("diagnostics-installed");
   heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL_MS);
@@ -391,5 +471,7 @@ export function installRuntimeDiagnostics(): void {
     heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
     loaderSampleLimit: MAX_LOADER_SAMPLES,
     missingTextureLimit: MAX_MISSING_TEXTURES,
+    phaseHistoryLimit: MAX_PHASE_HISTORY,
+    criticalPhases: [...CRITICAL_PHASES],
   });
 }

@@ -12,6 +12,9 @@ const path = require("path");
 const mainPath = path.join("pokerogue-src", "src", "main.ts");
 const battleScenePath = path.join("pokerogue-src", "src", "battle-scene.ts");
 const loadingScenePath = path.join("pokerogue-src", "src", "loading-scene.ts");
+const phasePath = path.join("pokerogue-src", "src", "phase.ts");
+const phaseManagerPath = path.join("pokerogue-src", "src", "phase-manager.ts");
+const attemptCapturePhasePath = path.join("pokerogue-src", "src", "phases", "attempt-capture-phase.ts");
 const encounterPhasePath = path.join("pokerogue-src", "src", "phases", "encounter-phase.ts");
 const switchBiomePhasePath = path.join("pokerogue-src", "src", "phases", "switch-biome-phase.ts");
 const titlePath = path.join("pokerogue-src", "src", "ui", "handlers", "title-ui-handler.ts");
@@ -157,7 +160,7 @@ const battleLaunchAnchor = `    this.launchBattle();
   }
 
   update()`;
-const battleLaunchReplacement = `    this.launchBattle();
+const previousBattleLaunchReplacement = `    this.launchBattle();
     (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("battle-scene:create-complete", {
       scene: "battle",
       biome: this.arena?.biomeId ?? null,
@@ -166,11 +169,64 @@ const battleLaunchReplacement = `    this.launchBattle();
   }
 
   update()`;
+const battleLaunchReplacement = `    this.launchBattle();
+    const runtimeDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    runtimeDiagnostics?.setGameStateProvider?.(() => {
+      const currentPhase = this.phaseManager?.getCurrentPhase?.();
+      const standbyPhase = this.phaseManager?.getStandbyPhase?.();
+      const handler = this.ui?.getHandler?.();
+      const camera = this.cameras?.main;
+      return {
+        phase: {
+          current: currentPhase?.phaseName ?? null,
+          standby: standbyPhase?.phaseName ?? null,
+        },
+        battle: {
+          wave: this.currentBattle?.waveIndex ?? null,
+          battleType: this.currentBattle?.battleType ?? null,
+          biome: this.arena?.biomeId ?? null,
+        },
+        ui: {
+          mode: this.ui?.getMode?.() ?? null,
+          handler: handler?.constructor?.name ?? null,
+          containerAlpha: this.uiContainer?.alpha ?? null,
+          containerVisible: this.uiContainer?.visible ?? null,
+          alpha: this.ui?.alpha ?? null,
+          visible: this.ui?.visible ?? null,
+        },
+        field: {
+          alpha: this.field?.alpha ?? null,
+          visible: this.field?.visible ?? null,
+          children: this.field?.list?.length ?? null,
+          backgroundTexture: this.arenaBg?.texture?.key ?? null,
+          backgroundAlpha: this.arenaBg?.alpha ?? null,
+          backgroundVisible: this.arenaBg?.visible ?? null,
+        },
+        camera: {
+          alpha: camera?.alpha ?? null,
+          visible: camera?.visible ?? null,
+          fadeRunning: (camera as any)?.fadeEffect?.isRunning ?? null,
+          fadeProgress: (camera as any)?.fadeEffect?.progress ?? null,
+        },
+        loaderActive: this.load?.isLoading?.() ?? null,
+      };
+    });
+    runtimeDiagnostics?.checkpoint?.("battle-scene:create-complete", {
+      scene: "battle",
+      biome: this.arena?.biomeId ?? null,
+      wave: this.currentBattle?.waveIndex ?? null,
+    }, true);
+  }
+
+  update()`;
 if (!battleScene.includes(battleLaunchReplacement)) {
-  if (!battleScene.includes(battleLaunchAnchor)) {
+  if (battleScene.includes(previousBattleLaunchReplacement)) {
+    battleScene = battleScene.replace(previousBattleLaunchReplacement, battleLaunchReplacement);
+  } else if (battleScene.includes(battleLaunchAnchor)) {
+    battleScene = battleScene.replace(battleLaunchAnchor, battleLaunchReplacement);
+  } else {
     fail("Could not find the BattleScene launch diagnostic anchor");
   }
-  battleScene = battleScene.replace(battleLaunchAnchor, battleLaunchReplacement);
 }
 
 const biomeLoadCacheAnchor = `    // Already in texture cache — nothing to load
@@ -306,6 +362,189 @@ if (!battleScene.includes(biomeClearEndReplacement)) {
   battleScene = battleScene.replace(biomeClearEndAnchor, biomeClearEndReplacement);
 }
 write(battleScenePath, battleScene);
+
+let phase = read(phasePath);
+const phaseEndAnchor = `  public end(): void {
+    globalScene.phaseManager.shiftPhase();
+  }`;
+const phaseEndReplacement = `  public end(): void {
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.phase?.("end", this.phaseName, {
+      wave: globalScene.currentBattle?.waveIndex ?? null,
+      biome: globalScene.arena?.biomeId ?? null,
+    });
+    globalScene.phaseManager.shiftPhase();
+  }`;
+if (!phase.includes(phaseEndReplacement)) {
+  if (!phase.includes(phaseEndAnchor)) {
+    fail("Could not find the base Phase end diagnostic anchor");
+  }
+  phase = phase.replace(phaseEndAnchor, phaseEndReplacement);
+}
+write(phasePath, phase);
+
+let phaseManager = read(phaseManagerPath);
+const phaseStartAnchor = `  private startCurrentPhase(): void {
+    console.log(\`%cStart Phase \${this.currentPhase.phaseName}\`, \`color:\${PHASE_START_COLOR};\`);
+    this.currentPhase.start();
+  }`;
+const phaseStartReplacement = `  private startCurrentPhase(): void {
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.phase?.("start", this.currentPhase.phaseName, {
+      wave: globalScene.currentBattle?.waveIndex ?? null,
+      biome: globalScene.arena?.biomeId ?? null,
+    });
+    console.log(\`%cStart Phase \${this.currentPhase.phaseName}\`, \`color:\${PHASE_START_COLOR};\`);
+    this.currentPhase.start();
+  }`;
+if (!phaseManager.includes(phaseStartReplacement)) {
+  if (!phaseManager.includes(phaseStartAnchor)) {
+    fail("Could not find the PhaseManager start diagnostic anchor");
+  }
+  phaseManager = phaseManager.replace(phaseStartAnchor, phaseStartReplacement);
+}
+write(phaseManagerPath, phaseManager);
+
+let attemptCapturePhase = read(attemptCapturePhasePath);
+const captureStartAnchor = `    const pokemon = this.getPokemon() as EnemyPokemon;
+
+    if (!pokemon?.hp) {`;
+const captureStartReplacement = `    const pokemon = this.getPokemon() as EnemyPokemon;
+    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    switchDiagnostics?.checkpoint?.("capture:start", {
+      wave: globalScene.currentBattle?.waveIndex ?? null,
+      biome: globalScene.arena?.biomeId ?? null,
+      battlerIndex: this.battlerIndex,
+      name: pokemon?.name ?? null,
+      species: pokemon?.species?.speciesId ?? null,
+      hp: pokemon?.hp ?? null,
+      maxHp: pokemon?.getMaxHp?.() ?? null,
+      partySize: globalScene.getPlayerParty?.()?.length ?? null,
+    }, true);
+
+    if (!pokemon?.hp) {`;
+if (!attemptCapturePhase.includes(captureStartReplacement)) {
+  if (!attemptCapturePhase.includes(captureStartAnchor)) {
+    fail("Could not find the AttemptCapturePhase start diagnostic anchor");
+  }
+  attemptCapturePhase = attemptCapturePhase.replace(captureStartAnchor, captureStartReplacement);
+}
+
+const catchStartAnchor = `  catch() {
+    const pokemon = this.getPokemon() as EnemyPokemon;
+
+    const speciesForm`;
+const catchStartReplacement = `  catch() {
+    const pokemon = this.getPokemon() as EnemyPokemon;
+    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    switchDiagnostics?.checkpoint?.("capture:success-entered", {
+      wave: globalScene.currentBattle?.waveIndex ?? null,
+      biome: globalScene.arena?.biomeId ?? null,
+      battlerIndex: this.battlerIndex,
+      name: pokemon?.name ?? null,
+      species: pokemon?.species?.speciesId ?? null,
+      hp: pokemon?.hp ?? null,
+      maxHp: pokemon?.getMaxHp?.() ?? null,
+      partySize: globalScene.getPlayerParty?.()?.length ?? null,
+    }, true);
+
+    const speciesForm`;
+if (!attemptCapturePhase.includes(catchStartReplacement)) {
+  if (!attemptCapturePhase.includes(catchStartAnchor)) {
+    fail("Could not find the AttemptCapturePhase success diagnostic anchor");
+  }
+  attemptCapturePhase = attemptCapturePhase.replace(catchStartAnchor, catchStartReplacement);
+}
+
+const captureInfoAnchor = `    globalScene.pokemonInfoContainer.show(pokemon, true);
+
+    globalScene.gameData.updateSpeciesDexIvs`;
+const captureInfoReplacement = `    globalScene.pokemonInfoContainer.show(pokemon, true);
+    switchDiagnostics?.checkpoint?.("capture:info-shown", {
+      wave: globalScene.currentBattle?.waveIndex ?? null,
+      partySize: globalScene.getPlayerParty?.()?.length ?? null,
+      uiMode: globalScene.ui?.getMode?.() ?? null,
+    });
+
+    globalScene.gameData.updateSpeciesDexIvs`;
+if (!attemptCapturePhase.includes(captureInfoReplacement)) {
+  if (!attemptCapturePhase.includes(captureInfoAnchor)) {
+    fail("Could not find the AttemptCapturePhase info diagnostic anchor");
+  }
+  attemptCapturePhase = attemptCapturePhase.replace(captureInfoAnchor, captureInfoReplacement);
+}
+
+const captureEndAnchor = `        const end = () => {
+          globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);`;
+const captureEndReplacement = `        const end = () => {
+          switchDiagnostics?.checkpoint?.("capture:queue-victory", {
+            wave: globalScene.currentBattle?.waveIndex ?? null,
+            partySize: globalScene.getPlayerParty?.()?.length ?? null,
+            uiMode: globalScene.ui?.getMode?.() ?? null,
+          }, true);
+          globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);`;
+if (!attemptCapturePhase.includes(captureEndReplacement)) {
+  if (!attemptCapturePhase.includes(captureEndAnchor)) {
+    fail("Could not find the AttemptCapturePhase end diagnostic anchor");
+  }
+  attemptCapturePhase = attemptCapturePhase.replace(captureEndAnchor, captureEndReplacement);
+}
+
+const addToPartyAnchor = `        const addToParty = (slotIndex?: number) => {
+          const newPokemon = pokemon.addToParty(this.pokeballType, slotIndex);`;
+const addToPartyReplacement = `        const addToParty = (slotIndex?: number) => {
+          switchDiagnostics?.checkpoint?.("capture:add-to-party-start", {
+            wave: globalScene.currentBattle?.waveIndex ?? null,
+            slotIndex: slotIndex ?? null,
+            partySize: globalScene.getPlayerParty?.()?.length ?? null,
+          }, true);
+          const newPokemon = pokemon.addToParty(this.pokeballType, slotIndex);`;
+if (!attemptCapturePhase.includes(addToPartyReplacement)) {
+  if (!attemptCapturePhase.includes(addToPartyAnchor)) {
+    fail("Could not find the AttemptCapturePhase add-to-party diagnostic anchor");
+  }
+  attemptCapturePhase = attemptCapturePhase.replace(addToPartyAnchor, addToPartyReplacement);
+}
+
+const newPartyAssetsAnchor = `              newPokemon.leaveField(true, true, false);
+              newPokemon.loadAssets().then(end);`;
+const newPartyAssetsReplacement = `              newPokemon.leaveField(true, true, false);
+              switchDiagnostics?.checkpoint?.("capture:new-party-assets-start", {
+                wave: globalScene.currentBattle?.waveIndex ?? null,
+                partySize: globalScene.getPlayerParty?.()?.length ?? null,
+              }, true);
+              newPokemon.loadAssets().then(() => {
+                switchDiagnostics?.checkpoint?.("capture:new-party-assets-complete", {
+                  wave: globalScene.currentBattle?.waveIndex ?? null,
+                  partySize: globalScene.getPlayerParty?.()?.length ?? null,
+                }, true);
+                end();
+              });`;
+if (!attemptCapturePhase.includes(newPartyAssetsReplacement)) {
+  if (!attemptCapturePhase.includes(newPartyAssetsAnchor)) {
+    fail("Could not find the AttemptCapturePhase party asset diagnostic anchor");
+  }
+  attemptCapturePhase = attemptCapturePhase.replace(newPartyAssetsAnchor, newPartyAssetsReplacement);
+}
+
+const capturePersistAnchor = `        Promise.all([pokemon.hideInfo(), globalScene.gameData.setPokemonCaught(pokemon)]).then(() => {
+          if (!addStatus.value) {`;
+const capturePersistReplacement = `        switchDiagnostics?.checkpoint?.("capture:persist-start", {
+          wave: globalScene.currentBattle?.waveIndex ?? null,
+          partySize: globalScene.getPlayerParty?.()?.length ?? null,
+        }, true);
+        Promise.all([pokemon.hideInfo(), globalScene.gameData.setPokemonCaught(pokemon)]).then(() => {
+          switchDiagnostics?.checkpoint?.("capture:persist-complete", {
+            wave: globalScene.currentBattle?.waveIndex ?? null,
+            partySize: globalScene.getPlayerParty?.()?.length ?? null,
+            addAllowed: addStatus.value,
+          }, true);
+          if (!addStatus.value) {`;
+if (!attemptCapturePhase.includes(capturePersistReplacement)) {
+  if (!attemptCapturePhase.includes(capturePersistAnchor)) {
+    fail("Could not find the AttemptCapturePhase persistence diagnostic anchor");
+  }
+  attemptCapturePhase = attemptCapturePhase.replace(capturePersistAnchor, capturePersistReplacement);
+}
+write(attemptCapturePhasePath, attemptCapturePhase);
 
 let encounterPhase = read(encounterPhasePath);
 const encounterStartAnchor = `  start() {

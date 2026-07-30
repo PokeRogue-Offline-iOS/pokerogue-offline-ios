@@ -174,11 +174,72 @@ function installOfflineFetch(): void {
       resolved: resolution.url,
       kind: resolution.kind,
     });
+    if (resolution.kind === "sd-card") {
+      return readSdCardResponse(resolution.url, input, init);
+    }
     if (input instanceof Request) {
       return nativeFetch(new Request(resolution.url, input), init);
     }
     return nativeFetch(resolution.url, init);
   };
+}
+
+function readSdCardResponse(
+  path: string,
+  input: string | URL | Request,
+  init?: RequestInit,
+): Response {
+  const method = String(init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    throw new TypeError(`Unsupported ${method} request for local SD-card resource: ${path}`);
+  }
+
+  const data = Switch.readFileSync(path);
+  if (data === null) {
+    appendLog("ERROR", "Local SD-card resource is missing", {
+      path,
+      method,
+    });
+    return new Response(null, {
+      status: 404,
+      statusText: "Not Found",
+    });
+  }
+
+  const headers = new Headers({
+    "content-length": String(data.byteLength),
+    "content-type": contentTypeForPath(path),
+  });
+  return new Response(method === "HEAD" ? null : data, {
+    status: 200,
+    statusText: "OK",
+    headers,
+  });
+}
+
+function contentTypeForPath(path: string): string {
+  const extension = /\.([^.\/]+)$/.exec(path.toLowerCase())?.[1] ?? "";
+  return (
+    {
+      css: "text/css; charset=utf-8",
+      gif: "image/gif",
+      html: "text/html; charset=utf-8",
+      jpeg: "image/jpeg",
+      jpg: "image/jpeg",
+      js: "text/javascript; charset=utf-8",
+      json: "application/json",
+      m4a: "audio/mp4",
+      mp3: "audio/mpeg",
+      ogg: "audio/ogg",
+      png: "image/png",
+      svg: "image/svg+xml",
+      ttf: "font/ttf",
+      txt: "text/plain; charset=utf-8",
+      wav: "audio/wav",
+      webm: "video/webm",
+      xml: "application/xml",
+    }[extension] ?? "application/octet-stream"
+  );
 }
 
 function resolveLocalRequest(input: string): {
@@ -198,7 +259,13 @@ function resolveLocalRequest(input: string): {
     return { url: input, kind: "unknown" };
   }
 
-  const withoutQuery = input.replace(/[?#].*$/, "");
+  const encodedWithoutQuery = input.replace(/[?#].*$/, "");
+  let withoutQuery: string;
+  try {
+    withoutQuery = decodeURIComponent(encodedWithoutQuery);
+  } catch {
+    throw new TypeError(`Malformed percent-encoding in local resource URL: ${input}`);
+  }
   let resolved: string;
   if (/^(sdmc|file):/i.test(withoutQuery)) {
     resolved = withoutQuery.replace(/^file:/i, "sdmc:");
