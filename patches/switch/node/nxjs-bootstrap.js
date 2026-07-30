@@ -157,7 +157,7 @@ const loadingIntroAnchor = `    this.load
 const loadingIntroReplacement = `    this.load
       .once(this.LOAD_EVENTS.START, () => {
         intro.setVisible(false);
-        switchDiagnostics?.checkpoint?.("loading-scene:progress-visible", {
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("loading-scene:progress-visible", {
           scene: LoadingScene.KEY,
           introSkipped: true,
         }, true);
