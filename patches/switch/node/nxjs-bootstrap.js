@@ -1388,11 +1388,40 @@ const rerollRequestAnchor = `    globalScene.reroll = true;
     globalScene.phaseManager.unshiftNew(
       "SelectModifierPhase",`;
 const rerollRequestReplacement = `    const switchApi = (globalThis as any).Switch;
-    const switchMemory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
+    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    let switchMemory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
+    const switchNativeUsedBeforeGcMiB = switchMemory ? switchMemory.nativeHeapUsed / 1048576 : 0;
+    const switchRerollRecoveryThresholdMiB = 2250;
+    if (switchNativeUsedBeforeGcMiB >= switchRerollRecoveryThresholdMiB) {
+      let gcRequested = false;
+      try {
+        if (typeof (globalThis as any).gc === "function") {
+          (globalThis as any).gc();
+          gcRequested = true;
+        }
+      } catch (error) {
+        switchDiagnostics?.checkpoint?.("reward:reroll-gc-failed", {
+          rerollCount: this.rerollCount,
+          message: error instanceof Error ? error.message : String(error),
+        }, true);
+      }
+      switchMemory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : switchMemory;
+      switchDiagnostics?.checkpoint?.("reward:reroll-pressure-recovery", {
+        rerollCount: this.rerollCount,
+        nativeUsedBeforeGcMiB: Math.round(switchNativeUsedBeforeGcMiB * 100) / 100,
+        nativeUsedAfterGcMiB: switchMemory
+          ? Math.round((switchMemory.nativeHeapUsed / 1048576) * 100) / 100
+          : null,
+        nativeFreeAfterGcMiB: switchMemory
+          ? Math.round((switchMemory.nativeHeapFree / 1048576) * 100) / 100
+          : null,
+        gcRequested,
+      }, true);
+    }
     const switchNativeUsedMiB = switchMemory ? switchMemory.nativeHeapUsed / 1048576 : 0;
-    const switchRerollSafetyLimitMiB = 2625;
+    const switchRerollSafetyLimitMiB = 2450;
     if (switchNativeUsedMiB >= switchRerollSafetyLimitMiB) {
-      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:reroll-blocked-memory", {
+      switchDiagnostics?.checkpoint?.("reward:reroll-blocked-memory", {
         rerollCount: this.rerollCount,
         nativeUsedMiB: Math.round(switchNativeUsedMiB * 100) / 100,
         nativeFreeMiB: switchMemory
@@ -1446,8 +1475,7 @@ const rerollPhaseTransitionAnchor = `    globalScene.reroll = true;
     }
     audioManager.playSound("se/buy");
     return true;`;
-const rerollPhaseTransitionReplacement = `    const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
-    const nextRerollCount = this.rerollCount + 1;
+const rerollPhaseTransitionReplacement = `    const nextRerollCount = this.rerollCount + 1;
     const nextModifierTiers =
       this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[];
     const modifierCount = this.getModifierCount();
