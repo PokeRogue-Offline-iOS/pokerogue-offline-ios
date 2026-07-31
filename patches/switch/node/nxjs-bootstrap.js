@@ -1592,41 +1592,48 @@ if (!selectModifierPhase.includes(rerollCopiedSettingsReplacement)) {
   );
 }
 
-const claimAllReturnAnchor = `    return cost === -1;
+const multiRewardReturnAnchor = `    return cost === -1;
   }
 
   // Reroll rewards`;
-const claimAllReturnReplacement = `    return cost === -1
-      && !(activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE && !(modifierType instanceof PokemonModifierType));
+const multiRewardReturnReplacement = `    return cost === -1
+      && !(
+        (activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE || activeOverrides.INFINITE_REWARDS_OVERRIDE)
+        && !(modifierType instanceof PokemonModifierType)
+      );
   }
 
   // Reroll rewards`;
-if (!selectModifierPhase.includes(claimAllReturnReplacement)) {
-  if (!selectModifierPhase.includes(claimAllReturnAnchor)) {
-    fail("Could not find the SelectModifierPhase Claim All callback-result anchor");
+if (!selectModifierPhase.includes(multiRewardReturnReplacement)) {
+  if (!selectModifierPhase.includes(multiRewardReturnAnchor)) {
+    fail("Could not find the SelectModifierPhase multi-reward callback-result anchor");
   }
-  selectModifierPhase = selectModifierPhase.replace(claimAllReturnAnchor, claimAllReturnReplacement);
+  selectModifierPhase = selectModifierPhase.replace(multiRewardReturnAnchor, multiRewardReturnReplacement);
 }
 
-const claimAllCompleteAnchor = `  private completeClaimAllReward(rewardIndex: number): void {
-    const nextClaimedRewardIndices = new Set(this.claimedRewardIndices);
-    nextClaimedRewardIndices.add(rewardIndex);
+const multiRewardCompleteAnchor = `  private completeMultiReward(rewardIndex: number, modifier: Modifier): void {
+    const shouldMarkReward = activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE || this.shouldMarkInfiniteReward(modifier);
+    if (shouldMarkReward) {
+      this.claimedRewardIndices.add(rewardIndex);
+    }
 
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE);
-    globalScene.phaseManager.unshiftPhase(
-      this.copy(nextClaimedRewardIndices),
-    );
-
+    globalScene.phaseManager.unshiftPhase(this.copy());
     super.end();
   }`;
-const claimAllCompleteReplacement = `  private completeClaimAllReward(
+const multiRewardCompleteReplacement = `  private completeMultiReward(
     rewardIndex: number,
+    modifier: Modifier,
     modifierSelectCallback: ModifierSelectCallback,
   ): void {
-    this.claimedRewardIndices.add(rewardIndex);
+    const shouldMarkReward = activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE || this.shouldMarkInfiniteReward(modifier);
+    if (shouldMarkReward) {
+      this.claimedRewardIndices.add(rewardIndex);
+    }
+
     const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
-    const markedInPlace = uiHandler.markRewardClaimed(rewardIndex);
+    const markedInPlace = shouldMarkReward && uiHandler.markRewardClaimed(rewardIndex);
     // The party/move callback has already returned to MODIFIER_SELECT here.
     // UI.setMode() short-circuits when the requested mode is already active,
     // so call the handler's active-show path directly to restore its callback.
@@ -1637,30 +1644,33 @@ const claimAllCompleteReplacement = `  private completeClaimAllReward(
       this.getRerollCost(globalScene.lockModifierTiers),
       [...this.claimedRewardIndices],
     ]);
-    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:claim-reused-ui", {
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("reward:multi-reused-ui", {
       rewardIndex,
+      claimAll: activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE,
+      infinite: activeOverrides.INFINITE_REWARDS_OVERRIDE,
+      shouldMarkReward,
       claimedRewardCount: this.claimedRewardIndices.size,
       rewardCount: this.typeOptions.length,
       markedInPlace,
       inputRearmed: true,
     }, true);
   }`;
-if (!selectModifierPhase.includes(claimAllCompleteReplacement)) {
-  if (!selectModifierPhase.includes(claimAllCompleteAnchor)) {
-    fail("Could not find the SelectModifierPhase Claim All completion anchor");
+if (!selectModifierPhase.includes(multiRewardCompleteReplacement)) {
+  if (!selectModifierPhase.includes(multiRewardCompleteAnchor)) {
+    fail("Could not find the SelectModifierPhase multi-reward completion anchor");
   }
-  selectModifierPhase = selectModifierPhase.replace(claimAllCompleteAnchor, claimAllCompleteReplacement);
+  selectModifierPhase = selectModifierPhase.replace(multiRewardCompleteAnchor, multiRewardCompleteReplacement);
 }
 
-const claimAllCompleteCallAnchor = `      this.completeClaimAllReward(rewardIndex!);
+const multiRewardCompleteCallAnchor = `      this.completeMultiReward(rewardIndex!, modifier);
       return;`;
-const claimAllCompleteCallReplacement = `      this.completeClaimAllReward(rewardIndex!, modifierSelectCallback!);
+const multiRewardCompleteCallReplacement = `      this.completeMultiReward(rewardIndex!, modifier, modifierSelectCallback!);
       return;`;
-if (!selectModifierPhase.includes(claimAllCompleteCallReplacement)) {
-  if (!selectModifierPhase.includes(claimAllCompleteCallAnchor)) {
-    fail("Could not find the SelectModifierPhase Claim All completion-call anchor");
+if (!selectModifierPhase.includes(multiRewardCompleteCallReplacement)) {
+  if (!selectModifierPhase.includes(multiRewardCompleteCallAnchor)) {
+    fail("Could not find the SelectModifierPhase multi-reward completion-call anchor");
   }
-  selectModifierPhase = selectModifierPhase.replace(claimAllCompleteCallAnchor, claimAllCompleteCallReplacement);
+  selectModifierPhase = selectModifierPhase.replace(multiRewardCompleteCallAnchor, multiRewardCompleteCallReplacement);
 }
 write(selectModifierPhasePath, selectModifierPhase);
 
