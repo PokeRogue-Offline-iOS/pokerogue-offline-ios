@@ -11,15 +11,28 @@ Download the latest Android APK from the repository's [Releases page](https://gi
 
 Before installing an update, export your save data and active session as a precaution.
 
-## v1.0.2 Highlights
+## v1.0.3 Highlights
 
-Version 1.0.2 adds three new optional progression modifiers:
+Version 1.0.3 expands the Offline sandbox with starter customization, reward,
+generation, progression, and battle-debugging options:
 
-- **Max Luck (SSS)** sets effective party luck to the maximum value of 14.
-- **100x Pokémon Candy** multiplies species or starter candy awards by 100.
-- **60 Starter Points** increases the starter selection point limit to 60.
+- **Duplicate Starters** supports up to six independently customized copies of
+  the same species, including separate moves, gender, nature, ability, form,
+  shiny variant, Tera type, and passive selection.
+- **Reward Claim Mode** combines the mutually exclusive Default, Claim All, and
+  Infinite reward behaviors into one setting.
+- **Infinite Player HP**, **Infinite Player PP**, and **Player OHKO** provide
+  guarded battle-debugging tools that preserve enemy behavior, boss shields,
+  scripted boss limits, and normal move resolution.
+- **Starting Level**, **All Starters Have Pokérus**, and **Unlock Starter on
+  Select** add targeted starter setup controls.
+- **Pokémon Candy Multiplier** now offers Default, 2x, 5x, 10x, 50x, and 100x;
+  **Candy Costs** separately offers Default, Rebalanced, and Free costs.
+- **Shiny Rate**, **Always Shiny**, **Rare Eggs**, **Instant Hatch**, and **Form
+  Change Items** provide configurable generation and progression shortcuts.
 
-All three options have been tested together with every previously available SilverShadow sandbox option enabled at the same time.
+The experimental **Fast Reward UI** option was removed from v1.0.3. Reward
+claims use the normal game interface and animation flow for stability.
 
 ## Features
 
@@ -59,7 +72,7 @@ The **Settings → Offline** menu includes optional gameplay modifiers.
 
 All sandbox options:
 
-- Default to **Off**
+- Default to **Off** or the normal game value
 - Are stored locally
 - Require a reload after being changed
 - Can be enabled together, except that reward claiming uses one mutually
@@ -73,43 +86,54 @@ All sandbox options:
 | **Free Rerolls** | Makes normal and locked reward rerolls cost zero. |
 | **Free Egg Gacha Pulls** | Egg Gacha pulls do not consume vouchers or tokens. |
 | **Guaranteed Capture** | Every valid Poké Ball throw captures the target while still consuming one ball. |
-| **Reward Claim Mode** | Selects Default, Claim All, or Infinite reward behavior; Claim All and Infinite cannot conflict. |
+| **Reward Claim Mode** | **Default** keeps the normal single choice, **Claim All** allows each generated slot to be taken once, and **Infinite** retains eligible rewards for repeated selection. |
 | **Max Luck (SSS)** | Sets effective party luck to 14, the maximum SSS value used by the luck and reward systems. |
-| **Pokémon Candy Multiplier** | Multiplies species or starter candy awards by 2x, 5x, 10x, 50x, or 100x while preserving the normal cap. |
+| **Pokémon Candy Multiplier** | Selects Default, 2x, 5x, 10x, 50x, or 100x species-candy awards while preserving the normal cap. |
 | **Candy Costs** | Uses Default, Rebalanced (25%, rounded up), or Free passive, point-reduction, and same-species egg costs. |
 | **60 Starter Points** | Raises the starter selection point limit to 60. |
-| **Allow Duplicate Starters** | Allows up to six independent copies of a species when point and challenge rules permit it. |
+| **Allow Duplicate Starters** | Allows up to six independently customized copies of a species when point and challenge rules permit them. |
 | **All Starters Have Pokérus** | Gives every selected starter record Pokérus, including every duplicate copy. |
-| **Starting Level** | Overrides the centralized starting level with a value from 10 through 100. |
-| **Shiny Rate** | Multiplies normal generated player/wild shiny rolls from 1x through 100x. |
+| **Starting Level** | Selects Default or level 10 through 100 in increments of 10 for the player's selected starters. |
+| **Shiny Rate** | Selects 1x, 2x, 4x, 8x, 10x, 20x, or 100x for normal generated player/wild shiny rolls. |
 | **Always Shiny** | Forces shiny for newly generated Pokémon that use the normal shiny-roll path. |
-| **Rare Eggs** | Uses Futuba's tier-weighted gacha odds: 12.5% Common, 25% Rare, 25% Epic, and 37.5% Legendary before machine offsets and guarantees. |
+| **Rare Eggs** | Uses tier-weighted gacha odds: 12.5% Common, 25% Rare, 25% Epic, and 37.5% Legendary before machine offsets and guarantees. |
 | **Instant Hatch** | Schedules eligible eggs for the normal hatch flow at the next egg-lapse opportunity. |
-| **Form Change Items** | Adds Rebalanced or Abundant reward-pool access for transformation-related items. |
-| **Unlock Starter on Select** | Persistently grants minimum ownership data when Action is pressed on a locked starter. |
+| **Form Change Items** | Selects Default, Rebalanced, or Abundant reward-pool access for form-changing items and prerequisites. |
+| **Unlock Starter on Select** | Pressing Action on a locked starter persistently grants its minimum ownership data and immediately refreshes its visual state. |
 | **Infinite Player HP** | Makes every battle damage result zero for both player field slots; enemies retain normal damage. |
-| **Infinite Player PP** | Prevents player move-use, Pressure, Grudge, and move-based PP depletion without changing enemy PP or max-PP upgrades. |
-| **Player OHKO** | Makes the first hit of player damage moves lethal while retaining immunities, protection, substitutes, Endure effects, boss shields, and scripted boss caps. |
+| **Infinite Player PP** | Prevents move-use, Pressure, Grudge, and move-based PP depletion for the player's party without changing enemy PP or PP Up/PP Max upgrades. |
+| **Player OHKO** | Amplifies the first successful hit of a player damage move while preserving immunities, protection, substitutes, Endure effects, boss shields, and scripted boss caps. |
 
 ### Sandbox Notes
 
 - **Guaranteed Capture** does not bypass encounters where Poké Balls cannot normally be used, including Trainer battles and other restricted encounters.
 - **Pokémon Candy Multiplier** affects awarded species candy. It does not modify Rare Candy battle items or the separate **Candy Costs** setting.
+- **Candy Costs** applies to passive unlocks, both starter point reductions, and same-species eggs. Rebalanced costs are 25% of normal, rounded up; Free costs are zero.
 - **60 Starter Points** changes the point limit only. Combine it with **Allow Duplicate Starters** when selecting costly duplicate teams.
-- With duplicate starters enabled, species-grid customization prepares the next copy. Highlight a selected copy in the team panel to edit only that copy.
-- Passive ownership is unlocked once per species, while the enabled/disabled passive choice is stored independently on each selected duplicate.
-- **Infinite** rewards remain selectable until the game's own stack or target-eligibility rules reach their cap. Unique persistent items such as Map are then marked claimed, as are Poké Balls at their count cap.
+- With duplicate starters enabled, species-grid customization prepares the next copy. Highlight a selected copy in the team panel to edit or remove that specific copy; adding another copy is done from the main species pool. Gender, moves, nature, ability, form, shiny variant, Tera type, and passive selection are stored per copy and survive save/continue.
+- Passive ownership is still unlocked once per species, while the enabled/disabled passive choice is stored independently on each selected duplicate.
+- **Claim All** rewards can each be taken once from the generated set. **Infinite** rewards remain selectable after a successful claim until the game's stack, uniqueness, or target-eligibility rules reach their cap. Unique persistent items such as Map and capped Poké Balls are then marked claimed, while targeted rewards retain their normal eligibility checks.
 - **Always Shiny** and **Shiny Rate** do not replace the separate egg shiny roll or retroactively change existing Pokémon.
-- **Unlock Starter on Select** permanently changes save data. Export your save before using it; disabling the option does not remove prior unlocks.
+- **Rare Eggs** changes the base egg-tier weights only; the selected machine's normal offsets and guaranteed pulls still apply. **Instant Hatch** sets eligible eggs to one remaining wave and lets the normal hatch, reward, and removal flow complete them.
+- **Form Change Items: Rebalanced** modestly adds prerequisite and fusion items to their normal reward tiers. **Abundant** adds very high-weight Common-tier access to eligible fusion, Tera, evolution, Mega, Dynamax, and regular/rare form-change items; normal eligibility checks still decide what can appear.
+- **Unlock Starter on Select** grants the minimum seen/caught state, first ability, and baseline IVs needed to select the species. It does not grant candy, passives, hidden abilities, shiny variants, or extra forms. The change is permanent save data, so export a backup before using it; disabling the option does not remove prior unlocks.
 - Futuba's literal **Pandemic** implementation is intentionally not included because it creates 5,000 Pokérus selections and UI cursors. **All Starters Have Pokérus** provides the deterministic result without that allocation.
 - **Infinite Player HP** acts at the shared HP-damage boundary, so direct hits,
   confusion self-hits, recoil, drain, status/weather damage, Perish Song, OHKO
   moves, and self-damage all finish their normal effect flow but deal zero
-  actual damage. It prevents new damage but does not heal HP already missing.
+  actual damage to either player field slot, including double battles. It
+  prevents new damage but does not heal HP already missing, and intentionally
+  leaves non-battle scripted HP changes alone.
+- **Infinite Player PP** covers normal move use, Pressure, PP-removing moves,
+  and Grudge for the player's party only. PP Up and PP Max can still increase a
+  move's maximum PP, and enemies continue using PP normally.
 - **Player OHKO** adds damage only after a move successfully produces positive
   damage. Cheat-added boss damage stops at the current shield, and a final-bar
   boss is left at 1 HP unless the move's original damage was naturally lethal.
-  Later hits of a multi-hit move keep their unmodified damage.
+  This preserves catch opportunities and forced story transitions. Misses,
+  immunities, protection, substitutes, Endure/Sturdy behavior, and other enemy
+  damage rules stay authoritative. Later hits of a multi-hit move keep their
+  unmodified damage.
 - The options share the existing Offline override system and are designed to be
   enabled together; the full on-device combination remains part of the manual
   Android checklist.
