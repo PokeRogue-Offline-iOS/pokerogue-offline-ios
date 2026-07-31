@@ -454,22 +454,108 @@ if (
   );
 }
 
-if (!starterSource.includes("const selectedStarterIndex = this.getEditableStarterIndex(this.lastSpecies);")) {
-  const passiveAnchor = `                starterData.passiveAttr ^= PassiveAttr.ENABLED;
+if (!starterSource.includes("const passiveStarterIndex = this.getEditableStarterIndex(this.lastSpecies);")) {
+  const passiveLabelAnchor = `          const passiveAttr = starterData.passiveAttr;
+          if (passiveAttr & PassiveAttr.UNLOCKED) {
+            // this is for enabling and disabling the passive
+            const label = i18next.t(
+              passiveAttr & PassiveAttr.ENABLED
+                ? "starterSelectUiHandler:disablePassive"
+                : "starterSelectUiHandler:enablePassive",
+            );`;
+  const passiveLabelReplacement = `          const passiveAttr = starterData.passiveAttr;
+          const passiveStarterIndex = this.getEditableStarterIndex(this.lastSpecies);
+          const passiveEnabled =
+            passiveStarterIndex >= 0
+              ? this.starters[passiveStarterIndex].passive
+              : !!(passiveAttr & PassiveAttr.ENABLED);
+          if (passiveAttr & PassiveAttr.UNLOCKED) {
+            // this is for enabling and disabling the passive
+            const label = i18next.t(
+              passiveEnabled ? "starterSelectUiHandler:disablePassive" : "starterSelectUiHandler:enablePassive",
+            );`;
+  starterSource = replaceRequired(
+    starterSource,
+    passiveLabelAnchor,
+    passiveLabelReplacement,
+    "the passive toggle label",
+  );
+}
+
+starterSource = starterSource.replace(
+  `            const label = i18next.t(
+              passiveEnabled
+                ? "starterSelectUiHandler:disablePassive"
+                : "starterSelectUiHandler:enablePassive",
+            );`,
+  `            const label = i18next.t(
+              passiveEnabled ? "starterSelectUiHandler:disablePassive" : "starterSelectUiHandler:enablePassive",
+            );`,
+);
+
+if (!starterSource.includes("const nextPassiveEnabled = !passiveEnabled;")) {
+  const originalPassiveHandlerAnchor = `                starterData.passiveAttr ^= PassiveAttr.ENABLED;
                 persistentStarterData.passiveAttr ^= PassiveAttr.ENABLED;
                 ui.setMode(UiMode.STARTER_SELECT);`;
-  const passiveReplacement = `                starterData.passiveAttr ^= PassiveAttr.ENABLED;
+  const previousPassiveHandlerAnchor = `                starterData.passiveAttr ^= PassiveAttr.ENABLED;
                 persistentStarterData.passiveAttr ^= PassiveAttr.ENABLED;
                 const selectedStarterIndex = this.getEditableStarterIndex(this.lastSpecies);
                 if (selectedStarterIndex >= 0) {
                   this.starters[selectedStarterIndex].passive = !!(starterData.passiveAttr & PassiveAttr.ENABLED);
                 }
                 ui.setMode(UiMode.STARTER_SELECT);`;
+  const passiveHandlerAnchor = starterSource.includes(previousPassiveHandlerAnchor)
+    ? previousPassiveHandlerAnchor
+    : originalPassiveHandlerAnchor;
+  const passiveHandlerReplacement = `                const nextPassiveEnabled = !passiveEnabled;
+                if (nextPassiveEnabled) {
+                  starterData.passiveAttr |= PassiveAttr.ENABLED;
+                  persistentStarterData.passiveAttr |= PassiveAttr.ENABLED;
+                } else {
+                  starterData.passiveAttr &= ~PassiveAttr.ENABLED;
+                  persistentStarterData.passiveAttr &= ~PassiveAttr.ENABLED;
+                }
+                if (passiveStarterIndex >= 0) {
+                  this.starters[passiveStarterIndex].passive = nextPassiveEnabled;
+                }
+                ui.setMode(UiMode.STARTER_SELECT);`;
   starterSource = replaceRequired(
     starterSource,
-    passiveAnchor,
-    passiveReplacement,
-    "the passive toggle handler",
+    passiveHandlerAnchor,
+    passiveHandlerReplacement,
+    "the per-copy passive toggle handler",
+  );
+}
+
+if (!starterSource.includes("this.starters[passiveStarterIndex].passive = true;")) {
+  const unlockPassiveAnchor = `                    persistentStarterData.passiveAttr |= PassiveAttr.UNLOCKED | PassiveAttr.ENABLED;
+                    starterData.passiveAttr = persistentStarterData.passiveAttr;`;
+  const unlockPassiveReplacement = `${unlockPassiveAnchor}
+                    if (passiveStarterIndex >= 0) {
+                      this.starters[passiveStarterIndex].passive = true;
+                    }`;
+  starterSource = replaceRequired(
+    starterSource,
+    unlockPassiveAnchor,
+    unlockPassiveReplacement,
+    "the passive unlock handler",
+  );
+}
+
+if (!starterSource.includes("const passiveStarterIndex = this.getEditableStarterIndex(species);")) {
+  const passiveDisplayAnchor = `          const isUnlocked = !!(passiveAttr & PassiveAttr.UNLOCKED);
+          const isEnabled = !!(passiveAttr & PassiveAttr.ENABLED);`;
+  const passiveDisplayReplacement = `          const isUnlocked = !!(passiveAttr & PassiveAttr.UNLOCKED);
+          const passiveStarterIndex = this.getEditableStarterIndex(species);
+          const isEnabled =
+            passiveStarterIndex >= 0
+              ? this.starters[passiveStarterIndex].passive
+              : !!(passiveAttr & PassiveAttr.ENABLED);`;
+  starterSource = replaceRequired(
+    starterSource,
+    passiveDisplayAnchor,
+    passiveDisplayReplacement,
+    "the passive enabled-state display",
   );
 }
 

@@ -116,7 +116,8 @@ blocked.
 When duplicates are enabled, customization from the species grid prepares the
 next copy without changing a copy already in the team. Highlighting a copy in
 the team panel loads and edits that record's own gender, moveset, and other
-starter settings.
+starter settings. Passive ownership remains a species-wide unlock, but each
+selected record keeps its own enabled or disabled passive state.
 
 The species grid intentionally keeps one selected marker rather than rendering
 overlapping markers or a count.

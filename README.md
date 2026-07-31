@@ -94,6 +94,7 @@ All sandbox options:
 - **Pokémon Candy Multiplier** affects awarded species candy. It does not modify Rare Candy battle items or the separate **Candy Costs** setting.
 - **60 Starter Points** changes the point limit only. Combine it with **Allow Duplicate Starters** when selecting costly duplicate teams.
 - With duplicate starters enabled, species-grid customization prepares the next copy. Highlight a selected copy in the team panel to edit only that copy.
+- Passive ownership is unlocked once per species, while the enabled/disabled passive choice is stored independently on each selected duplicate.
 - **Infinite** rewards remain selectable until the game's own stack or target-eligibility rules reach their cap. Unique persistent items such as Map are then marked claimed, as are Poké Balls at their count cap.
 - **Always Shiny** and **Shiny Rate** do not replace the separate egg shiny roll or retroactively change existing Pokémon.
 - **Unlock Starter on Select** permanently changes save data. Export your save before using it; disabling the option does not remove prior unlocks.
