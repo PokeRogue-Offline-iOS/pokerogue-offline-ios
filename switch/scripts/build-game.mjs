@@ -279,6 +279,19 @@ async function prepareWorktree(sourceContainer, sourceRoot) {
       });
       await removeInside(worktreesCache, sourceContainer);
     }
+    // GitHub Actions caches the bare mirror but deliberately excludes the
+    // disposable checkout directory. A restored mirror can therefore retain
+    // a registration for a worktree path that no longer exists. Prune only
+    // those stale registrations before adding the fresh checkout.
+    await run("git", [
+      "-c",
+      "core.longpaths=true",
+      `--git-dir=${upstreamCache}`,
+      "worktree",
+      "prune",
+      "--expire",
+      "now",
+    ]);
     await mkdir(sourceContainer, { recursive: true });
     await run("git", [
       "-c",
