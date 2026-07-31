@@ -174,7 +174,10 @@ if (!starterSource.includes("// unlock-starter-on-select: persistent Futuba owne
                 globalScene.reset(true);
               }
             });
-            this.updateStarters();
+            // Refresh only the unlocked grid icon; do not rebuild filters or selected-team state.
+            if (starterContainer) {
+              starterContainer.icon.clearTint();
+            }
             this.setSpecies(this.lastSpecies);
             success = true;
           } else {
