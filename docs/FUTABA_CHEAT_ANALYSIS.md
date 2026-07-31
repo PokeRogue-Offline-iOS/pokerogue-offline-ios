@@ -59,8 +59,9 @@ Other Futuba keys in the same region include `ALWAYS_CATCH`, `FREE_EGGS`,
 | Rare Eggs | Replaces gacha tier thresholds with 224/160/96 | Implemented | Medium |
 | Instant Hatch | Gives newly pulled eggs one remaining hatch wave | Implemented using the current immediate-hatch override | Low |
 | Form Change Items | Adds Rebalanced or Abundant modifier-pool entries | Implemented with a documented current-source adaptation | Medium |
+| Candy Costs | Uses Default, quarter-cost Rebalanced, or Free prices | Implemented through current centralized candy-cost getters | Low |
 | Unlock Starter on Select | Persistently writes minimum ownership data when Action is pressed on a locked starter | Implemented with save-data warning | High |
-| Pandemic | Makes 5,000 seeded Pokérus selections with replacement and allocates 5,000 cursors | Deferred | High |
+| Pandemic | Makes 5,000 seeded Pokérus selections with replacement and allocates 5,000 cursors | Replaced by deterministic All Starters Have Pokérus | Low |
 
 ## Allow Duplicate Starters
 
@@ -339,6 +340,15 @@ Recommended and implemented. Risk is medium because modifier-pool composition
 can change over time and its exact anchors should fail loudly after upstream
 pool refactors.
 
+## Candy Costs
+
+Futuba exposes `Default`, `Rebalanced`, and `Free`. Its Rebalanced path uses
+25% of the normal price rounded up; Free uses zero. The current source
+centralizes the relevant prices in three getters, so
+`starter-extra-settings.js` applies the mode to passive unlocks, both starter
+point reductions, and same-species egg purchases without duplicating purchase
+logic in the starter and Pokédex menus.
+
 ## Pandemic
 
 ### Futuba behavior
@@ -358,11 +368,12 @@ rendering risk.
 Current source normally selects five Pokérus starters through
 `getPokerusStarters`.
 
-### Recommendation
+### SilverShadow implementation
 
-Not implemented. The behavior is understood, but literal reproduction is
-wasteful and nondeterministic. A clean "all starters have Pokérus" design would
-be a new behavior, not an equivalent port, and should be considered separately.
+The literal behavior remains excluded. `All Starters Have Pokérus` sets the
+existing `pokerus` field when each selected starter record is created. Every
+duplicate copy therefore receives Pokérus independently, while the normal five
+daily indicators and cursor objects remain unchanged.
 
 ## Unlock Starter on Select
 
@@ -398,18 +409,34 @@ Implemented, but high risk from a user-data perspective. The setting defaults
 Off and should be tested only after exporting save data. There is no automatic
 rollback for starters unlocked while the option was enabled.
 
+## Reward flow additions
+
+`Reward Claim Mode` is one setting with `Default`, `Claim All`, and `Infinite`,
+so Claim All and Infinite cannot be active together. Infinite retains a
+successful reward until its own cap is reached. Persistent modifiers use their
+live stack maximum, targeted items use the game's target eligibility, and Poké
+Balls use their existing per-type cap.
+
+`Fast Reward UI` rebinds generated rewards to the existing card objects during
+rerolls and keeps the current cards for multi-reward claims. It does not remove
+level-up, move-learning, evolution, or form-change phases. If the number of
+reward cards changes, it falls back to the normal full transition.
+
 ## Patch order and compatibility
 
 The new all-platform order is:
 
-1. `claim-all-rewards.js`
-2. `duplicate-starters.js`
-3. `starting-level-settings.js`
-4. `shiny-settings.js`
-5. `egg-settings.js`
-6. `form-change-item-settings.js`
-7. `unlock-starter-on-select.js`
-8. existing Gacha Calendar and community patches
+1. `sandbox-progression-settings.js`
+2. `claim-all-rewards.js`
+3. `reward-sandbox-settings.js`
+4. `duplicate-starters.js`
+5. `starting-level-settings.js`
+6. `shiny-settings.js`
+7. `egg-settings.js`
+8. `form-change-item-settings.js`
+9. `unlock-starter-on-select.js`
+10. `starter-extra-settings.js`
+11. existing Gacha Calendar and community patches
 
 Claim All Rewards must remain before these additions because it anchors to the
 then-final Offline setting and override rows. Each new script checks for its own
@@ -425,17 +452,17 @@ Validation was performed against a clean checkout of current source commit
 | --- | --- |
 | JavaScript syntax for all all-platform patch scripts | Passed |
 | Clean all-platform patch application | Passed |
-| Second run of the six new scripts | Passed; generated target hashes unchanged |
+| Second run of the three changed/new scripts | Passed; eight generated target hashes unchanged |
 | TypeScript `tsc --noEmit` | Passed |
-| Biome on the six generated-source targets | Passed with no fixes required |
+| Biome on the eight generated-source targets | Passed with no fixes required |
 | Vite app build | Passed |
 | Focused existing offline tests | 15 passed in 2 files |
 | Full upstream Vitest suite | Inconclusive: exceeded 120 seconds with many existing offline/session test timeouts |
-| Android patch wrapper | Blocked before compilation by the existing `fix-android-image-paths.js` anchor for `scene-base.ts` |
+| Complete Android patch wrapper from an LF checkout | Passed |
 
-The Android wrapper failure predates and does not reach the new Futaba patches:
-`Could not find loadImage pattern in scene-base.ts.` It requires a separate
-maintenance change to the existing Android-only patch.
+The earlier Android wrapper failure was caused by a local CRLF working tree.
+The unchanged Android image-path patch matches and completes in an LF checkout,
+which mirrors the GitHub Ubuntu runner.
 
 The repository's older `offline-settings-navigation-fix.js` also fails if the
 entire patch wrapper is run a second time. The six new scripts themselves pass
@@ -486,14 +513,25 @@ Select.
   hatch animation, reward, and egg removal.
 - [ ] Form Change Items: compare Default, Rebalanced, and Abundant reward pools;
   test DNA Splicers with one and with two unfused party members.
+- [ ] Candy Costs: verify Default, quarter-cost rounded-up Rebalanced, and Free
+  for passives, both point reductions, and same-species eggs.
+- [ ] All Starters Have Pokérus: select distinct and duplicate starters and
+  confirm every resulting party member has Pokérus.
+- [ ] Pokémon Candy Multiplier: verify 2x, 5x, 10x, 50x, and 100x awards and the
+  existing maximum candy cap.
+- [ ] Reward Claim Mode: verify Default exits after one reward, Claim All marks
+  each slot once, and Infinite keeps repeatable rewards available.
+- [ ] Infinite rewards: reach the Map, persistent-item, targeted-item, and Poké
+  Ball caps and confirm the exhausted slot becomes claimed.
+- [ ] Fast Reward UI: claim rewards and reroll repeatedly; confirm cards update
+  immediately and queued level-up, move, evolution, and form-change behavior
+  still completes normally.
 - [ ] Unlock Starter on Select: with a backup save, press Action on a locked
   starter, restart the app, confirm persistence, and confirm no candy/passive or
   alternate forms were granted.
 - [ ] Disable every new option and confirm a normal run still starts.
 
 ### Android-specific smoke test
-
-After the existing Android image-path patch is updated:
 
 - [ ] Apply the Android patch pipeline from a clean source checkout.
 - [ ] Build and install both main and development APKs.

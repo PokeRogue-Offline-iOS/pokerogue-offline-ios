@@ -4,7 +4,7 @@
  * Adds three low-risk, offline-only progression sandbox options:
  *
  * - Max Luck (14 / SSS)
- * - 100x Pokemon Candy
+ * - Pokemon Candy Multiplier
  * - 60 Starter Points
  *
  * This patch must run after sandbox-economy-settings.js because it extends
@@ -69,7 +69,7 @@ if (!settingsSource.includes("Offline_Max_Luck")) {
   const keysReplacement =
     '  Offline_Guaranteed_Capture: "OFFLINE_GUARANTEED_CAPTURE",\n'
     + '  Offline_Max_Luck: "OFFLINE_MAX_LUCK",\n'
-    + '  Offline_Starter_Candy_100x: "OFFLINE_STARTER_CANDY_100X",\n'
+    + '  Offline_Starter_Candy_Multiplier: "OFFLINE_STARTER_CANDY_MULTIPLIER",\n'
     + '  Offline_Starter_Points_60: "OFFLINE_STARTER_POINTS_60",\n'
     + "};";
 
@@ -118,11 +118,15 @@ if (!settingsSource.includes('label: "Max Luck (SSS)"')) {
     requireReload: true,
   },
   {
-    key: SettingKeys.Offline_Starter_Candy_100x,
-    label: "100x Pokemon Candy",
+    key: SettingKeys.Offline_Starter_Candy_Multiplier,
+    label: "Pokemon Candy Multiplier",
     options: [
-      { value: "0", label: "Off" },
-      { value: "1", label: "On" },
+      { value: "1", label: "Default" },
+      { value: "2", label: "2x" },
+      { value: "5", label: "5x" },
+      { value: "10", label: "10x" },
+      { value: "50", label: "50x" },
+      { value: "100", label: "100x" },
     ],
     default: 0,
     type: SettingType.APP,
@@ -161,8 +165,8 @@ if (!settingsSource.includes("case SettingKeys.Offline_Max_Luck:")) {
     case SettingKeys.Offline_Max_Luck:
       activeOverrides.MAX_LUCK_OVERRIDE = value === 1;
       break;
-    case SettingKeys.Offline_Starter_Candy_100x:
-      activeOverrides.STARTER_CANDY_MULTIPLIER_OVERRIDE = value === 1 ? 100 : 1;
+    case SettingKeys.Offline_Starter_Candy_Multiplier:
+      activeOverrides.STARTER_CANDY_MULTIPLIER_OVERRIDE = Number(Setting[index].options[value].value);
       break;
     case SettingKeys.Offline_Starter_Points_60:
       activeOverrides.STARTER_POINT_LIMIT_OVERRIDE = value === 1 ? 60 : null;
@@ -178,7 +182,7 @@ if (!settingsSource.includes("case SettingKeys.Offline_Max_Luck:")) {
 }
 
 fs.writeFileSync(settingsTarget, settingsSource, "utf8");
-console.log("Added Max Luck, 100x Pokemon Candy, and 60 Starter Points settings.");
+console.log("Added Max Luck, Pokemon Candy Multiplier, and 60 Starter Points settings.");
 
 /*
  * ---------------------------------------------------------------------------
@@ -298,7 +302,7 @@ if (
 }
 
 fs.writeFileSync(gameDataTarget, gameDataSource, "utf8");
-console.log("Enabled the 100x Pokemon Candy runtime hook.");
+console.log("Enabled the Pokemon Candy Multiplier runtime hook.");
 
 /*
  * ---------------------------------------------------------------------------
