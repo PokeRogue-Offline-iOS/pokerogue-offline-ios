@@ -7,14 +7,24 @@ An unofficial PokéRogue Offline fork with SilverShadow Android branding, option
 
 ## Download
 
-Download the latest Android APK from the repository's [Releases page](https://github.com/silvershadowkat/pokerogue-offline/releases).
+Download the latest Android APK or Nintendo Switch Alpha `-switch.zip` from the repository's [Releases page](https://github.com/silvershadowkat/pokerogue-offline/releases).
 
 Before installing an update, export your save data and active session as a precaution.
 
+The Switch build is an experimental homebrew Alpha. Read the installation and known-issues sections below before using it.
+
 ## v1.0.3 Highlights
 
-Version 1.0.3 expands the Offline sandbox with starter customization, reward,
-generation, progression, and battle-debugging options:
+Version 1.0.3 expands the Offline sandbox with starter customization, reward
+generation, progression, and battle-debugging options. It also adds the first
+public Nintendo Switch Alpha package, including:
+
+- A self-contained nx.js NRO with a SilverShadow Homebrew Menu icon.
+- Full offline PokéRogue gameplay files packaged into four random-access asset containers instead of roughly 34,000 loose files.
+- Hardware-tested fixes for controller input, rendering, fonts, local saves, BGM playback, reward selection, and returning from targeted rewards.
+- Clear startup diagnostics and checks for missing or damaged asset packs.
+
+The expanded sandbox includes:
 
 - **Duplicate Starters** supports up to six independently customized copies of
   the same species, including separate moves, gender, nature, ability, form,
@@ -294,32 +304,87 @@ The patch runner intentionally stops when an expected upstream code anchor canno
 
 ## Nintendo Switch Alpha
 
-This repository also contains an experimental Nintendo Switch port using nx.js and Phaser.
+This repository contains an experimental Nintendo Switch homebrew port built with [nx.js](https://github.com/TooTallNate/nx.js) and Phaser. Android builds are separate and are not affected by the Switch port.
 
-The real SilverShadow-patched PokéRogue application has reached playable gameplay on real Switch hardware, including:
+> [!WARNING]
+> The Switch build remains **Alpha**. Back up your saves, expect occasional stalls, and do not treat a successful build or a short play session as proof of long-session stability.
 
-- Starter selection
-- Battles
-- Reward selection
-- Catching Pokémon
-- Cheat settings
-- Controller input
-- Pokédex persistence
-- Active-session continuation
+### Confirmed Working on Real Switch Hardware
 
-The Switch version remains **Alpha** and is not considered a stable release.
+The following have worked on a Nintendo Switch OLED in handheld, title-override/application-memory mode:
 
-Current limitations can include:
+- The custom SilverShadow icon appears in the Homebrew Menu and the self-contained NRO launches.
+- Offline package validation, indexed asset loading, and readable fatal diagnostics.
+- The title screen, starter selection, Pokédex, party screen, battles, rewards, menus, and continuation of an active run.
+- WebGL rendering scaled correctly from PokéRogue's 1920×1080 layout to the 1280×720 handheld display.
+- Readable regular and bitmap fonts.
+- Attached-controller D-pad navigation and Nintendo A/B behavior.
+- PLUS-menu access in tested ordinary scenes.
+- Catching Pokémon and persistence of Pokédex and active-session data after fully closing and relaunching.
+- Save and Quit followed by Continue.
+- BGM playback and looping during tested gameplay.
+- Immediate rewards and targeted reward flows such as Rare Candy and PP Up returning to an interactive reward screen.
+- SilverShadow offline settings and cheats during tested sessions.
+- Front-end assets, sprites, animations, fonts, locales, audio, and game data loaded directly from four uncompressed random-access packs without extracting thousands of SD-card files.
 
-- Long black-screen startup
-- No working audio
-- Missing-texture placeholders during some effects
-- Visual irregularities
-- Severe slowdowns in some areas
-- Occasional native crashes
-- Non-Switch controller prompts
+These are hardware observations, not guarantees for every console, firmware, controller arrangement, game mode, move, Pokémon form, or length of play session.
 
-Android builds are separate and are not affected by the Switch port.
+### Switch Requirements
+
+- A homebrew-capable Nintendo Switch with Atmosphère and hbmenu.
+- At least 1 GB of free SD-card space.
+- Title-override/application-memory mode. Album/applet mode does not provide enough memory.
+- A backup of `/switch/SilverShadow-PokeRogue/saves/` before updating.
+
+### Installing the `-switch.zip`
+
+1. Download the release file whose name ends in `-switch.zip`.
+2. Back up your existing `/switch/SilverShadow-PokeRogue/saves/`, `config/`, and `logs/` directories if present.
+3. Extract the ZIP directly to the SD-card root. The final NRO path must be:
+
+   ```text
+   /switch/SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro
+   ```
+
+4. Allow the release files to replace older files, but preserve `saves/`, `config/`, and `logs/`.
+5. If updating from the former loose-asset build, remove only the obsolete `game/assets/`, `game/audio/`, `game/battle-anims/`, `game/fonts/`, `game/images/`, and `game/locales/` directories after the new package has copied successfully. Never delete the whole `SilverShadow-PokeRogue` directory.
+6. Hold `R` while starting an installed Switch title to enter hbmenu with title override, then launch **SilverShadow PokeRogue**.
+7. Allow at least 60 seconds for the first screen. A long black screen during this period does not necessarily mean the application has frozen.
+
+The fat NRO already contains the nx.js runtime. No separate runtime NRO, NSP forwarder, network connection, or extraction of the four `.sspack` files is required.
+
+### Expected Loading Behavior
+
+- A cold launch can remain black for approximately 35–45 seconds before showing the first game content. Some observed launches have exceeded 40 seconds and looked frozen while still loading.
+- Returning to the main menu triggers a similar full refresh and can again appear frozen for roughly 40 seconds.
+- Smaller loading hiccups can occur during play while assets are read or decoded from the SD card.
+- Wait at least 60 seconds before assuming a black loading screen has failed. If an error screen appears, retain the newest `/switch/SilverShadow-PokeRogue/logs/milestone2-*.log`.
+
+### Memory and Stability Warning
+
+Normal gameplay has been smooth enough in the sessions tested so far, but many consecutive battles and very long sessions have not been thoroughly stress-tested.
+
+Extreme reward-cheat use can exhaust native memory. In particular, repeatedly using infinite/free rerolls or generating and claiming many reward sets without leaving the reward phase can eventually block further rerolls, cause severe slowdown, or crash the homebrew process. The build includes a memory guard to stop rerolls before the most dangerous point, but it cannot make unlimited stress use safe. Save, fully close, and relaunch if memory pressure develops.
+
+Other Alpha limitations include:
+
+- Occasional loading stalls or native crashes may still occur.
+- Some move effects may still show a missing-texture placeholder or another visual irregularity.
+- PLUS behavior, suspend/resume, docked mode, detached controllers, controller reconnection, and long-session audio lifecycle have not been exhaustively tested.
+- Some on-screen button prompts may still use keyboard or Xbox-style artwork.
+- Real hardware behavior can vary with firmware, Atmosphère, hbmenu, SD-card speed, filesystem, and controller configuration.
+
+### Updating and Troubleshooting
+
+Release updates should be merged over the existing application folder so local saves remain in place. Never distribute, overwrite, or delete another user's `saves/`, `config/`, or `logs/` directories.
+
+Each launch writes a timestamped diagnostic log under:
+
+```text
+/switch/SilverShadow-PokeRogue/logs/milestone2-*.log
+```
+
+When reporting a problem, include the newest complete log, a photo of any error screen, the step that failed, and whether title override was used.
 
 Detailed Switch information is available in:
 
@@ -344,8 +409,12 @@ Upstream changes may occasionally move or rewrite the code used as a patch ancho
 SilverShadow PokéRogue Offline builds on the work of:
 
 - [PokéRogue](https://github.com/pagefaultgames/pokerogue)
-- [PokéRogue Offline](https://github.com/PokeRogue-Offline/pokerogue-offline)
-- The developers, artists, translators, testers, and community contributors behind both projects
+- [PokéRogue Offline](https://github.com/PokeRogue-Offline/pokerogue-offline), including Scooom and its contributors, which is the base of this fork
+- [nx.js](https://github.com/TooTallNate/nx.js) by Nathan Rajlich and its contributors, which provides the Nintendo Switch JavaScript runtime and NRO tooling
+- [Phaser](https://github.com/phaserjs/phaser), used by PokéRogue for rendering and game systems
+- The developers, artists, translators, testers, and community contributors behind these projects
+
+PokéRogue source is distributed under the GNU Affero General Public License v3.0. nx.js is distributed under the MIT License. The Switch package includes the applicable license texts and third-party notices. Corresponding source for SilverShadow release builds is available in this repository and its release tag.
 
 This repository is an unofficial fan project and is not affiliated with or endorsed by the official PokéRogue team, Nintendo, Game Freak, Creatures Inc., or The Pokémon Company.
 

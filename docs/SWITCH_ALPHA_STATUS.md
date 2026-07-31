@@ -38,6 +38,7 @@ Every hardware statement below is limited to that tested configuration.
 The following behavior was observed on the real Switch:
 
 - The fat NRO appears in hbmenu and launches.
+- The NRO uses the SilverShadow custom Homebrew Menu icon.
 - The external game package passes manifest and required-file validation.
 - The real consolidated Vite entry evaluates under nx.js.
 - Phaser creates a WebGL game using the nx.js WebGL2 context.
@@ -58,6 +59,11 @@ The following behavior was observed on the real Switch:
 - An active run appeared as Continue Run after relaunch.
 - Loading that saved session reported success and advanced into the next
   battle.
+- BGM playback and looping work during tested battles and reward screens.
+- Immediate and targeted rewards, including return from Pokémon or move
+  selection, work in the accepted reward-fix build.
+- The indexed four-pack asset layout launches after calibrating beta.6's
+  hardware-observed exclusive ranged-read end behavior.
 - The `item-count` bitmap font no longer blocks session continuation after the
   5x Poké Ball reward path.
 - The tester enabled the existing custom cheat/sandbox options and reported
@@ -122,19 +128,27 @@ the corresponding texture is not registered when the animation sprite uses
 it. The next investigation should record Phaser loader errors and verify each
 animation texture key before playback.
 
-### Audio is silent
+### Audio and long-session lifecycle are not exhaustive
 
-No music or sound effects were audible in the hardware test. The current audio
-shim only bypasses the unsupported native spatial-listener API so the game can
-start. It does not establish working decode, playback, mixer, or lifecycle
-behavior.
+BGM playback and looping now work in tested gameplay. Sound-effect, cry,
+suspend/resume, device-change, and very long-session audio behavior have not
+been exhaustively tested across all content and hardware arrangements.
 
 ### Slow black-screen startup and reload
 
-Cold startup takes approximately 35-44 seconds before the first visible game
-asset. Enabling many settings/cheats caused another long in-process reload that
-eventually completed. There is no loading indicator, so a slow load resembles
-a freeze.
+Cold startup takes approximately 35-45 seconds before the first visible game
+asset. Returning to the main menu performs a similar refresh that can again
+take roughly 40 seconds. Smaller loading hiccups also occur. There is no
+reliable early loading indicator, so a slow load resembles a freeze.
+
+### Reward-cheat native memory pressure
+
+Normal gameplay has been smooth enough to continue testing, but many
+back-to-back battles and long sessions have not been comprehensively stressed.
+Repeated infinite/free rerolls or extreme Claim All Rewards use can exhaust
+native memory. The current guard blocks further rerolls near the dangerous
+threshold and latches for the reward phase, but unlimited reward stress is not
+safe.
 
 ### Incorrect controller prompt artwork
 
@@ -162,7 +176,7 @@ gameplay and should be distinguished from fatal errors.
 - Long-session memory stability.
 - Repeated settings-driven game reloads.
 - Safe Plus behavior in every UI and battle state.
-- Audio decoding/playback and audio lifecycle.
+- Complete sound-effect, cry, suspend/resume, and long-session audio coverage.
 - Correct playback of all battle and encounter animations.
 - Save import/export and native file-picker flows.
 - Native software keyboard and text-entry flows.

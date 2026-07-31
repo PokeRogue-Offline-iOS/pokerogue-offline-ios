@@ -1,8 +1,6 @@
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream } from "node:fs";
 import {
   copyFile,
-  cp,
   mkdir,
   open,
   readFile,
@@ -12,10 +10,10 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
-import { once } from "node:events";
 import { execFileSync } from "node:child_process";
-import { Zip, ZipDeflate, ZipPassThrough } from "fflate";
 import {
+  ASSETS_COMMIT,
+  LOCALES_COMMIT,
   MANIFEST_SCHEMA_VERSION,
   NODE_VERSION,
   NXJS_NRO_VERSION,
@@ -28,16 +26,30 @@ import {
   UPSTREAM_VERSION,
   buildLogPath,
   buildResultPath,
+  cacheRoot,
   repositoryRoot,
   switchRoot,
 } from "./config.mjs";
+import {
+  ASSET_PACK_FORMAT,
+  ASSET_PACK_VERSION,
+  buildAssetPacks,
+  writeDeterministicAssetIndex,
+} from "./asset-pack-lib.mjs";
 
 const releaseRoot = path.join(switchRoot, "release");
 const appRoot = path.join(releaseRoot, "switch", "SilverShadow-PokeRogue");
 const gameRoot = path.join(appRoot, "game");
+const licensesRoot = path.join(appRoot, "licenses");
 const sourceNro = path.join(switchRoot, "silvershadow-pokerogue-switch.nro");
 const outputNro = path.join(appRoot, "SilverShadow-PokeRogue.nro");
-const outputZip = path.join(releaseRoot, "SilverShadow-PokeRogue-Switch-Milestone2.zip");
+const assetIndexName = "asset-packs.json";
+const licenseFiles = [
+  "Phaser-MIT.txt",
+  "PokeRogue-AGPL-3.0.txt",
+  "THIRD-PARTY-NOTICES.txt",
+  "nx.js-MIT.txt",
+];
 
 const buildResult = JSON.parse(await readFile(buildResultPath, "utf8"));
 if (
@@ -50,17 +62,21 @@ if (
 
 await rm(releaseRoot, { recursive: true, force: true });
 await mkdir(gameRoot, { recursive: true });
-await cp(buildResult.compiledGameRoot, gameRoot, { recursive: true });
-await mkdir(path.join(appRoot, "saves"), { recursive: true });
-await mkdir(path.join(appRoot, "logs"), { recursive: true });
-await mkdir(path.join(appRoot, "config"), { recursive: true });
+await mkdir(licensesRoot, { recursive: true });
 await mkdir(path.join(releaseRoot, "symbols"), { recursive: true });
 await copyFile(sourceNro, outputNro);
+for (const licenseFile of licenseFiles) {
+  await copyFile(path.join(switchRoot, "licenses", licenseFile), path.join(licensesRoot, licenseFile));
+}
+await copyFile(
+  path.join(buildResult.compiledGameRoot, buildResult.compiledEntryPoint),
+  path.join(gameRoot, buildResult.compiledEntryPoint),
+);
+await writeFile(path.join(gameRoot, "index.html"), switchIndexHtml());
 
-const sourceMap = path.join(gameRoot, "switch-entry.js.map");
+const sourceMap = path.join(buildResult.compiledGameRoot, "switch-entry.js.map");
 try {
   await copyFile(sourceMap, path.join(releaseRoot, "symbols", "SilverShadow-PokeRogue-switch-entry.js.map"));
-  await rm(sourceMap);
 } catch {
   // Source maps are useful but not required for a production-mode upstream build.
 }
@@ -92,42 +108,38 @@ const version = {
   upstreamPokeRogueVersion: UPSTREAM_VERSION,
 };
 await writeJson(path.join(gameRoot, "version.json"), version);
-await writeJson(path.join(appRoot, "config", "defaults.json"), {
-  networkEnabled: false,
-  renderer: "upstream-phaser-webgl",
-  intendedMemoryMode: "application/title-override",
-  gameRoot: "sdmc:/switch/SilverShadow-PokeRogue/game",
-  saveRoot: "sdmc:/switch/SilverShadow-PokeRogue/saves",
-});
-await writeFile(
-  path.join(appRoot, "saves", "README.txt"),
-  "Persistent localStorage is stored here as local-storage.json with a recoverable backup. Preserve this directory when updating.\n",
-);
-await writeFile(
-  path.join(appRoot, "logs", "README.txt"),
-  "Return the newest milestone2-*.log and a photo of the screen when reporting hardware results.\n",
-);
 
-const requiredDirectories = ["assets", "audio", "fonts", "images", "locales"];
+const packResult = await buildAssetPacks({
+  sourceRoot: buildResult.compiledGameRoot,
+  outputRoot: gameRoot,
+  cacheRoot,
+  log: message => {
+    console.log(message);
+  },
+});
+const assetIndexPath = path.join(gameRoot, assetIndexName);
+await writeDeterministicAssetIndex(assetIndexPath, packResult.index);
+
+const requiredDirectories = [];
 const importantPaths = [
   "index.html",
   "version.json",
-  buildResult.originalEntryPoint,
   buildResult.compiledEntryPoint,
+  assetIndexName,
 ];
 const requiredFiles = [];
-for (const relativePath of [...new Set(importantPaths)]) {
+for (const relativePath of importantPaths) {
   const absolutePath = safeGamePath(relativePath);
   const info = await stat(absolutePath);
   requiredFiles.push({
-    path: relativePath.replaceAll("\\", "/"),
+    path: relativePath,
     size: info.size,
     sha256: await sha256File(absolutePath),
     purpose:
       relativePath === buildResult.compiledEntryPoint
         ? "nx.js controlled real-game entry"
-        : relativePath === buildResult.originalEntryPoint
-          ? "original Vite module entry"
+        : relativePath === assetIndexName
+          ? "deterministic random-access asset-pack index"
           : "package bootstrap metadata",
   });
 }
@@ -141,6 +153,8 @@ const manifest = {
   repositoryDirtyAtBuild: repositoryDirty,
   upstreamPokeRogueCommit: UPSTREAM_COMMIT,
   upstreamPokeRogueVersion: UPSTREAM_VERSION,
+  assetsCommit: ASSETS_COMMIT,
+  localesCommit: LOCALES_COMMIT,
   nxjsRuntimeVersion: NXJS_VERSION,
   nxjsNroVersion: NXJS_NRO_VERSION,
   phaserVersion: PHASER_VERSION,
@@ -154,12 +168,21 @@ const manifest = {
   compiledInputHash: buildResult.inputHash,
   compiledEntryPoint: buildResult.compiledEntryPoint,
   originalEntryPoint: buildResult.originalEntryPoint,
+  originalEntryPointDeployed: false,
   evaluationMode: "async-function",
   requiredDirectories,
   requiredFiles,
+  assetPacks: {
+    format: ASSET_PACK_FORMAT,
+    version: ASSET_PACK_VERSION,
+    indexPath: assetIndexName,
+    packCount: packResult.index.packCount,
+    entryCount: packResult.index.entryCount,
+  },
   packageLayout: "switch/SilverShadow-PokeRogue",
   intendedMemoryMode: "application/title-override",
   offlineRequired: true,
+  thirdPartyNotices: licenseFiles.map(file => `licenses/${file}`),
   compatibilityShims: [
     "minimal-dom",
     "dom-tag-lookup",
@@ -168,6 +191,8 @@ const manifest = {
     "dom-dataset",
     "zero-bound-text-metrics-fallback",
     "sdmc-local-fetch",
+    "indexed-random-access-asset-packs",
+    "per-asset-sha256-verification",
     "fetch-backed-xmlhttprequest",
     "nxjs-audio-codec-detection",
     "phaser-audio-listener",
@@ -191,9 +216,13 @@ await writeJson(path.join(gameRoot, "manifest.json"), manifest);
 
 const checksumTargets = [
   "SilverShadow-PokeRogue.nro",
+  ...licenseFiles.map(file => `licenses/${file}`),
   "game/manifest.json",
   "game/version.json",
+  "game/index.html",
   `game/${buildResult.compiledEntryPoint}`,
+  `game/${assetIndexName}`,
+  ...packResult.index.packs.map(pack => `game/${pack.path}`),
 ];
 const checksumLines = [];
 for (const relativePath of checksumTargets) {
@@ -202,9 +231,14 @@ for (const relativePath of checksumTargets) {
 await writeFile(path.join(appRoot, "SHA256SUMS.txt"), `${checksumLines.join("\n")}\n`);
 await copyFile(buildLogPath, path.join(releaseRoot, "milestone2-build.log"));
 
-await createZip(appRoot, outputZip);
+const deploymentFiles = await listFiles(appRoot);
+const deploymentBytes = (
+  await Promise.all(deploymentFiles.map(async file => (await stat(path.join(appRoot, file))).size))
+).reduce((sum, size) => sum + size, 0);
 console.log(`Created ${outputNro}`);
-console.log(`Created ${outputZip}`);
+console.log(
+  `Created uncompressed SD-card directory with ${deploymentFiles.length} files (${deploymentBytes} bytes): ${appRoot}`,
+);
 
 function safeGamePath(relativePath) {
   const resolved = path.resolve(gameRoot, relativePath);
@@ -254,42 +288,6 @@ async function sha256File(file) {
   return hash.digest("hex");
 }
 
-async function createZip(sourceDirectory, outputFile) {
-  const files = await listFiles(sourceDirectory);
-  const output = createWriteStream(outputFile, { flags: "wx" });
-  let zipError;
-  const zip = new Zip((error, data, final) => {
-    if (error) {
-      zipError = error;
-      output.destroy(error);
-      return;
-    }
-    output.write(data);
-    if (final) {
-      output.end();
-    }
-  });
-
-  for (const relativePath of files) {
-    const absolutePath = path.join(sourceDirectory, relativePath);
-    const archivePath = `switch/SilverShadow-PokeRogue/${relativePath.replaceAll("\\", "/")}`;
-    const extension = path.extname(relativePath).toLowerCase();
-    const storeOnly = [".png", ".jpg", ".jpeg", ".webp", ".mp3", ".ogg", ".wav", ".zip", ".nro"].includes(extension);
-    const entry = storeOnly ? new ZipPassThrough(archivePath) : new ZipDeflate(archivePath, { level: 6 });
-    zip.add(entry);
-    const input = createReadStream(absolutePath, { highWaterMark: 1024 * 1024 });
-    for await (const chunk of input) {
-      entry.push(new Uint8Array(chunk), false);
-    }
-    entry.push(new Uint8Array(), true);
-  }
-  zip.end();
-  await once(output, "close");
-  if (zipError) {
-    throw zipError;
-  }
-}
-
 async function listFiles(directory, prefix = "") {
   const files = [];
   const entries = await readdir(directory, { withFileTypes: true });
@@ -303,4 +301,19 @@ async function listFiles(directory, prefix = "") {
     }
   }
   return files;
+}
+
+function switchIndexHtml() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SilverShadow PokeRogue for Nintendo Switch</title>
+</head>
+<body>
+  <div id="app"></div>
+</body>
+</html>
+`;
 }

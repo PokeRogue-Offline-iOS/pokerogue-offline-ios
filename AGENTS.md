@@ -10,7 +10,8 @@
   `@nx.js/runtime` and `@nx.js/nro` `1.0.0-beta.6`; do not replace exact pins
   with `latest` or a range.
 - Switch releases must use `nxjs-nro --fat`, run without network access, and
-  keep large game files outside the NRO but inside the SD-card-ready ZIP.
+  keep large game files outside the NRO in the verified uncompressed
+  SD-card-ready directory. Do not recreate the retired ZIP output.
 - Do not clone, fork, or compile nx.js unless a minimized proof demonstrates a
   missing API or native defect. Keep any runtime change isolated and suitable
   for upstream contribution.
@@ -24,7 +25,8 @@
   `bash scripts/apply-patches.sh android`; Switch source patch validation is
   `bash scripts/apply-patches.sh switch`.
 - Read `docs/SWITCH_ALPHA_STATUS.md`, `docs/SWITCH_PORT.md`, and
-  `docs/SWITCH_NXJS_COMPATIBILITY.md` before expanding the port.
+  `docs/SWITCH_NXJS_COMPATIBILITY.md` before expanding the port. Read
+  `docs/SWITCH_STATIC_ASSET_PACKAGING.md` before changing asset deployment.
 - The Alpha maturity label does not change the proven internal
   `milestone2-real-game` manifest schema or `milestone2-*.log` names. Treat any
   rename as a separately tested migration.

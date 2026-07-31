@@ -79,7 +79,8 @@ npm --prefix switch run verify
 pinned worktree, restores exact assets/locales, applies `all` then `switch`,
 uses `pnpm fetch` plus a frozen offline install, builds Vite's app mode,
 overlays the complete external asset tree, creates `switch-entry.js`, builds
-the fat NRO, streams the ZIP, and verifies it.
+the fat NRO, creates/reuses four deterministic random-access asset packs, and
+verifies the uncompressed SD-card directory.
 
 ## Refresh, cleanup, and offline commands
 
@@ -96,7 +97,7 @@ node switch/scripts/build-game.mjs --refresh-assets --rebuild-intermediate
 # Recreate the disposable checkout without deleting downloads.
 node switch/scripts/build-game.mjs --force-clean-checkout --rebuild-intermediate
 
-# Remove final NRO/ZIP/RomFS only.
+# Remove final NRO/release/RomFS only.
 npm.cmd --prefix switch run clean:output
 
 # Remove worktrees and compiled intermediates only.
@@ -113,7 +114,7 @@ npm.cmd --prefix switch run package:offline
 ```
 
 An offline rebuild can recreate dependencies, the real Vite build, NRO, and
-ZIP when the pinned upstream object, both immutable archives, exact pnpm CLI,
+uncompressed asset-pack release when the pinned upstream object, both immutable archives, exact pnpm CLI,
 pnpm store, and Switch npm dependencies are present. A cache miss reports the
 specific missing category instead of attempting the network. `npm ci` itself
 also needs a populated npm cache when performed offline.
@@ -121,9 +122,10 @@ also needs a populated npm cache when performed offline.
 ## Generated output
 
 ```text
-switch/release/SilverShadow-PokeRogue-Switch-Milestone2.zip
 switch/release/switch/SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro
 switch/release/switch/SilverShadow-PokeRogue/game/manifest.json
+switch/release/switch/SilverShadow-PokeRogue/game/asset-packs.json
+switch/release/switch/SilverShadow-PokeRogue/game/assets-*.sspack
 switch/release/switch/SilverShadow-PokeRogue/SHA256SUMS.txt
 switch/release/milestone2-build.log
 switch/release/symbols/SilverShadow-PokeRogue-switch-entry.js.map
@@ -131,8 +133,8 @@ switch/release/symbols/SilverShadow-PokeRogue-switch-entry.js.map
 
 `npm run verify` rejects a missing/thin/duplicated NRO, invalid metadata,
 missing or mismatched entry, checksum failure, empty critical asset directory,
-Milestone 1-only package, insufficient compiled JavaScript, cache leakage, or
-an incomplete ZIP central directory.
+Milestone 1-only package, pack coverage/offset/hash failures, any ZIP, cache
+leakage, or packaged `saves`, `config`, or `logs`.
 
 ## Source patch validation
 

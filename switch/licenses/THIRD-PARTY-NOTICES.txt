@@ -1,0 +1,47 @@
+SilverShadow PokeRogue Offline - Nintendo Switch Alpha
+Third-Party Notices
+
+This is an unofficial, fan-made modification. It is not affiliated with or
+endorsed by the official PokeRogue team, Nintendo, Game Freak, Creatures Inc.,
+or The Pokemon Company.
+
+PokeRogue
+---------
+Project: https://github.com/pagefaultgames/pokerogue
+License: GNU Affero General Public License v3.0
+
+This distribution contains a modified offline build of PokeRogue. The full
+license is included as PokeRogue-AGPL-3.0.txt. Corresponding source for the
+SilverShadow build is available from the same GitHub repository and release
+tag where this binary package is published.
+
+PokeRogue Offline
+-----------------
+Project: https://github.com/PokeRogue-Offline/pokerogue-offline
+
+SilverShadow PokeRogue Offline is based on the PokeRogue Offline work by
+Scooom and its contributors. Thank you to its maintainers and community for
+the offline build and patching foundation used by this fork.
+
+nx.js
+-----
+Project: https://github.com/TooTallNate/nx.js
+Version: 1.0.0-beta.6
+Copyright (c) 2023 Nathan Rajlich
+License: MIT
+
+The self-contained NRO includes the nx.js runtime and uses its NRO packaging
+tooling. The full license is included as nx.js-MIT.txt.
+
+Phaser
+------
+Project: https://github.com/phaserjs/phaser
+Version: 3.90.0
+Copyright (c) 2024 Richard Davey, Phaser Studio Inc.
+License: MIT
+
+PokeRogue uses Phaser for rendering and game systems. The full license is
+included as Phaser-MIT.txt.
+
+Thanks also go to the developers, artists, translators, testers, and
+community contributors across all of these projects.
