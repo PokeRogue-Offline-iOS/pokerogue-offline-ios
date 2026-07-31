@@ -26,6 +26,17 @@ apply_patch "auto-hide-touch-controls.js" all
 apply_patch "sandbox-economy-settings.js"   all
 apply_patch "sandbox-progression-settings.js" all
 apply_patch "claim-all-rewards.js"          all
+apply_patch "reward-sandbox-settings.js"    all
+apply_patch "duplicate-starters.js"         all
+apply_patch "starting-level-settings.js"    all
+apply_patch "shiny-settings.js"             all
+apply_patch "egg-settings.js"               all
+apply_patch "form-change-item-settings.js"  all
+apply_patch "unlock-starter-on-select.js"   all
+apply_patch "starter-extra-settings.js"     all
+apply_patch "player-ohko.js"                all
+apply_patch "infinite-player-pp.js"         all
+apply_patch "infinite-player-hp.js"         all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all
 
