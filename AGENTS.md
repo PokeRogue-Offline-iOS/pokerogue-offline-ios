@@ -11,7 +11,8 @@
   with `latest` or a range.
 - Switch releases must use `nxjs-nro --fat`, run without network access, and
   keep large game files outside the NRO in the verified uncompressed
-  SD-card-ready directory. Do not recreate the retired ZIP output.
+  SD-card-ready directory. CI may wrap that verified directory in a
+  ready-to-copy ZIP only after release verification succeeds.
 - Do not clone, fork, or compile nx.js unless a minimized proof demonstrates a
   missing API or native defect. Keep any runtime change isolated and suitable
   for upstream contribution.

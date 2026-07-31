@@ -1,32 +1,37 @@
-name: Build Switch Milestone 2
+name: Build PokeRogueOffline Switch NRO
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - "switch/**"
+      - "configs/android/icon-main.png"
       - "patches/all/**"
       - "patches/switch/**"
       - "new-files/**"
       - "scripts/**"
       - "docs/SWITCH_*.md"
+      - ".github/workflows/build-android.yml"
       - ".github/workflows/build-switch-poc.yml"
   push:
     branches:
-      - feature/switch-port
+      - main
+      - fix/switch-alpha-runtime
     paths:
       - "switch/**"
+      - "configs/android/icon-main.png"
       - "patches/all/**"
       - "patches/switch/**"
       - "new-files/**"
       - "scripts/**"
+      - ".github/workflows/build-android.yml"
       - ".github/workflows/build-switch-poc.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: switch-milestone2-${{ github.ref }}
+  group: switch-nro-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -42,22 +47,37 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Read and validate the shared SilverShadow version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(sed -nE "s/^[[:space:]]*SILVERSHADOW_VERSION:[[:space:]]*'([^']+)'[[:space:]]*$/\1/p" .github/workflows/build-android.yml)
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Could not read a valid SILVERSHADOW_VERSION from .github/workflows/build-android.yml: $VERSION"
+            exit 1
+          fi
+
+          echo "SILVERSHADOW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip_name=SilverShadow-PokeRogue-v${VERSION}-switch.zip" >> "$GITHUB_OUTPUT"
 
       - name: Set up pinned Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 24.9.0
+          node-version: ${{ env.NODE_VERSION }}
           check-latest: false
 
       - name: Restore exact nx.js and npm downloads
         id: npm-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .cache/switch-build/downloads/npm
           key: ${{ runner.os }}-switch-npm-node${{ env.NODE_VERSION }}-nxjs${{ env.NXJS_VERSION }}-phaser${{ env.PHASER_VERSION }}-${{ hashFiles('switch/package-lock.json') }}
@@ -66,7 +86,7 @@ jobs:
 
       - name: Restore pnpm content-addressable store
         id: pnpm-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .cache/switch-build/pnpm-store
           key: ${{ runner.os }}-switch-pnpm${{ env.PNPM_VERSION }}-node${{ env.NODE_VERSION }}-${{ env.UPSTREAM_LOCK_SHA256 }}
@@ -75,14 +95,14 @@ jobs:
 
       - name: Restore pinned upstream Git objects
         id: upstream-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .cache/switch-build/upstream
           key: ${{ runner.os }}-switch-upstream-${{ env.UPSTREAM_COMMIT }}
 
       - name: Restore immutable asset downloads
         id: asset-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             .cache/switch-build/downloads/assets-*
@@ -90,33 +110,144 @@ jobs:
             .cache/switch-build/assets
           key: ${{ runner.os }}-switch-assets-${{ env.ASSETS_COMMIT }}-${{ env.LOCALES_COMMIT }}
 
+      - name: Restore generated static asset packs
+        id: asset-pack-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .cache/switch-build/asset-packs
+          key: ${{ runner.os }}-switch-asset-packs-v1-${{ env.ASSETS_COMMIT }}-${{ env.LOCALES_COMMIT }}-${{ hashFiles('switch/scripts/asset-pack-lib.mjs', 'switch/scripts/config.mjs') }}
+
       - name: Restore exact compiled intermediate
         id: compiled-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .cache/switch-build/intermediate
-          key: ${{ runner.os }}-switch-compiled-v2-${{ env.UPSTREAM_COMMIT }}-${{ env.UPSTREAM_LOCK_SHA256 }}-node${{ env.NODE_VERSION }}-pnpm${{ env.PNPM_VERSION }}-nxjs${{ env.NXJS_VERSION }}-phaser${{ env.PHASER_VERSION }}-${{ hashFiles('patches/all/**', 'patches/switch/**', 'new-files/**', 'scripts/apply-patches.sh', 'scripts/apply-post-build-patches.sh', 'scripts/patch-lib.sh', 'switch/scripts/**', 'switch/src/**', 'switch/package.json', 'switch/package-lock.json') }}
+          key: ${{ runner.os }}-switch-compiled-v2-${{ env.UPSTREAM_COMMIT }}-${{ env.UPSTREAM_LOCK_SHA256 }}-silver${{ steps.version.outputs.version }}-node${{ env.NODE_VERSION }}-pnpm${{ env.PNPM_VERSION }}-nxjs${{ env.NXJS_VERSION }}-phaser${{ env.PHASER_VERSION }}-${{ hashFiles('patches/all/**', 'patches/switch/**', 'new-files/**', 'scripts/apply-patches.sh', 'scripts/apply-post-build-patches.sh', 'scripts/patch-lib.sh', 'switch/scripts/**', 'switch/src/**', 'switch/package.json', 'switch/package-lock.json') }}
 
       - name: Install exact Switch dependencies
         working-directory: switch
         run: npm ci --cache "$SILVERSHADOW_CACHE_DIR/downloads/npm" --prefer-offline
 
-      - name: Build real game, fat NRO, release ZIP, and verify
+      - name: Apply shared version to temporary NRO metadata
         working-directory: switch
-        run: npm run package
+        run: |
+          cp package.json "$RUNNER_TEMP/switch-package.json"
+          cp package-lock.json "$RUNNER_TEMP/switch-package-lock.json"
+          npm pkg set "version=$SILVERSHADOW_VERSION"
+          test "$(node -p "require('./package.json').version")" = "$SILVERSHADOW_VERSION"
 
-      - name: Publish cache and build status
+      - name: Generate NRO icon from the Android artwork
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends imagemagick zip unzip
+
+          ICON_SOURCE="configs/android/icon-main.png"
+          ICON_DESTINATION="switch/icon.jpg"
+
+          if [ ! -f "$ICON_SOURCE" ]; then
+            echo "::error::Switch icon source is missing: $ICON_SOURCE"
+            exit 1
+          fi
+
+          cp "$ICON_DESTINATION" "$RUNNER_TEMP/switch-icon.jpg"
+
+          convert "$ICON_SOURCE" \
+            -auto-orient \
+            -strip \
+            -filter Lanczos \
+            -resize '256x256!' \
+            -quality 92 \
+            "$ICON_DESTINATION"
+
+          node switch/scripts/verify-icon.mjs
+          identify "$ICON_SOURCE" "$ICON_DESTINATION"
+
+      - name: Build game, test asset packs, and create the fat NRO
+        working-directory: switch
+        run: |
+          npm run game:build
+          npm run typecheck
+          npm run test:asset-packs
+          npm run build
+          npm run nro
+
+      - name: Restore source metadata after NRO generation
+        if: always()
+        shell: bash
+        run: |
+          cp "$RUNNER_TEMP/switch-package.json" switch/package.json
+          cp "$RUNNER_TEMP/switch-package-lock.json" switch/package-lock.json
+          cp "$RUNNER_TEMP/switch-icon.jpg" switch/icon.jpg
+
+      - name: Package and verify the SD-card release tree
+        working-directory: switch
+        run: |
+          node scripts/package-release.mjs
+          node scripts/verify-release.mjs
+
+      - name: Create and verify the SD-card-ready ZIP
+        id: release
+        shell: bash
+        env:
+          ZIP_NAME: ${{ steps.version.outputs.zip_name }}
+        run: |
+          mkdir -p switch/artifacts
+          ZIP_PATH="switch/artifacts/$ZIP_NAME"
+
+          (
+            cd switch/release
+            zip -0 -X -r "../artifacts/$ZIP_NAME" switch
+          )
+
+          unzip -t "$ZIP_PATH"
+          ZIP_ENTRIES="$RUNNER_TEMP/switch-zip-entries.txt"
+          unzip -Z1 "$ZIP_PATH" > "$ZIP_ENTRIES"
+
+          PACK_COUNT=$(grep -Ec '^switch/SilverShadow-PokeRogue/game/assets-(audio|graphics|animations|support)\.sspack$' "$ZIP_ENTRIES" || true)
+          if [ "$PACK_COUNT" -ne 4 ]; then
+            echo "::error::Ready-to-copy ZIP must contain exactly four .sspack files; found $PACK_COUNT."
+            exit 1
+          fi
+
+          if grep -Eq '^switch/SilverShadow-PokeRogue/game/(audio|images|battle-anims|fonts|locales)/' "$ZIP_ENTRIES"; then
+            echo "::error::ZIP contains the obsolete many-file asset tree instead of only packed static assets."
+            exit 1
+          fi
+
+          grep -Fxq 'switch/SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro' "$ZIP_ENTRIES"
+          grep -Fxq 'switch/SilverShadow-PokeRogue/SHA256SUMS.txt' "$ZIP_ENTRIES"
+          grep -Fxq 'switch/SilverShadow-PokeRogue/game/asset-packs.json' "$ZIP_ENTRIES"
+
+          ZIP_BYTES=$(stat -c %s "$ZIP_PATH")
+          ZIP_SHA256=$(sha256sum "$ZIP_PATH" | cut -d ' ' -f 1)
+          DEPLOYMENT_FILES=$(find switch/release/switch -type f | wc -l)
+
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          echo "zip_bytes=$ZIP_BYTES" >> "$GITHUB_OUTPUT"
+          echo "zip_sha256=$ZIP_SHA256" >> "$GITHUB_OUTPUT"
+          echo "deployment_files=$DEPLOYMENT_FILES" >> "$GITHUB_OUTPUT"
+
+      - name: Publish build summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## Switch Milestone 2 cache status"
+            echo "## PokeRogueOffline Switch NRO"
             echo
+            echo "- Version: ${{ steps.version.outputs.version }}"
+            echo "- Ready-to-copy ZIP: ${{ steps.release.outputs.zip_name || 'not created' }}"
+            echo "- ZIP bytes: ${{ steps.release.outputs.zip_bytes || 'n/a' }}"
+            echo "- ZIP SHA-256: ${{ steps.release.outputs.zip_sha256 || 'n/a' }}"
+            echo "- SD-card deployment files: ${{ steps.release.outputs.deployment_files || 'n/a' }}"
             echo "- npm download cache restored: ${{ steps.npm-cache.outputs.cache-hit == 'true' }}"
             echo "- pnpm store restored: ${{ steps.pnpm-cache.outputs.cache-hit == 'true' }}"
             echo "- upstream Git cache restored: ${{ steps.upstream-cache.outputs.cache-hit == 'true' }}"
             echo "- immutable assets restored: ${{ steps.asset-cache.outputs.cache-hit == 'true' }}"
+            echo "- generated asset-pack cache restored: ${{ steps.asset-pack-cache.outputs.cache-hit == 'true' }}"
             echo "- compiled intermediate restored: ${{ steps.compiled-cache.outputs.cache-hit == 'true' }}"
+
             if [ -f switch/build/build-result.json ]; then
               echo
               echo '```json'
@@ -127,28 +258,28 @@ jobs:
 
       - name: Save exact nx.js and npm downloads
         if: always() && steps.npm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .cache/switch-build/downloads/npm
           key: ${{ steps.npm-cache.outputs.cache-primary-key }}
 
       - name: Save pnpm store
         if: always() && steps.pnpm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .cache/switch-build/pnpm-store
           key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
 
       - name: Save upstream Git objects
         if: always() && steps.upstream-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .cache/switch-build/upstream
           key: ${{ steps.upstream-cache.outputs.cache-primary-key }}
 
       - name: Save immutable assets
         if: always() && steps.asset-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             .cache/switch-build/downloads/assets-*
@@ -156,23 +287,38 @@ jobs:
             .cache/switch-build/assets
           key: ${{ steps.asset-cache.outputs.cache-primary-key }}
 
+      - name: Save generated static asset packs
+        if: success() && steps.asset-pack-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .cache/switch-build/asset-packs
+          key: ${{ steps.asset-pack-cache.outputs.cache-primary-key }}
+
       - name: Save exact compiled intermediate
         if: success() && steps.compiled-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .cache/switch-build/intermediate
           key: ${{ steps.compiled-cache.outputs.cache-primary-key }}
 
-      - name: Upload SD-card package and diagnostics
-        uses: actions/upload-artifact@v4
+      - name: Upload ready-to-copy Switch ZIP
+        uses: actions/upload-artifact@v7
         with:
-          name: SilverShadow-PokeRogue-Switch-Milestone2
+          name: SilverShadow-PokeRogue-v${{ steps.version.outputs.version }}-switch
+          path: ${{ steps.release.outputs.zip_path }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Switch build diagnostics
+        uses: actions/upload-artifact@v7
+        with:
+          name: SilverShadow-PokeRogue-v${{ steps.version.outputs.version }}-switch-diagnostics
           path: |
-            switch/release/SilverShadow-PokeRogue-Switch-Milestone2.zip
-            switch/release/switch/SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro
-            switch/release/switch/SilverShadow-PokeRogue/game/manifest.json
-            switch/release/switch/SilverShadow-PokeRogue/SHA256SUMS.txt
             switch/release/milestone2-build.log
             switch/release/symbols/
+            switch/release/switch/SilverShadow-PokeRogue/game/manifest.json
+            switch/release/switch/SilverShadow-PokeRogue/game/asset-packs.json
+            switch/release/switch/SilverShadow-PokeRogue/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30

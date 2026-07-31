@@ -353,6 +353,12 @@ These are hardware observations, not guarantees for every console, firmware, con
 
 The fat NRO already contains the nx.js runtime. No separate runtime NRO, NSP forwarder, network connection, or extraction of the four `.sspack` files is required.
 
+### Building the Switch ZIP with GitHub Actions
+
+Run the **Build PokeRogueOffline Switch NRO** workflow manually, or let it run for a matching pull request or push to `main`. The workflow builds the pinned, SilverShadow-patched PokÃ©Rogue source, creates a fat NRO, generates the Homebrew Menu icon from `configs/android/icon-main.png`, builds and verifies the four `.sspack` files, and uploads `SilverShadow-PokeRogue-vX.Y.Z-switch.zip`. The ZIP starts with the `switch/` directory and is ready to extract to an SD-card root.
+
+The shared release version comes from `SILVERSHADOW_VERSION` near the top of `.github/workflows/build-android.yml`. Updating that one value controls the Switch manifest, NRO metadata, artifact name, and ZIP filename as well as the Android release version. The workflow rejects an invalid version before beginning the large build.
+
 ### Expected Loading Behavior
 
 - A cold launch can remain black for approximately 35–45 seconds before showing the first game content. Some observed launches have exceeded 40 seconds and looked frozen while still loading.

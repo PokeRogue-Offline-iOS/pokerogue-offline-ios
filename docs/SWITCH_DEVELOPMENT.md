@@ -136,6 +136,23 @@ missing or mismatched entry, checksum failure, empty critical asset directory,
 Milestone 1-only package, pack coverage/offset/hash failures, any ZIP, cache
 leakage, or packaged `saves`, `config`, or `logs`.
 
+## GitHub Actions release ZIP
+
+`.github/workflows/build-switch-poc.yml` exposes the **Build PokeRogueOffline
+Switch NRO** workflow. It treats the verified uncompressed release tree above
+as the build authority and only then creates a store-mode ZIP containing the
+top-level `switch/` directory. CI checks that the ZIP contains one fat NRO,
+the checksum and pack index, exactly four `.sspack` files, and none of the old
+many-file static asset directories.
+
+The workflow reads `SILVERSHADOW_VERSION` from
+`.github/workflows/build-android.yml`, exports it to the Switch build, and
+temporarily applies it to `switch/package.json` while `nxjs-nro` generates the
+NRO metadata. It restores the checked-in metadata before release manifests are
+created. The same workflow regenerates `switch/icon.jpg` as a 256x256 JPEG
+from `configs/android/icon-main.png` and restores the checked-in source file
+after NRO generation.
+
 ## Source patch validation
 
 From the repository root:

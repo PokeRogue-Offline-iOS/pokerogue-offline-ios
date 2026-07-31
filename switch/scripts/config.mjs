@@ -1,14 +1,18 @@
 import path from "node:path";
 import os from "node:os";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const switchRoot = fileURLToPath(new URL("../", import.meta.url));
 export const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
+const switchPackage = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
 export const UPSTREAM_URL = "https://github.com/pagefaultgames/pokerogue.git";
 export const UPSTREAM_COMMIT = "0d94c5bbbc7a4fc67014c480e31dab1cfdf7ceb4";
 export const UPSTREAM_VERSION = "1.12.0.10";
-export const SILVERSHADOW_VERSION = "1.0.3";
+// CI exports the version from build-android.yml so Android and Switch releases
+// share one user-edited value. Local Switch builds fall back to package.json.
+export const SILVERSHADOW_VERSION = process.env.SILVERSHADOW_VERSION || switchPackage.version;
 export const ASSETS_COMMIT = "909b43612324622608023b3beb2f24f4ef159c1d";
 export const LOCALES_COMMIT = "c2f9c794ce17f1445d14357a4995353447e9df55";
 

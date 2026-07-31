@@ -26,8 +26,7 @@
   "nacp": {
     "id": "01a5a17e5d010000",
     "title": "SilverShadow PokeRogue",
-    "author": "SilverShadow",
-    "version": "1.0.3"
+    "author": "SilverShadow"
   },
   "dependencies": {
     "phaser": "3.90.0"
