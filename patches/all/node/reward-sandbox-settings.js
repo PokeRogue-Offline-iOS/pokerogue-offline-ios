@@ -1,18 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Extend Claim All Rewards into a mutually exclusive reward-claim mode and add
- * an optional fast reward UI.
+ * Extend Claim All Rewards into a mutually exclusive reward-claim mode.
  *
  * Reward Claim Mode:
  * - Default: upstream one-reward behavior.
  * - Claim All: each generated reward slot can be claimed once.
  * - Infinite: repeat successful rewards; cap/unique rewards become claimed
  *   when the game's own stack/eligibility rules say they are exhausted.
- *
- * Fast Reward UI reuses the existing reward cards for rerolls and multi-claim
- * completion. It does not remove gameplay phases such as move learning,
- * evolution, or level-up processing.
  */
 
 const fs = require("fs");
@@ -57,18 +52,6 @@ if (!settingsSource.includes("Offline_Claim_All_Rewards")) {
   fail("reward-sandbox-settings.js must run after claim-all-rewards.js.");
 }
 
-if (!settingsSource.includes("Offline_Fast_Reward_UI")) {
-  const keyAnchor =
-    '  Offline_Claim_All_Rewards: "OFFLINE_CLAIM_ALL_REWARDS",';
-  settingsSource = replaceRequired(
-    settingsSource,
-    keyAnchor,
-    `${keyAnchor}
-  Offline_Fast_Reward_UI: "OFFLINE_FAST_REWARD_UI",`,
-    "the Claim All Rewards setting key",
-  );
-}
-
 if (!settingsSource.includes('label: "Reward Claim Mode"')) {
   const rowAnchor = `  {
     key: SettingKeys.Offline_Claim_All_Rewards,
@@ -92,17 +75,6 @@ if (!settingsSource.includes('label: "Reward Claim Mode"')) {
     default: 0,
     type: SettingType.APP,
     requireReload: true,
-  },
-  {
-    key: SettingKeys.Offline_Fast_Reward_UI,
-    label: "Fast Reward UI",
-    options: [
-      { value: "0", label: "Off" },
-      { value: "1", label: "On" },
-    ],
-    default: 0,
-    type: SettingType.APP,
-    requireReload: true,
   },`;
   settingsSource = replaceRequired(
     settingsSource,
@@ -112,16 +84,13 @@ if (!settingsSource.includes('label: "Reward Claim Mode"')) {
   );
 }
 
-if (!settingsSource.includes("case SettingKeys.Offline_Fast_Reward_UI:")) {
+if (!settingsSource.includes("activeOverrides.INFINITE_REWARDS_OVERRIDE = value === 2;")) {
   const switchAnchor = `    case SettingKeys.Offline_Claim_All_Rewards:
       activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE = value === 1;
       break;`;
   const switchReplacement = `    case SettingKeys.Offline_Claim_All_Rewards:
       activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE = value === 1;
       activeOverrides.INFINITE_REWARDS_OVERRIDE = value === 2;
-      break;
-    case SettingKeys.Offline_Fast_Reward_UI:
-      activeOverrides.FAST_REWARD_UI_OVERRIDE = value === 1;
       break;`;
   settingsSource = replaceRequired(
     settingsSource,
@@ -132,7 +101,7 @@ if (!settingsSource.includes("case SettingKeys.Offline_Fast_Reward_UI:")) {
 }
 
 fs.writeFileSync(settingsTarget, settingsSource, "utf8");
-console.log("Added Reward Claim Mode and Fast Reward UI settings.");
+console.log("Added the Reward Claim Mode setting.");
 
 const overridesTarget = path.join("pokerogue-src", "src", "overrides.ts");
 let overridesSource = readNormalized(overridesTarget);
@@ -142,9 +111,7 @@ if (!overridesSource.includes("INFINITE_REWARDS_OVERRIDE")) {
     "  readonly CLAIM_ALL_REWARDS_OVERRIDE: boolean = false;";
   const overrideReplacement = `${overrideAnchor}
   /** Reuses successful free rewards until their own cap or eligibility is exhausted. */
-  readonly INFINITE_REWARDS_OVERRIDE: boolean = false;
-  /** Reuses existing reward-card objects for rerolls and multi-claim returns. */
-  readonly FAST_REWARD_UI_OVERRIDE: boolean = false;`;
+  readonly INFINITE_REWARDS_OVERRIDE: boolean = false;`;
   overridesSource = replaceRequired(
     overridesSource,
     overrideAnchor,
@@ -237,114 +204,6 @@ if (!phaseSource.includes(
   );
 }
 
-if (!phaseSource.includes(
-  "return (\n      cost === -1\n      && !(\n        activeOverrides.FAST_REWARD_UI_OVERRIDE",
-)) {
-  const returnAnchor = `    return cost === -1;
-  }
-
-  // Reroll rewards`;
-  const returnReplacement = `    return (
-      cost === -1
-      && !(
-        activeOverrides.FAST_REWARD_UI_OVERRIDE
-        && (activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE || activeOverrides.INFINITE_REWARDS_OVERRIDE)
-        && !(modifierType instanceof PokemonModifierType)
-      )
-    );
-  }
-
-  // Reroll rewards`;
-  phaseSource = replaceRequired(
-    phaseSource,
-    returnAnchor,
-    returnReplacement,
-    "the chosen-modifier callback result",
-  );
-}
-
-if (!phaseSource.includes("uiHandler.reuseRewardOptions(")) {
-  const rerollAnchor = `  private rerollModifiers() {
-    const rerollCost = this.getRerollCost(globalScene.lockModifierTiers);
-    if (rerollCost < 0 || globalScene.money < rerollCost) {
-      globalScene.ui.playError();
-      return false;
-    }
-    globalScene.reroll = true;
-    globalScene.phaseManager.unshiftNew(
-      "SelectModifierPhase",
-      this.rerollCount + 1,
-      this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
-    );
-    globalScene.ui.clearText();
-    globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
-    if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
-      globalScene.money -= rerollCost;
-      globalScene.updateMoneyText();
-      globalScene.animateMoneyChanged(false);
-    }
-    audioManager.playSound("se/buy");
-    return true;
-  }`;
-  const rerollReplacement = `  private rerollModifiers() {
-    const rerollCost = this.getRerollCost(globalScene.lockModifierTiers);
-    if (rerollCost < 0 || globalScene.money < rerollCost) {
-      globalScene.ui.playError();
-      return false;
-    }
-
-    const nextRerollCount = this.rerollCount + 1;
-    const nextModifierTiers = this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[];
-
-    if (activeOverrides.FAST_REWARD_UI_OVERRIDE) {
-      const modifierCount = this.getModifierCount();
-      const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
-      if (uiHandler.canReuseRewardOptions(modifierCount)) {
-        globalScene.reroll = true;
-        this.modifierTiers = nextModifierTiers;
-        this.rerollCount = nextRerollCount;
-        this.claimedRewardIndices.clear();
-        clearPendingClaimAllReward();
-        if (this.isCopy) {
-          this.isCopy = false;
-          this.customModifierSettings = undefined;
-        }
-        regenerateModifierPoolThresholds(globalScene.getPlayerParty(), this.getPoolType(), this.rerollCount);
-        this.typeOptions = this.getModifierTypeOptions(modifierCount);
-
-        if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
-          globalScene.money -= rerollCost;
-          globalScene.updateMoneyText();
-          globalScene.animateMoneyChanged(false);
-        }
-
-        uiHandler.reuseRewardOptions(this.typeOptions, this.getRerollCost(globalScene.lockModifierTiers));
-        globalScene.reroll = false;
-        audioManager.playSound("se/buy");
-        return false;
-      }
-    }
-
-    globalScene.reroll = true;
-    globalScene.phaseManager.unshiftNew("SelectModifierPhase", nextRerollCount, nextModifierTiers);
-    globalScene.ui.clearText();
-    globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
-    if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
-      globalScene.money -= rerollCost;
-      globalScene.updateMoneyText();
-      globalScene.animateMoneyChanged(false);
-    }
-    audioManager.playSound("se/buy");
-    return true;
-  }`;
-  phaseSource = replaceRequired(
-    phaseSource,
-    rerollAnchor,
-    rerollReplacement,
-    "the reward reroll method",
-  );
-}
-
 if (!phaseSource.includes("private shouldMarkInfiniteReward(")) {
   const completeAnchor = `  /**
    * Finish a successfully claimed free reward and reopen the same reward set.
@@ -388,23 +247,10 @@ if (!phaseSource.includes("private shouldMarkInfiniteReward(")) {
    * Finish a successful multi-reward pick and reopen the same reward set.
    * Infinite mode marks only rewards that have reached their own cap.
    */
-  private completeMultiReward(
-    rewardIndex: number,
-    modifier: Modifier,
-    modifierSelectCallback: ModifierSelectCallback,
-  ): void {
+  private completeMultiReward(rewardIndex: number, modifier: Modifier): void {
     const shouldMarkReward = activeOverrides.CLAIM_ALL_REWARDS_OVERRIDE || this.shouldMarkInfiniteReward(modifier);
     if (shouldMarkReward) {
       this.claimedRewardIndices.add(rewardIndex);
-    }
-
-    if (activeOverrides.FAST_REWARD_UI_OVERRIDE) {
-      const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
-      if (shouldMarkReward) {
-        uiHandler.markRewardClaimed(rewardIndex);
-      }
-      this.resetModifierSelect(modifierSelectCallback);
-      return;
     }
 
     globalScene.ui.clearText();
@@ -419,6 +265,19 @@ if (!phaseSource.includes("private shouldMarkInfiniteReward(")) {
     "the Claim All reward completion method",
   );
 }
+
+phaseSource = phaseSource.replace(
+  `  private completeMultiReward(
+    rewardIndex: number,
+    modifier: Modifier,
+    modifierSelectCallback: ModifierSelectCallback,
+  ): void {`,
+  "  private completeMultiReward(rewardIndex: number, modifier: Modifier): void {",
+);
+phaseSource = phaseSource.replace(
+  "      this.completeMultiReward(rewardIndex!, modifier, modifierSelectCallback!);",
+  "      this.completeMultiReward(rewardIndex!, modifier);",
+);
 
 if (!phaseSource.includes("const multiReward =")) {
   const multiAnchor = `    const claimAllReward =
@@ -459,12 +318,12 @@ if (!phaseSource.includes(
 }
 
 if (!phaseSource.includes(
-  "this.completeMultiReward(rewardIndex!, modifier, modifierSelectCallback!);",
+  "this.completeMultiReward(rewardIndex!, modifier);",
 )) {
   phaseSource = replaceRequired(
     phaseSource,
     "      this.completeClaimAllReward(rewardIndex!);",
-    "      this.completeMultiReward(rewardIndex!, modifier, modifierSelectCallback!);",
+    "      this.completeMultiReward(rewardIndex!, modifier);",
     "the multi-reward completion call",
   );
 }
@@ -503,7 +362,7 @@ phaseSource = phaseSource.replace(
 );
 
 fs.writeFileSync(phaseTarget, phaseSource, "utf8");
-console.log("Enabled Claim All, Infinite, and fast reroll phase behavior.");
+console.log("Enabled Claim All and Infinite reward behavior.");
 
 const learnMoveTarget = path.join(
   "pokerogue-src",
@@ -549,151 +408,4 @@ if (!learnMoveSource.includes(
 
 fs.writeFileSync(learnMoveTarget, learnMoveSource, "utf8");
 console.log("Kept Infinite TM and Memory rewards available after successful learning.");
-
-const uiTarget = path.join(
-  "pokerogue-src",
-  "src",
-  "ui",
-  "handlers",
-  "modifier-select-ui-handler.ts",
-);
-let uiSource = readNormalized(uiTarget);
-
-if (!uiSource.includes("canReuseRewardOptions(rewardOptionCount: number)")) {
-  const methodsAnchor = `  setRerollCost(rerollCost: number): void {
-    this.rerollCost = rerollCost;
-  }`;
-  const methodsReplacement = `  canReuseRewardOptions(rewardOptionCount: number): boolean {
-    return this.active && this.options.length === rewardOptionCount;
-  }
-
-  reuseRewardOptions(typeOptions: ModifierTypeOption[], rerollCost: number): void {
-    if (!this.canReuseRewardOptions(typeOptions.length)) {
-      throw new Error("Reward option reuse count mismatch");
-    }
-    for (let index = 0; index < typeOptions.length; index++) {
-      this.options[index].reuse(typeOptions[index]);
-    }
-    this.rerollCost = rerollCost;
-    this.updateCostText();
-  }
-
-  markRewardClaimed(rewardIndex: number): boolean {
-    const option = this.options[rewardIndex];
-    if (!this.active || !option) {
-      return false;
-    }
-    option.markClaimed();
-    return true;
-  }
-
-  setRerollCost(rerollCost: number): void {
-    this.rerollCost = rerollCost;
-  }`;
-  uiSource = replaceRequired(
-    uiSource,
-    methodsAnchor,
-    methodsReplacement,
-    "the modifier-select reroll-cost setter",
-  );
-}
-
-if (!uiSource.includes(
-  "private claimedBackground?: Phaser.GameObjects.Rectangle;",
-)) {
-  const fieldsAnchor = `  private itemText: Phaser.GameObjects.Text;
-  private itemCostText: Phaser.GameObjects.Text;`;
-  const fieldsReplacement = `${fieldsAnchor}
-  private claimedBackground?: Phaser.GameObjects.Rectangle;
-  private claimedText?: Phaser.GameObjects.Text;`;
-  uiSource = replaceRequired(
-    uiSource,
-    fieldsAnchor,
-    fieldsReplacement,
-    "the ModifierOption item fields",
-  );
-}
-
-if (!uiSource.includes("reuse(modifierTypeOption: ModifierTypeOption): void")) {
-  const markAnchor = `  markClaimed(): void {
-    this.item.setTint(0x666666);
-    this.itemText.setTint(0x777777);
-    this.pb?.setTint(0x555555);
-
-    const claimedBackground = globalScene.add.rectangle(
-      0,
-      62,
-      96,
-      18,
-      0x000000,
-      0.9,
-    );
-    claimedBackground.setStrokeStyle(2, 0xff3030, 1);
-    this.add(claimedBackground);
-
-    const claimedText = addTextObject(
-      0,
-      56,
-      "CLAIMED",
-      TextStyle.PARTY_RED,
-      {
-        align: "center",
-      },
-    );
-    claimedText.setOrigin(0.5, 0);
-    this.add(claimedText);
-  }`;
-  const markReplacement = `  reuse(modifierTypeOption: ModifierTypeOption): void {
-    this.modifierTypeOption = modifierTypeOption;
-    this.item.setTexture("items", modifierTypeOption.type?.iconImage);
-    this.item.clearTint();
-    this.itemText.setText(modifierTypeOption.type?.name ?? "");
-    this.itemText.clearTint();
-    if (modifierTypeOption.type?.tier) {
-      this.itemText.setTint(getModifierTierTextTint(modifierTypeOption.type.tier));
-    }
-    this.claimedBackground?.setVisible(false);
-    this.claimedText?.setVisible(false);
-  }
-
-  markClaimed(): void {
-    this.item.setTint(0x666666);
-    this.itemText.setTint(0x777777);
-    this.pb?.setTint(0x555555);
-
-    if (!this.claimedBackground) {
-      this.claimedBackground = globalScene.add.rectangle(0, 62, 96, 18, 0x000000, 0.9);
-      this.claimedBackground.setStrokeStyle(2, 0xff3030, 1);
-      this.add(this.claimedBackground);
-    }
-    this.claimedBackground.setVisible(true);
-
-    if (!this.claimedText) {
-      this.claimedText = addTextObject(0, 56, "CLAIMED", TextStyle.PARTY_RED, {
-        align: "center",
-      });
-      this.claimedText.setOrigin(0.5, 0);
-      this.add(this.claimedText);
-    }
-    this.claimedText.setVisible(true);
-  }`;
-  uiSource = replaceRequired(
-    uiSource,
-    markAnchor,
-    markReplacement,
-    "the claimed reward-card method",
-  );
-}
-
-uiSource = uiSource.replace(
-  `    if (
-      (args.length !== 4 && args.length !== 5)
-      || !Array.isArray(args[1])
-      || !(args[2] instanceof Function)
-    ) {`,
-  `    if ((args.length !== 4 && args.length !== 5) || !Array.isArray(args[1]) || !(args[2] instanceof Function)) {`,
-);
-
-fs.writeFileSync(uiTarget, uiSource, "utf8");
-console.log("Added in-place reward-card reuse and cap visuals.");
 console.log("Reward sandbox settings patch applied successfully.");

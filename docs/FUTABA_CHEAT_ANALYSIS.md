@@ -113,6 +113,11 @@ continues through the existing point-limit and challenge validation. The
 existing six-member party maximum remains authoritative, so a seventh copy is
 blocked.
 
+When duplicates are enabled, customization from the species grid prepares the
+next copy without changing a copy already in the team. Highlighting a copy in
+the team panel loads and edits that record's own gender, moveset, and other
+starter settings.
+
 The species grid intentionally keeps one selected marker rather than rendering
 overlapping markers or a count.
 
@@ -417,11 +422,6 @@ successful reward until its own cap is reached. Persistent modifiers use their
 live stack maximum, targeted items use the game's target eligibility, and Poké
 Balls use their existing per-type cap.
 
-`Fast Reward UI` rebinds generated rewards to the existing card objects during
-rerolls and keeps the current cards for multi-reward claims. It does not remove
-level-up, move-learning, evolution, or form-change phases. If the number of
-reward cards changes, it falls back to the normal full transition.
-
 ## Patch order and compatibility
 
 The new all-platform order is:
@@ -488,6 +488,8 @@ Select.
 - [ ] Give duplicate copies different moves, nature, ability, form, gender,
   shiny/variant state, Tera type, and passive state where the species supports
   those choices.
+- [ ] Prepare a differently configured copy from the species grid and confirm
+  the already-selected copy does not change.
 - [ ] Re-edit one team-panel copy and confirm the other copies do not change.
 - [ ] Start a run with duplicate starters.
 - [ ] Save and quit the run, then reload it.
@@ -523,9 +525,6 @@ Select.
   each slot once, and Infinite keeps repeatable rewards available.
 - [ ] Infinite rewards: reach the Map, persistent-item, targeted-item, and Poké
   Ball caps and confirm the exhausted slot becomes claimed.
-- [ ] Fast Reward UI: claim rewards and reroll repeatedly; confirm cards update
-  immediately and queued level-up, move, evolution, and form-change behavior
-  still completes normally.
 - [ ] Unlock Starter on Select: with a backup save, press Action on a locked
   starter, restart the app, confirm persistence, and confirm no candy/passive or
   alternate forms were granted.

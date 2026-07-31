@@ -181,8 +181,7 @@ if (!starterSource.includes("getSelectedStarterIndex(")) {
    * Resolve an independently editable starter record.
    *
    * Team-panel actions target the highlighted slot. Species-grid actions use
-   * the most recently added matching copy so add/remove/edit behavior stays
-   * predictable when duplicates are enabled.
+   * the most recently added matching copy for display and removal.
    */
   private getSelectedStarterIndex(species: PokemonSpecies): number {
     if (this.starterIconsCursorObj.visible && this.starterSpecies[this.starterIconsCursorIndex] === species) {
@@ -191,12 +190,58 @@ if (!starterSource.includes("getSelectedStarterIndex(")) {
 
     return this.starterSpecies.lastIndexOf(species);
   }
+
+  /**
+   * Resolve the starter record that may be changed by the current cursor.
+   *
+   * With duplicates enabled, species-grid edits prepare the next copy and do
+   * not overwrite an existing copy. Team-panel edits still target one slot.
+   */
+  private getEditableStarterIndex(species: PokemonSpecies): number {
+    if (activeOverrides.ALLOW_DUPLICATE_STARTERS_OVERRIDE && !this.starterIconsCursorObj.visible) {
+      return -1;
+    }
+
+    return this.getSelectedStarterIndex(species);
+  }
 `;
   starterSource = replaceRequired(
     starterSource,
     helperAnchor,
     helperReplacement,
     "isInParty in starter-select-ui-handler.ts",
+  );
+}
+
+if (!starterSource.includes("getEditableStarterIndex(")) {
+  const editableHelperAnchor = `  private getSelectedStarterIndex(species: PokemonSpecies): number {
+    if (this.starterIconsCursorObj.visible && this.starterSpecies[this.starterIconsCursorIndex] === species) {
+      return this.starterIconsCursorIndex;
+    }
+
+    return this.starterSpecies.lastIndexOf(species);
+  }
+`;
+  const editableHelperReplacement = `${editableHelperAnchor}
+  /**
+   * Resolve the starter record that may be changed by the current cursor.
+   *
+   * With duplicates enabled, species-grid edits prepare the next copy and do
+   * not overwrite an existing copy. Team-panel edits still target one slot.
+   */
+  private getEditableStarterIndex(species: PokemonSpecies): number {
+    if (activeOverrides.ALLOW_DUPLICATE_STARTERS_OVERRIDE && !this.starterIconsCursorObj.visible) {
+      return -1;
+    }
+
+    return this.getSelectedStarterIndex(species);
+  }
+`;
+  starterSource = replaceRequired(
+    starterSource,
+    editableHelperAnchor,
+    editableHelperReplacement,
+    "getSelectedStarterIndex in starter-select-ui-handler.ts",
   );
 }
 
@@ -357,14 +402,14 @@ if (
   );
 }
 
-if (!starterSource.includes("const selectedIndex = this.getSelectedStarterIndex(species);")) {
+if (!starterSource.includes("const selectedIndex = this.getEditableStarterIndex(species);")) {
   const movesAnchor = `    for (const [index, species] of this.starterSpecies.entries()) {
       if (species.speciesId === id) {
         this.starters[index].moveset = this.starterMoveset;
       }
     }`;
   const movesReplacement = `    const species = speciesDataRegistry.getSpecies(id);
-    const selectedIndex = this.getSelectedStarterIndex(species);
+    const selectedIndex = this.getEditableStarterIndex(species);
     if (selectedIndex >= 0) {
       this.starters[selectedIndex].moveset = this.starterMoveset.slice() as StarterMoveset;
     }`;
@@ -376,17 +421,19 @@ if (!starterSource.includes("const selectedIndex = this.getSelectedStarterIndex(
   );
 }
 
-const firstCopyAnchors = [
-  "        const starterIndex = this.starterSpecies.indexOf(species);",
-  "        const starterIndex = this.starterSpecies.indexOf(species);",
-];
-for (const firstCopyAnchor of firstCopyAnchors) {
-  if (starterSource.includes(firstCopyAnchor)) {
-    starterSource = starterSource.replace(
-      firstCopyAnchor,
-      "        const starterIndex = this.getSelectedStarterIndex(species);",
-    );
-  }
+const firstCopyAnchor =
+  "        const starterIndex = this.starterSpecies.indexOf(species);";
+if (starterSource.includes(firstCopyAnchor)) {
+  starterSource = starterSource.replace(
+    firstCopyAnchor,
+    "        const starterIndex = this.getSelectedStarterIndex(species);",
+  );
+}
+if (starterSource.includes(firstCopyAnchor)) {
+  starterSource = starterSource.replace(
+    firstCopyAnchor,
+    "        const starterIndex = this.getEditableStarterIndex(species);",
+  );
 }
 
 if (
@@ -395,26 +442,25 @@ if (
   )
 ) {
   const partyIconAnchor =
-    "      const [isInParty, partyIndex]: [boolean, number] = this.isInParty(species); // we use this to firstly check if the pokemon is in the party, and if so, to get the party index in order to update the icon image\n"
-    + "      if (isInParty) {";
-  const partyIconReplacement =
-    "      const partyIndex = this.getSelectedStarterIndex(species);\n"
-    + "      if (partyIndex >= 0) {";
+    "\n      const [isInParty, partyIndex]: [boolean, number] = this.isInParty(species); // we use this to firstly check if the pokemon is in the party, and if so, to get the party index in order to update the icon image\n"
+    + "      if (isInParty) {\n"
+    + "        this.updatePartyIcon(species, partyIndex);\n"
+    + "      }";
   starterSource = replaceRequired(
     starterSource,
     partyIconAnchor,
-    partyIconReplacement,
-    "the party-icon species lookup",
+    "",
+    "the premature party-icon update",
   );
 }
 
-if (!starterSource.includes("const selectedStarterIndex = this.getSelectedStarterIndex(this.lastSpecies);")) {
+if (!starterSource.includes("const selectedStarterIndex = this.getEditableStarterIndex(this.lastSpecies);")) {
   const passiveAnchor = `                starterData.passiveAttr ^= PassiveAttr.ENABLED;
                 persistentStarterData.passiveAttr ^= PassiveAttr.ENABLED;
                 ui.setMode(UiMode.STARTER_SELECT);`;
   const passiveReplacement = `                starterData.passiveAttr ^= PassiveAttr.ENABLED;
                 persistentStarterData.passiveAttr ^= PassiveAttr.ENABLED;
-                const selectedStarterIndex = this.getSelectedStarterIndex(this.lastSpecies);
+                const selectedStarterIndex = this.getEditableStarterIndex(this.lastSpecies);
                 if (selectedStarterIndex >= 0) {
                   this.starters[selectedStarterIndex].passive = !!(starterData.passiveAttr & PassiveAttr.ENABLED);
                 }
@@ -424,6 +470,76 @@ if (!starterSource.includes("const selectedStarterIndex = this.getSelectedStarte
     passiveAnchor,
     passiveReplacement,
     "the passive toggle handler",
+  );
+}
+
+if (!starterSource.includes("const starter = this.starters[index];\n    this.starterIcons[index]")) {
+  const updatePartyIconAnchor = `  updatePartyIcon(species: PokemonSpecies, index: number) {
+    const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
+    this.starterIcons[index].setTexture(species.getIconAtlasKey(props.formIndex, props.shiny, props.variant));
+    this.starterIcons[index].setFrame(species.getIconId(props.female, props.formIndex, props.shiny, props.variant));
+    this.checkIconId(this.starterIcons[index], species, props.female, props.formIndex, props.shiny, props.variant);
+  }`;
+  const updatePartyIconReplacement = `  updatePartyIcon(species: PokemonSpecies, index: number) {
+    const starter = this.starters[index];
+    this.starterIcons[index].setTexture(species.getIconAtlasKey(starter.formIndex, starter.shiny, starter.variant));
+    this.starterIcons[index].setFrame(
+      species.getIconId(starter.female ?? false, starter.formIndex, starter.shiny, starter.variant),
+    );
+    this.checkIconId(
+      this.starterIcons[index],
+      species,
+      starter.female ?? false,
+      starter.formIndex,
+      starter.shiny,
+      starter.variant,
+    );
+  }`;
+  starterSource = replaceRequired(
+    starterSource,
+    updatePartyIconAnchor,
+    updatePartyIconReplacement,
+    "updatePartyIcon's species-wide preference lookup",
+  );
+}
+
+if (!starterSource.includes("this.updatePartyIcon(species, starterIndex);")) {
+  const starterMutationAnchor = `          starter.abilityIndex = this.abilityCursor;
+          starter.nature = this.natureCursor;
+          starter.teraType = this.teraCursor;`;
+  const starterMutationReplacement = `${starterMutationAnchor}
+          this.updatePartyIcon(species, starterIndex);`;
+  starterSource = replaceRequired(
+    starterSource,
+    starterMutationAnchor,
+    starterMutationReplacement,
+    "the selected starter record update",
+  );
+}
+
+if (!starterSource.includes("const selectedStarterMoveset =")) {
+  const moveDataAnchor = `        const speciesMoveData = starterDataEntry.moveset;
+        const moveData: StarterMoveset | null = speciesMoveData
+          ? Array.isArray(speciesMoveData)
+            ? speciesMoveData
+            : speciesMoveData[formIndex!] // TODO: is this bang correct?
+          : null;`;
+  const moveDataReplacement = `        const selectedStarterIndex = this.getSelectedStarterIndex(species);
+        const selectedStarterMoveset =
+          selectedStarterIndex >= 0 ? this.starters[selectedStarterIndex].moveset : undefined;
+        const speciesMoveData = starterDataEntry.moveset;
+        const moveData: StarterMoveset | null | undefined =
+          selectedStarterMoveset
+          ?? (speciesMoveData
+            ? Array.isArray(speciesMoveData)
+              ? speciesMoveData
+              : speciesMoveData[formIndex!] // TODO: is this bang correct?
+            : null);`;
+  starterSource = replaceRequired(
+    starterSource,
+    moveDataAnchor,
+    moveDataReplacement,
+    "the selected starter moveset source",
   );
 }
 

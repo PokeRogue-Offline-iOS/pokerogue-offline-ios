@@ -74,7 +74,6 @@ All sandbox options:
 | **Free Egg Gacha Pulls** | Egg Gacha pulls do not consume vouchers or tokens. |
 | **Guaranteed Capture** | Every valid Poké Ball throw captures the target while still consuming one ball. |
 | **Reward Claim Mode** | Selects Default, Claim All, or Infinite reward behavior; Claim All and Infinite cannot conflict. |
-| **Fast Reward UI** | Reuses the current reward cards for claims and rerolls instead of rebuilding and replaying the reward reveal. |
 | **Max Luck (SSS)** | Sets effective party luck to 14, the maximum SSS value used by the luck and reward systems. |
 | **Pokémon Candy Multiplier** | Multiplies species or starter candy awards by 2x, 5x, 10x, 50x, or 100x while preserving the normal cap. |
 | **Candy Costs** | Uses Default, Rebalanced (25%, rounded up), or Free passive, point-reduction, and same-species egg costs. |
@@ -94,8 +93,8 @@ All sandbox options:
 - **Guaranteed Capture** does not bypass encounters where Poké Balls cannot normally be used, including Trainer battles and other restricted encounters.
 - **Pokémon Candy Multiplier** affects awarded species candy. It does not modify Rare Candy battle items or the separate **Candy Costs** setting.
 - **60 Starter Points** changes the point limit only. Combine it with **Allow Duplicate Starters** when selecting costly duplicate teams.
+- With duplicate starters enabled, species-grid customization prepares the next copy. Highlight a selected copy in the team panel to edit only that copy.
 - **Infinite** rewards remain selectable until the game's own stack or target-eligibility rules reach their cap. Unique persistent items such as Map are then marked claimed, as are Poké Balls at their count cap.
-- **Fast Reward UI** keeps gameplay phases such as level-up, move-learning, evolution, and form changes intact; it only avoids rebuilding reward cards and makes rerolls appear immediately.
 - **Always Shiny** and **Shiny Rate** do not replace the separate egg shiny roll or retroactively change existing Pokémon.
 - **Unlock Starter on Select** permanently changes save data. Export your save before using it; disabling the option does not remove prior unlocks.
 - Futuba's literal **Pandemic** implementation is intentionally not included because it creates 5,000 Pokérus selections and UI cursors. **All Starters Have Pokérus** provides the deterministic result without that allocation.
