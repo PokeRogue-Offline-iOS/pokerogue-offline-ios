@@ -12,6 +12,25 @@
 - `--fat` produces a self-contained NRO and is explicitly used here.
 - beta.6 lets `Image`, `Audio`, and `Video` honor a call-time `globalThis.fetch`
   wrapper, which permits offline enforcement and custom local resolution.
+- beta.6 provides ranged SD-card reads through `Switch.readFile()` and
+  `Switch.readFileSync()` `start`/`end` options and `Switch.FsFile.slice()`.
+  Although the installed typings call `end` inclusive, hardware returned one
+  byte for `{ start: 0, end: 1 }`, proving an exclusive implementation in the
+  pinned build. The asset reader detects and adapts to either convention.
+
+## External RomFS decision for beta.6
+
+The installed beta.6 runtime typings and NRO packager source do not expose an
+API to mount an arbitrary external `.romfs` image. `romfs:` addresses the
+running application's embedded NRO RomFS. `Switch.FileSystem` can open BIS,
+SDMC, and title filesystems, but has no external RomFS opener. The
+`@tootallnate/romfs` dependency belongs to the host-side NRO encoder/decoder.
+
+A bootstrap launch can make another NRO (and its embedded RomFS) the running
+application; it is not a general or multiple-external-RomFS mount mechanism.
+The Switch static payload therefore uses deterministic uncompressed indexed
+packs and beta.6 ranged reads. See
+[`SWITCH_STATIC_ASSET_PACKAGING.md`](SWITCH_STATIC_ASSET_PACKAGING.md).
 
 ## Not resolved by release notes or API presence
 
@@ -26,6 +45,7 @@
 - SD-card-backed localStorage with atomic writes and recovery.
 - Switch software keyboard integration.
 - Long-session V8 heap, GPU texture cache, and decoded audio memory behavior.
+- Hardware behavior and performance of the indexed external asset packs.
 
 ## Upstream Phaser proof of concept
 

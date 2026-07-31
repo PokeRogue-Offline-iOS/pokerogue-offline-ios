@@ -1,4 +1,11 @@
 import { GAME_ROOT, LOG_PATH, NXJS_VERSION, PHASER_VERSION } from "./constants";
+import {
+  hasPackedAsset,
+  initializeAssetPacks,
+  readGameFile,
+  readGameFileSync,
+  verifyPackedAssetPrefix,
+} from "./asset-packs";
 import { installAudioCompatibilityShims } from "./audio-shim";
 import { captureMemorySnapshot, installRuntimeDiagnostics } from "./diagnostics";
 import { appendLog } from "./logger";
@@ -58,6 +65,12 @@ async function boot(): Promise<void> {
   });
 
   const manifest = await validateStartup();
+  await initializeAssetPacks(manifest.assetPacks);
+  await verifyPackedAssetPrefix("fonts/");
+  setStartupStage("asset-packs-checked", {
+    packs: manifest.assetPacks.packCount,
+    entries: manifest.assetPacks.entryCount,
+  });
   const diagnostics = runCanvasDiagnostics();
   if (diagnostics.resizeContext !== "PASS" || diagnostics.crossContextFont !== "PASS") {
     appendLog("WARN", "Continuing after a Canvas regression diagnostic failure", diagnostics);
@@ -80,7 +93,7 @@ async function boot(): Promise<void> {
 
   const entryPath = `${GAME_ROOT}/${manifest.compiledEntryPoint}`;
   setRequestedResource(entryPath, "sd-card");
-  const entryData = Switch.readFileSync(entryPath);
+  const entryData = readGameFileSync(entryPath);
   if (entryData === null) {
     throw new Error(`Compiled entry is missing after manifest validation: ${entryPath}`);
   }
@@ -184,21 +197,33 @@ function installOfflineFetch(): void {
   };
 }
 
-function readSdCardResponse(
+async function readSdCardResponse(
   path: string,
   input: string | URL | Request,
   init?: RequestInit,
-): Response {
+): Promise<Response> {
   const method = String(init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   if (method !== "GET" && method !== "HEAD") {
     throw new TypeError(`Unsupported ${method} request for local SD-card resource: ${path}`);
   }
 
-  const data = Switch.readFileSync(path);
+  let data: ArrayBuffer | null;
+  try {
+    data = await readGameFile(path);
+  } catch (error) {
+    appendLog("ERROR", "Packed SD-card resource is corrupt or unreadable", {
+      path,
+      method,
+      packed: hasPackedAsset(path),
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
   if (data === null) {
     appendLog("ERROR", "Local SD-card resource is missing", {
       path,
       method,
+      indexed: hasPackedAsset(path),
     });
     return new Response(null, {
       status: 404,
@@ -321,7 +346,7 @@ function installFontFaceShim(): void {
       throw new Error(`Switch FontFace URL must resolve inside the game folder: ${source}`);
     }
     setRequestedResource(resolution.url, resolution.kind);
-    const data = Switch.readFileSync(resolution.url);
+    const data = readGameFileSync(resolution.url);
     if (data === null) {
       throw new Error(`Switch FontFace file is missing: ${resolution.url}`);
     }
@@ -352,7 +377,7 @@ function installFonts(): void {
   ] as const) {
     const path = `${GAME_ROOT}/fonts/${file}`;
     setRequestedResource(path, "sd-card");
-    const data = Switch.readFileSync(path);
+    const data = readGameFileSync(path);
     if (data === null) {
       appendLog("WARN", "Optional bootstrap font is missing", { family, path });
       continue;

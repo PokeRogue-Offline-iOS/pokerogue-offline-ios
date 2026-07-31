@@ -7,15 +7,44 @@ import {
   NXJS_VERSION,
   PHASER_VERSION,
   UPSTREAM_COMMIT,
+  buildResultPath,
   switchRoot,
 } from "./config.mjs";
+import {
+  ASSET_PACK_FORMAT,
+  ASSET_PACK_VERSION,
+  readPackedEntry,
+  validateAssetIndex,
+  verifyPackFile,
+} from "./asset-pack-lib.mjs";
 
 const releaseRoot = path.join(switchRoot, "release");
 const appRoot = path.join(releaseRoot, "switch", "SilverShadow-PokeRogue");
 const gameRoot = path.join(appRoot, "game");
 const nroPath = path.join(appRoot, "SilverShadow-PokeRogue.nro");
-const zipPath = path.join(releaseRoot, "SilverShadow-PokeRogue-Switch-Milestone2.zip");
 const manifestPath = path.join(gameRoot, "manifest.json");
+const buildResult = JSON.parse(await readFile(buildResultPath, "utf8"));
+const representativeAssets = [
+  "battle-anims/absorb.json",
+  "images/battle_anims/015-Fire01.png",
+  "images/pokemon/1.png",
+  "images/pokemon/back/1.png",
+  "images/pokemon/shiny/1.png",
+  "images/pokemon/back/shiny/1.png",
+  "images/pokemon/female/19.png",
+  "audio/bgm/abyss.mp3",
+  "audio/se/achv.wav",
+  "audio/cry/1.m4a",
+  "fonts/pokemon-emerald-pro.ttf",
+  "fonts/item-count.xml",
+  "locales/en/battle-message-ui-handler.json",
+];
+const licenseFiles = [
+  "licenses/Phaser-MIT.txt",
+  "licenses/PokeRogue-AGPL-3.0.txt",
+  "licenses/THIRD-PARTY-NOTICES.txt",
+  "licenses/nx.js-MIT.txt",
+];
 
 const nro = await readFile(nroPath);
 if (nro.subarray(0x10, 0x14).toString("ascii") !== "NRO0") {
@@ -30,6 +59,15 @@ const nroFiles = allReleaseFiles.filter(file => path.extname(file).toLowerCase()
 if (nroFiles.length !== 1 || nroFiles[0].replaceAll("\\", "/") !== "SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro") {
   throw new Error(`Expected exactly one correctly placed NRO, found: ${nroFiles.join(", ")}`);
 }
+const everyReleaseFile = await listFiles(releaseRoot);
+if (everyReleaseFile.some(file => path.extname(file).toLowerCase() === ".zip")) {
+  throw new Error("Release contains a ZIP; Switch hardware updates must remain uncompressed.");
+}
+for (const protectedDirectory of ["saves", "config", "logs"]) {
+  if (await exists(path.join(appRoot, protectedDirectory))) {
+    throw new Error(`Release must not contain or overwrite the user's ${protectedDirectory}/ directory.`);
+  }
+}
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 if (manifest.schemaVersion !== MANIFEST_SCHEMA_VERSION || manifest.packageKind !== "milestone2-real-game") {
@@ -39,13 +77,28 @@ if (manifest.nxjsRuntimeVersion !== NXJS_VERSION || manifest.nxjsNroVersion !== 
   throw new Error("Manifest nx.js versions are not the tested exact beta pins.");
 }
 if (manifest.phaserVersion !== PHASER_VERSION || manifest.upstreamPokeRogueCommit !== UPSTREAM_COMMIT) {
-  throw new Error("Manifest Phaser or upstream PokéRogue version does not match the selected build.");
+  throw new Error("Manifest Phaser or upstream PokeRogue version does not match the selected build.");
 }
 if (manifest.offlineRequired !== true || manifest.evaluationMode !== "async-function") {
   throw new Error("Manifest does not enforce the expected offline loader policy.");
 }
+assertSamePaths(
+  [...(manifest.thirdPartyNotices ?? [])].sort(comparePaths),
+  [...licenseFiles].sort(comparePaths),
+  "third-party notice",
+);
 if (manifest.compiledEntryPoint === "assets/milestone1-test.png" || manifest.packageKind.includes("poc")) {
   throw new Error("Release still identifies itself as the Milestone 1 proof of concept.");
+}
+if (
+  manifest.assetPacks?.format !== ASSET_PACK_FORMAT ||
+  manifest.assetPacks?.version !== ASSET_PACK_VERSION ||
+  manifest.assetPacks?.indexPath !== "asset-packs.json"
+) {
+  throw new Error("Manifest asset-pack metadata is missing or incompatible.");
+}
+if (manifest.originalEntryPointDeployed !== false) {
+  throw new Error("Manifest must record that redundant original Vite chunks are not deployed.");
 }
 
 for (const directory of manifest.requiredDirectories) {
@@ -72,55 +125,89 @@ if (
   !entry.includes("__SILVERSHADOW_WEB_BOOTSTRAP_STARTED__") ||
   !entry.includes("Phaser")
 ) {
-  throw new Error("Compiled entry does not contain expected real PokéRogue/Phaser indicators.");
+  throw new Error("Compiled entry does not contain expected real PokeRogue/Phaser indicators.");
 }
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 new AsyncFunction("globalThis", `"use strict";\n${entry}`);
 if (entry.includes("import.meta")) {
   throw new Error("Compiled entry still contains import.meta and cannot be evaluated by the controlled loader.");
 }
-if (await exists(path.join(gameRoot, "assets", "milestone1-test.png"))) {
-  throw new Error("Milestone 1 proof-of-concept asset is present in the Milestone 2 release.");
-}
 
 const compiledJavaScript = (await listFiles(gameRoot)).filter(file => /\.(?:m?js)$/i.test(file));
-if (compiledJavaScript.length < 2) {
-  throw new Error(`Expected real compiled JavaScript plus the Switch entry, found ${compiledJavaScript.length} file(s).`);
+if (
+  compiledJavaScript.length !== 1 ||
+  compiledJavaScript[0].replaceAll("\\", "/") !== manifest.compiledEntryPoint
+) {
+  throw new Error(`Expected only the consolidated loose Switch entry, found: ${compiledJavaScript.join(", ")}`);
 }
 
+const assetIndexPath = safeGamePath(manifest.assetPacks.indexPath);
+const assetIndex = JSON.parse(await readFile(assetIndexPath, "utf8"));
+validateAssetIndex(assetIndex);
+if (
+  assetIndex.packCount !== manifest.assetPacks.packCount ||
+  assetIndex.entryCount !== manifest.assetPacks.entryCount
+) {
+  throw new Error("Manifest and asset-pack index counts do not match.");
+}
+for (const pack of assetIndex.packs) {
+  await verifyPackFile(gameRoot, pack);
+}
+
+const expectedAssets = await expectedPackedAssets(buildResult.compiledGameRoot);
+const indexedAssets = Object.keys(assetIndex.entries).sort(comparePaths);
+if (expectedAssets.length !== indexedAssets.length) {
+  throw new Error(
+    `Packed asset coverage mismatch: expected ${expectedAssets.length}, indexed ${indexedAssets.length}.`,
+  );
+}
+for (let index = 0; index < expectedAssets.length; index += 1) {
+  if (expectedAssets[index] !== indexedAssets[index]) {
+    throw new Error(`Packed asset coverage differs at ${expectedAssets[index]} / ${indexedAssets[index]}.`);
+  }
+}
+
+await verifyRepresentativeAssets(assetIndex);
+
 const checksums = await readFile(path.join(appRoot, "SHA256SUMS.txt"), "utf8");
+const checksumPaths = [];
 for (const line of checksums.trim().split(/\r?\n/)) {
   const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
   if (!match) {
     throw new Error(`Invalid SHA256SUMS line: ${line}`);
   }
-  if ((await sha256File(path.join(appRoot, match[2]))) !== match[1]) {
+  const target = path.resolve(appRoot, match[2]);
+  if (!target.startsWith(`${path.resolve(appRoot)}${path.sep}`)) {
+    throw new Error(`Unsafe SHA256SUMS path: ${match[2]}`);
+  }
+  if ((await sha256File(target)) !== match[1]) {
     throw new Error(`SHA256SUMS mismatch for ${match[2]}`);
   }
+  checksumPaths.push(match[2]);
 }
 
-const zipInfo = await stat(zipPath);
-if (zipInfo.size < 50 * 1024 * 1024) {
-  throw new Error(`Release ZIP is unexpectedly small for the real game: ${zipInfo.size} bytes.`);
-}
-const zipEntries = await readZipCentralDirectory(zipPath);
-for (const required of [
-  "switch/SilverShadow-PokeRogue/SilverShadow-PokeRogue.nro",
-  "switch/SilverShadow-PokeRogue/game/index.html",
-  "switch/SilverShadow-PokeRogue/game/manifest.json",
-  `switch/SilverShadow-PokeRogue/game/${manifest.compiledEntryPoint}`,
-]) {
-  if (!zipEntries.includes(required)) {
-    throw new Error(`Release ZIP is missing ${required}`);
-  }
-}
-if (zipEntries.filter(value => value.toLowerCase().endsWith(".nro")).length !== 1) {
-  throw new Error("Release ZIP contains duplicate or misplaced NRO files.");
-}
-if (zipEntries.some(value => value.includes(".cache/") || value.includes("node_modules/"))) {
-  throw new Error("Release ZIP contains cache or node_modules files.");
-}
+const deploymentFiles = (await listFiles(appRoot)).map(file => file.replaceAll("\\", "/")).sort(comparePaths);
+const expectedDeploymentFiles = [
+  "SHA256SUMS.txt",
+  "SilverShadow-PokeRogue.nro",
+  ...licenseFiles,
+  "game/asset-packs.json",
+  "game/index.html",
+  "game/manifest.json",
+  ...assetIndex.packs.map(pack => `game/${pack.path}`),
+  `game/${manifest.compiledEntryPoint}`,
+  "game/version.json",
+].sort(comparePaths);
+assertSamePaths(deploymentFiles, expectedDeploymentFiles, "deployment file");
+assertSamePaths(
+  checksumPaths.sort(comparePaths),
+  expectedDeploymentFiles.filter(file => file !== "SHA256SUMS.txt").sort(comparePaths),
+  "checksum",
+);
 
+const deploymentBytes = (
+  await Promise.all(deploymentFiles.map(async file => (await stat(path.join(appRoot, file))).size))
+).reduce((sum, size) => sum + size, 0);
 console.log(
   JSON.stringify(
     {
@@ -132,16 +219,68 @@ console.log(
       phaser: manifest.phaserVersion,
       entryPoint: manifest.compiledEntryPoint,
       nroBytes: nro.byteLength,
-      zipBytes: zipInfo.size,
-      zipEntries: zipEntries.length,
-      compiledJavaScriptFiles: compiledJavaScript.length,
-      requiredDirectories: manifest.requiredDirectories,
-      requiredFiles: manifest.requiredFiles.length,
+      deploymentFiles: deploymentFiles.length,
+      deploymentBytes,
+      assetPacks: assetIndex.packs.map(pack => ({
+        id: pack.id,
+        path: pack.path,
+        bytes: pack.size,
+        entries: pack.entryCount,
+      })),
+      packedAssets: assetIndex.entryCount,
+      representativeAssetsVerified: representativeAssets.length,
+      zipPresent: false,
+      protectedDirectoriesPresent: false,
     },
     null,
     2,
   ),
 );
+
+async function verifyRepresentativeAssets(index) {
+  for (const assetPath of representativeAssets) {
+    const data = await readPackedEntry(gameRoot, index, assetPath);
+    if (!data || data.byteLength === 0) {
+      throw new Error(`Representative packed asset is missing or empty: ${assetPath}`);
+    }
+    if (assetPath.endsWith(".json")) {
+      JSON.parse(data.toString("utf8"));
+    } else if (assetPath.endsWith(".png")) {
+      if (!data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+        throw new Error(`Representative PNG has an invalid signature: ${assetPath}`);
+      }
+    } else if (assetPath.endsWith(".wav") && data.subarray(0, 4).toString("ascii") !== "RIFF") {
+      throw new Error(`Representative WAV has an invalid signature: ${assetPath}`);
+    } else if (assetPath.endsWith(".m4a") && data.subarray(4, 8).toString("ascii") !== "ftyp") {
+      throw new Error(`Representative M4A has an invalid signature: ${assetPath}`);
+    } else if (assetPath.endsWith(".xml") && !data.toString("utf8").includes("<font")) {
+      throw new Error(`Representative bitmap-font XML is invalid: ${assetPath}`);
+    }
+  }
+}
+
+async function expectedPackedAssets(sourceRoot) {
+  const values = [];
+  for (const directory of ["audio", "images", "battle-anims", "fonts", "locales"]) {
+    values.push(
+      ...(await listFiles(path.join(sourceRoot, directory), directory)).map(file => file.replaceAll("\\", "/")),
+    );
+  }
+  for (const file of [
+    "biome-bgm-loop-points.json",
+    "exp-sprites.json",
+    "logo128.png",
+    "logo512.png",
+    "manifest.webmanifest",
+    "starter-colors.json",
+  ]) {
+    if (!(await exists(path.join(sourceRoot, file)))) {
+      throw new Error(`Expected stable asset is missing from compiled output: ${file}`);
+    }
+    values.push(file);
+  }
+  return values.sort(comparePaths);
+}
 
 function safeGamePath(relativePath) {
   const resolved = path.resolve(gameRoot, relativePath);
@@ -154,6 +293,7 @@ function safeGamePath(relativePath) {
 async function listFiles(directory, prefix = "") {
   const files = [];
   const entries = await readdir(directory, { withFileTypes: true });
+  entries.sort((a, b) => comparePaths(a.name, b.name));
   for (const entry of entries) {
     const relative = path.join(prefix, entry.name);
     if (entry.isDirectory()) {
@@ -187,45 +327,17 @@ async function exists(file) {
   }
 }
 
-async function readZipCentralDirectory(file) {
-  const handle = await open(file, "r");
-  try {
-    const info = await handle.stat();
-    const tailSize = Math.min(info.size, 65_557);
-    const tail = Buffer.alloc(tailSize);
-    await handle.read(tail, 0, tailSize, info.size - tailSize);
-    let eocd = -1;
-    for (let offset = tail.length - 22; offset >= 0; offset -= 1) {
-      if (tail.readUInt32LE(offset) === 0x06054b50) {
-        eocd = offset;
-        break;
-      }
-    }
-    if (eocd < 0) {
-      throw new Error("ZIP end-of-central-directory record was not found.");
-    }
-    const totalEntries = tail.readUInt16LE(eocd + 10);
-    const centralSize = tail.readUInt32LE(eocd + 12);
-    const centralOffset = tail.readUInt32LE(eocd + 16);
-    const central = Buffer.alloc(centralSize);
-    await handle.read(central, 0, centralSize, centralOffset);
-    const names = [];
-    let offset = 0;
-    while (offset < central.length && names.length < totalEntries) {
-      if (central.readUInt32LE(offset) !== 0x02014b50) {
-        throw new Error(`Invalid ZIP central-directory signature at ${offset}.`);
-      }
-      const nameLength = central.readUInt16LE(offset + 28);
-      const extraLength = central.readUInt16LE(offset + 30);
-      const commentLength = central.readUInt16LE(offset + 32);
-      names.push(central.subarray(offset + 46, offset + 46 + nameLength).toString("utf8"));
-      offset += 46 + nameLength + extraLength + commentLength;
-    }
-    if (names.length !== totalEntries) {
-      throw new Error(`ZIP central directory declared ${totalEntries} entries but contained ${names.length}.`);
-    }
-    return names;
-  } finally {
-    await handle.close();
+function assertSamePaths(actual, expected, label) {
+  if (actual.length !== expected.length) {
+    throw new Error(`Unexpected ${label} count: expected ${expected.length}, received ${actual.length}.`);
   }
+  for (let index = 0; index < actual.length; index += 1) {
+    if (actual[index] !== expected[index]) {
+      throw new Error(`Unexpected ${label} at ${index}: expected ${expected[index]}, received ${actual[index]}.`);
+    }
+  }
+}
+
+function comparePaths(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
 }

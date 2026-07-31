@@ -9,11 +9,13 @@ build reached sustained gameplay on a Switch OLED. The title screen, starter
 selection, battles, rewards, Pokédex, readable text, attached-controller input,
 and save/session persistence have been observed.
 
-It is not a stable port. Audio is silent, move animations can use Phaser's
-missing-texture placeholder, cold boot shows a black screen for roughly 35-44
-seconds, controller prompts are not Switch-specific, and Plus caused one
-native crash during a rival battle. The authoritative evidence, resolved
-blockers, known bugs, and next investigation order are in
+It is not a stable port. BGM playback and looping now work in tested gameplay,
+but long-session audio behavior is not exhaustively validated. Move animations
+can still use Phaser's missing-texture placeholder, cold boot and main-menu
+refresh can show a black screen for roughly 35-45 seconds, controller prompts
+are not always Switch-specific, and extreme repeated reward rerolls can exhaust
+native memory. The authoritative evidence, resolved blockers, known bugs, and
+next investigation order are in
 [`SWITCH_ALPHA_STATUS.md`](SWITCH_ALPHA_STATUS.md).
 
 The final architecture remains a direct nx.js NRO. It does not use the Android
@@ -191,15 +193,17 @@ The build now:
 7. Overlays the complete external asset and locale trees.
 8. Preserves Vite's original hashed output and creates one additional
    `switch-entry.js` from the actual module/chunk graph.
-9. Packages the native bootstrap in a fat NRO and the game beside it.
+9. Packages the native bootstrap in a fat NRO and the game beside it using
+   four deterministic random-access external asset packs.
 10. Writes schema-2 metadata/checksums and rejects proof-of-concept-only
     packages.
 
 The consolidated entry has no remaining JavaScript imports. It is evaluated as
 an async function because the real entry contains top-level await. This avoids
 assuming that nx.js can parse `index.html` or dynamically import arbitrary
-SD-card ESM chunks. Original Vite files remain present for provenance and
-diagnosis.
+SD-card ESM chunks. Original Vite chunks remain in the host-side compiled
+cache for provenance and diagnosis but are not copied into the 11-file
+SD-card deployment.
 
 The only Switch source patch supplies Phaser with the physical nx.js `screen`
 canvas, enables Phaser's custom-environment path, injects the Switch build
@@ -225,7 +229,9 @@ The NRO records these stages:
 
 Schema 2 verifies important file sizes and SHA-256 values before evaluation.
 The runtime maps build-relative, root-relative, `sdmc:`, and `file:` asset
-requests into the external game root. It allows `data:`, `blob:`, and embedded
+requests into the external game root and then into indexed ranged pack reads
+when the loose file is not part of the small runtime set. It allows `data:`,
+`blob:`, and embedded
 `romfs:` resources, blocks HTTP(S), WebSocket, protocol-relative, unsupported,
 and out-of-root requests, and logs the URL plus an origin stack. It does not
 turn local file loads into a blanket fetch rejection.
@@ -260,10 +266,10 @@ hashes, compiled-input hash, original and controlled entry points, evaluation
 mode, required directories/files and their important checksums, offline
 policy, and active shims.
 
-`SHA256SUMS.txt` covers the NRO, manifest, version metadata, and controlled
-entry. The verifier also checks the ZIP central directory, ensures exactly one
-correctly placed NRO, requires the real compiled JavaScript and critical asset
-trees, and rejects Milestone 1 indicators and cache leakage.
+`SHA256SUMS.txt` covers every deployed file. The verifier ensures exactly one
+correctly placed NRO, validates full pack hashes and exact source coverage,
+checks representative random-access entries, and rejects Milestone 1
+indicators, ZIP output, cache leakage, and protected user directories.
 
 ## Code-verified versus hardware-verified
 
@@ -272,9 +278,10 @@ Code-verified in Milestone 2:
 - the exact real upstream/SilverShadow build completes;
 - 14,273 JSON assets are processed;
 - Vite output is converted to an 8.8 MB no-import controlled entry;
-- the external package includes compiled code, images, audio, fonts, locales,
-  and data;
-- the fat NRO, 610 MB-class ZIP, manifest, and checksums verify;
+- the external package includes compiled code plus indexed images, audio,
+  fonts, locales, animations, and data;
+- the fat NRO, 11-file uncompressed directory, manifest, packs, and checksums
+  verify;
 - exact-key compiled reuse works.
 
 Hardware-verified in the Alpha baseline:
@@ -292,6 +299,10 @@ Hardware-verified in the Alpha baseline:
 
 These claims apply only to the returned Switch OLED handheld evidence. See
 `SWITCH_ALPHA_STATUS.md` for limitations and unverified configurations.
+
+The later indexed asset-pack layout and beta.6 ranged-read correction have
+launched on the tested hardware. See
+[`SWITCH_STATIC_ASSET_PACKAGING.md`](SWITCH_STATIC_ASSET_PACKAGING.md).
 
 ## Next milestones
 

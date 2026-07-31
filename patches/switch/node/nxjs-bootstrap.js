@@ -1873,7 +1873,7 @@ write(modifierSelectUiPath, modifierSelectUi);
 
 let title = read(titlePath);
 for (const [placeholder, replacement] of [
-  ["SILVERSHADOW_VERSION_PLACEHOLDER", "1.0.2"],
+  ["SILVERSHADOW_VERSION_PLACEHOLDER", "1.0.3"],
   ["BUILD_NUMBER_PLACEHOLDER", "Switch M2"],
 ]) {
   if (!title.includes(placeholder)) {

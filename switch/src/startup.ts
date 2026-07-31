@@ -8,6 +8,7 @@ import {
   SCREEN_WIDTH,
   SWITCH_PLATFORM_VERSION,
 } from "./constants";
+import type { AssetPackManifest } from "./asset-packs";
 import { readMemorySnapshot } from "./diagnostics";
 import { appendLog } from "./logger";
 
@@ -40,6 +41,7 @@ export interface SwitchGameManifest {
   evaluationMode: "async-function";
   requiredDirectories: string[];
   requiredFiles: RequiredFile[];
+  assetPacks: AssetPackManifest;
   compatibilityShims: string[];
   offlineRequired: true;
 }
@@ -57,6 +59,7 @@ export type StartupStage =
   | "manifest-opened"
   | "package-version-validated"
   | "required-files-checked"
+  | "asset-packs-checked"
   | "compatibility-shims-installed"
   | "compiled-entry-resolved"
   | "compiled-entry-evaluated"
@@ -140,6 +143,9 @@ export async function validateStartup(): Promise<SwitchGameManifest> {
 
   if (!Array.isArray(manifest.requiredDirectories) || !Array.isArray(manifest.requiredFiles)) {
     throw new Error("Manifest requiredDirectories or requiredFiles is invalid.");
+  }
+  if (!manifest.assetPacks || typeof manifest.assetPacks !== "object") {
+    throw new Error("Manifest assetPacks metadata is missing or invalid.");
   }
   for (const directory of manifest.requiredDirectories) {
     validateRelativePath(directory);
