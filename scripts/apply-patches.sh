@@ -34,6 +34,9 @@ apply_patch "egg-settings.js"               all
 apply_patch "form-change-item-settings.js"  all
 apply_patch "unlock-starter-on-select.js"   all
 apply_patch "starter-extra-settings.js"     all
+apply_patch "player-ohko.js"                all
+apply_patch "infinite-player-pp.js"         all
+apply_patch "infinite-player-hp.js"         all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all
 

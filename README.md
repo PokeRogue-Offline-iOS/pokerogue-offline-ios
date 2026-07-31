@@ -87,6 +87,9 @@ All sandbox options:
 | **Instant Hatch** | Schedules eligible eggs for the normal hatch flow at the next egg-lapse opportunity. |
 | **Form Change Items** | Adds Rebalanced or Abundant reward-pool access for transformation-related items. |
 | **Unlock Starter on Select** | Persistently grants minimum ownership data when Action is pressed on a locked starter. |
+| **Infinite Player HP** | Makes every battle damage result zero for both player field slots; enemies retain normal damage. |
+| **Infinite Player PP** | Prevents player move-use, Pressure, Grudge, and move-based PP depletion without changing enemy PP or max-PP upgrades. |
+| **Player OHKO** | Makes the first hit of player damage moves lethal while retaining immunities, protection, substitutes, Endure effects, boss shields, and scripted boss caps. |
 
 ### Sandbox Notes
 
@@ -99,6 +102,13 @@ All sandbox options:
 - **Always Shiny** and **Shiny Rate** do not replace the separate egg shiny roll or retroactively change existing Pokémon.
 - **Unlock Starter on Select** permanently changes save data. Export your save before using it; disabling the option does not remove prior unlocks.
 - Futuba's literal **Pandemic** implementation is intentionally not included because it creates 5,000 Pokérus selections and UI cursors. **All Starters Have Pokérus** provides the deterministic result without that allocation.
+- **Infinite Player HP** acts at the shared HP-damage boundary, so direct hits,
+  recoil, drain, status/weather damage, Perish Song, OHKO moves, and
+  self-damage all finish their normal effect flow but deal zero actual damage.
+- **Player OHKO** adds damage only after a move successfully produces positive
+  damage. Cheat-added boss damage stops at the current shield, and a final-bar
+  boss is left at 1 HP unless the move's original damage was naturally lethal.
+  Later hits of a multi-hit move keep their unmodified damage.
 - The options share the existing Offline override system and are designed to be
   enabled together; the full on-device combination remains part of the manual
   Android checklist.

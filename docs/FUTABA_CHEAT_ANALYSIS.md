@@ -437,7 +437,10 @@ The new all-platform order is:
 8. `form-change-item-settings.js`
 9. `unlock-starter-on-select.js`
 10. `starter-extra-settings.js`
-11. existing Gacha Calendar and community patches
+11. `player-ohko.js`
+12. `infinite-player-pp.js`
+13. `infinite-player-hp.js`
+14. existing Gacha Calendar and community patches
 
 Claim All Rewards must remain before these additions because it anchors to the
 then-final Offline setting and override rows. Each new script checks for its own
@@ -468,6 +471,27 @@ which mirrors the GitHub Ubuntu runner.
 The repository's older `offline-settings-navigation-fix.js` also fails if the
 entire patch wrapper is run a second time. The six new scripts themselves pass
 the byte-for-byte idempotence check.
+
+### Battle debug option validation
+
+The three battle options were additionally checked from an LF-normalized clean
+working tree, matching the GitHub Ubuntu checkout behavior:
+
+| Check | Result |
+| --- | --- |
+| Complete all-platform patch order | Passed |
+| Complete Android patch order, including the unchanged image-path patch | Passed |
+| JavaScript syntax for all three independent patch files | Passed |
+| Second run of all three battle patches | Passed; seven generated target hashes unchanged |
+| Biome formatting on the six modified runtime targets | Passed; no fixes required |
+| Focused player-side, boss-shield, final-bar, multi-hit, PP-drain, and sacrificial-heal source assertions | Passed |
+
+The source-only TypeScript check traversed all modified battle and setting
+files without a diagnostic in them. Its overall exit remains blocked by
+unrelated source/dependency baseline diagnostics in this local validation
+checkout. The Android-layer check also lacks the optional Capacitor package and
+generated sprite masterlists that are supplied by the full Android build
+environment.
 
 ## Manual test checklist
 
@@ -529,6 +553,18 @@ Select.
 - [ ] Unlock Starter on Select: with a backup save, press Action on a locked
   starter, restart the app, confirm persistence, and confirm no candy/passive or
   alternate forms were granted.
+- [ ] Infinite Player HP: test both player slots in a double battle against
+  direct damage, OHKO moves, burn/poison/weather, Perish Song, recoil,
+  self-destruct, and draining moves; confirm actual damage remains zero and the
+  opponent versions remain normal.
+- [ ] Infinite Player PP: test ordinary use, Pressure, Spite/Eerie Spell, and
+  Grudge on multiple party members; apply PP Up/PP Max and confirm maximum PP
+  still increases while enemy PP continues to decrease normally.
+- [ ] Player OHKO: test misses, immunities, Protect, Substitute, Endure/Sturdy,
+  spread moves, and multi-hit moves. On bosses, confirm cheat-added damage
+  breaks only the current shield, the final bar stops at 1 HP when natural
+  damage was nonlethal, naturally lethal damage remains lethal, and Classic
+  final-boss transitions still occur normally.
 - [ ] Disable every new option and confirm a normal run still starts.
 
 ### Android-specific smoke test
