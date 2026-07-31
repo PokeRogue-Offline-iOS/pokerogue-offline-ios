@@ -1389,6 +1389,11 @@ const rerollRequestAnchor = `    globalScene.reroll = true;
       "SelectModifierPhase",`;
 const rerollRequestReplacement = `    const switchApi = (globalThis as any).Switch;
     const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
+    const switchRerollState = this as any;
+    if (switchRerollState.switchRerollBlockedForMemory) {
+      globalScene.ui.playError();
+      return false;
+    }
     let switchMemory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
     const switchNativeUsedBeforeGcMiB = switchMemory ? switchMemory.nativeHeapUsed / 1048576 : 0;
     const switchRerollRecoveryThresholdMiB = 2250;
@@ -1419,8 +1424,9 @@ const rerollRequestReplacement = `    const switchApi = (globalThis as any).Swit
       }, true);
     }
     const switchNativeUsedMiB = switchMemory ? switchMemory.nativeHeapUsed / 1048576 : 0;
-    const switchRerollSafetyLimitMiB = 2450;
+    const switchRerollSafetyLimitMiB = 2250;
     if (switchNativeUsedMiB >= switchRerollSafetyLimitMiB) {
+      switchRerollState.switchRerollBlockedForMemory = true;
       switchDiagnostics?.checkpoint?.("reward:reroll-blocked-memory", {
         rerollCount: this.rerollCount,
         nativeUsedMiB: Math.round(switchNativeUsedMiB * 100) / 100,
@@ -1428,6 +1434,7 @@ const rerollRequestReplacement = `    const switchApi = (globalThis as any).Swit
           ? Math.round((switchMemory.nativeHeapFree / 1048576) * 100) / 100
           : null,
         safetyLimitMiB: switchRerollSafetyLimitMiB,
+        latched: true,
       }, true);
       globalScene.ui.playError();
       return false;
