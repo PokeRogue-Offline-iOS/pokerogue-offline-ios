@@ -4,8 +4,8 @@
  * Adds the offline-only "Allow Duplicate Starters" setting.
  *
  * The runtime changes keep selected starters as independent records. Species
- * grid actions target the most recently added matching starter, while actions
- * opened from the team panel target the exact highlighted slot.
+ * grid edits prepare defaults for the next copy (and removal targets the most
+ * recent copy), while team-panel actions target the exact highlighted slot.
  *
  * This patch must run after sandbox-progression-settings.js.
  */
@@ -245,6 +245,38 @@ if (!starterSource.includes("getEditableStarterIndex(")) {
   );
 }
 
+if (!starterSource.includes("const editableStarterIndex = this.getEditableStarterIndex(this.lastSpecies);")) {
+  const editContextAnchor = `      const starterAttributes = this.starterPreferences[this.lastSpecies.speciesId]!;
+      const originalStarterAttributes = this.originalStarterPreferences[this.lastSpecies.speciesId]!;`;
+  const editContextReplacement = `${editContextAnchor}
+      // Capture the exact team slot before opening nested option/rename/move
+      // handlers, which may temporarily hide the team-panel cursor.
+      const editableStarterIndex = this.getEditableStarterIndex(this.lastSpecies);`;
+  starterSource = replaceRequired(
+    starterSource,
+    editContextAnchor,
+    editContextReplacement,
+    "the starter edit context",
+  );
+}
+
+if (!starterSource.includes("starterIndexOverride?: number,")) {
+  const setSpeciesDetailsSignatureAnchor =
+    "  setSpeciesDetails(species: PokemonSpecies, options: SpeciesDetails = {}, save = true): void {";
+  const setSpeciesDetailsSignatureReplacement = `  setSpeciesDetails(
+    species: PokemonSpecies,
+    options: SpeciesDetails = {},
+    save = true,
+    starterIndexOverride?: number,
+  ): void {`;
+  starterSource = replaceRequired(
+    starterSource,
+    setSpeciesDetailsSignatureAnchor,
+    setSpeciesDetailsSignatureReplacement,
+    "the setSpeciesDetails signature",
+  );
+}
+
 if (
   !starterSource.includes(
     "!isDupe || activeOverrides.ALLOW_DUPLICATE_STARTERS_OVERRIDE",
@@ -402,22 +434,89 @@ if (
   );
 }
 
-if (!starterSource.includes("const selectedIndex = this.getEditableStarterIndex(species);")) {
+if (
+  !starterSource.includes(
+    "switchMoveHandler(targetIndex: number, newMove: MoveId, previousMove: MoveId, starterIndexOverride?: number)",
+  )
+) {
+  const switchMoveSignatureAnchor =
+    "  switchMoveHandler(targetIndex: number, newMove: MoveId, previousMove: MoveId) {";
+  const switchMoveSignatureReplacement =
+    "  switchMoveHandler(targetIndex: number, newMove: MoveId, previousMove: MoveId, starterIndexOverride?: number) {";
+  starterSource = replaceRequired(
+    starterSource,
+    switchMoveSignatureAnchor,
+    switchMoveSignatureReplacement,
+    "the switchMoveHandler signature",
+  );
+
+  const updateMovesSignatureAnchor =
+    "  private updateSelectedStarterMoveset(id: SpeciesId): void {";
+  const updateMovesSignatureReplacement =
+    "  private updateSelectedStarterMoveset(id: SpeciesId, starterIndexOverride?: number): void {";
+  starterSource = replaceRequired(
+    starterSource,
+    updateMovesSignatureAnchor,
+    updateMovesSignatureReplacement,
+    "the updateSelectedStarterMoveset signature",
+  );
+}
+
+if (!starterSource.includes("const selectedIndex = starterIndexOverride ?? this.getEditableStarterIndex(species);")) {
   const movesAnchor = `    for (const [index, species] of this.starterSpecies.entries()) {
       if (species.speciesId === id) {
         this.starters[index].moveset = this.starterMoveset;
       }
     }`;
-  const movesReplacement = `    const species = speciesDataRegistry.getSpecies(id);
+  const previouslyPatchedMovesAnchor = `    const species = speciesDataRegistry.getSpecies(id);
     const selectedIndex = this.getEditableStarterIndex(species);
     if (selectedIndex >= 0) {
       this.starters[selectedIndex].moveset = this.starterMoveset.slice() as StarterMoveset;
     }`;
+  const movesReplacement = `    const species = speciesDataRegistry.getSpecies(id);
+    const selectedIndex = starterIndexOverride ?? this.getEditableStarterIndex(species);
+    if (selectedIndex >= 0) {
+      this.starters[selectedIndex].moveset = this.starterMoveset.slice() as StarterMoveset;
+    }`;
+  const selectedMovesAnchor = starterSource.includes(previouslyPatchedMovesAnchor)
+    ? previouslyPatchedMovesAnchor
+    : movesAnchor;
   starterSource = replaceRequired(
     starterSource,
-    movesAnchor,
+    selectedMovesAnchor,
     movesReplacement,
-    "updateSelectedStarterMoveset's species-wide loop",
+    "updateSelectedStarterMoveset's target selection",
+  );
+}
+
+if (!starterSource.includes("this.switchMoveHandler(i, sm, m, editableStarterIndex);")) {
+  starterSource = replaceRequired(
+    starterSource,
+    "                                            this.switchMoveHandler(i, sm, m);",
+    "                                            this.switchMoveHandler(i, sm, m, editableStarterIndex);",
+    "the starter move-swap callback",
+  );
+}
+
+if (
+  !starterSource.includes(
+    "this.updateSelectedStarterMoveset(speciesId, starterIndexOverride);\n"
+      + "    this.setSpeciesDetails(this.lastSpecies, { forSeen: false }, true, starterIndexOverride);",
+  )
+) {
+  const moveRefreshAnchor = `    this.hasSwappedMoves = true;
+    this.setSpeciesDetails(this.lastSpecies, { forSeen: false });
+    this.updateSelectedStarterMoveset(speciesId);`;
+  const moveRefreshReplacement = `    this.hasSwappedMoves = true;
+    // Save the edited moveset to the captured copy before refreshing. Refreshing
+    // first would reload that copy's old moves and discard the user's change.
+    this.updateSelectedStarterMoveset(speciesId, starterIndexOverride);
+    this.setSpeciesDetails(this.lastSpecies, { forSeen: false }, true, starterIndexOverride);`;
+  starterSource = replaceRequired(
+    starterSource,
+    moveRefreshAnchor,
+    moveRefreshReplacement,
+    "the move-swap refresh order",
   );
 }
 
@@ -432,7 +531,7 @@ if (starterSource.includes(firstCopyAnchor)) {
 if (starterSource.includes(firstCopyAnchor)) {
   starterSource = starterSource.replace(
     firstCopyAnchor,
-    "        const starterIndex = this.getEditableStarterIndex(species);",
+    "        const starterIndex = starterIndexOverride ?? this.getEditableStarterIndex(species);",
   );
 }
 
@@ -454,7 +553,7 @@ if (
   );
 }
 
-if (!starterSource.includes("const passiveStarterIndex = this.getEditableStarterIndex(this.lastSpecies);")) {
+if (!starterSource.includes("const passiveEnabled =\n            editableStarterIndex >= 0")) {
   const passiveLabelAnchor = `          const passiveAttr = starterData.passiveAttr;
           if (passiveAttr & PassiveAttr.UNLOCKED) {
             // this is for enabling and disabling the passive
@@ -464,10 +563,9 @@ if (!starterSource.includes("const passiveStarterIndex = this.getEditableStarter
                 : "starterSelectUiHandler:enablePassive",
             );`;
   const passiveLabelReplacement = `          const passiveAttr = starterData.passiveAttr;
-          const passiveStarterIndex = this.getEditableStarterIndex(this.lastSpecies);
           const passiveEnabled =
-            passiveStarterIndex >= 0
-              ? this.starters[passiveStarterIndex].passive
+            editableStarterIndex >= 0
+              ? this.starters[editableStarterIndex].passive
               : !!(passiveAttr & PassiveAttr.ENABLED);
           if (passiveAttr & PassiveAttr.UNLOCKED) {
             // this is for enabling and disabling the passive
@@ -515,8 +613,8 @@ if (!starterSource.includes("const nextPassiveEnabled = !passiveEnabled;")) {
                   starterData.passiveAttr &= ~PassiveAttr.ENABLED;
                   persistentStarterData.passiveAttr &= ~PassiveAttr.ENABLED;
                 }
-                if (passiveStarterIndex >= 0) {
-                  this.starters[passiveStarterIndex].passive = nextPassiveEnabled;
+                if (editableStarterIndex >= 0) {
+                  this.starters[editableStarterIndex].passive = nextPassiveEnabled;
                 }
                 ui.setMode(UiMode.STARTER_SELECT);`;
   starterSource = replaceRequired(
@@ -527,12 +625,12 @@ if (!starterSource.includes("const nextPassiveEnabled = !passiveEnabled;")) {
   );
 }
 
-if (!starterSource.includes("this.starters[passiveStarterIndex].passive = true;")) {
+if (!starterSource.includes("this.starters[editableStarterIndex].passive = true;")) {
   const unlockPassiveAnchor = `                    persistentStarterData.passiveAttr |= PassiveAttr.UNLOCKED | PassiveAttr.ENABLED;
                     starterData.passiveAttr = persistentStarterData.passiveAttr;`;
   const unlockPassiveReplacement = `${unlockPassiveAnchor}
-                    if (passiveStarterIndex >= 0) {
-                      this.starters[passiveStarterIndex].passive = true;
+                    if (editableStarterIndex >= 0) {
+                      this.starters[editableStarterIndex].passive = true;
                     }`;
   starterSource = replaceRequired(
     starterSource,
@@ -542,11 +640,11 @@ if (!starterSource.includes("this.starters[passiveStarterIndex].passive = true;"
   );
 }
 
-if (!starterSource.includes("const passiveStarterIndex = this.getEditableStarterIndex(species);")) {
+if (!starterSource.includes("const passiveStarterIndex = starterIndexOverride ?? this.getEditableStarterIndex(species);")) {
   const passiveDisplayAnchor = `          const isUnlocked = !!(passiveAttr & PassiveAttr.UNLOCKED);
           const isEnabled = !!(passiveAttr & PassiveAttr.ENABLED);`;
   const passiveDisplayReplacement = `          const isUnlocked = !!(passiveAttr & PassiveAttr.UNLOCKED);
-          const passiveStarterIndex = this.getEditableStarterIndex(species);
+          const passiveStarterIndex = starterIndexOverride ?? this.getEditableStarterIndex(species);
           const isEnabled =
             passiveStarterIndex >= 0
               ? this.starters[passiveStarterIndex].passive
@@ -610,7 +708,7 @@ if (!starterSource.includes("const selectedStarterMoveset =")) {
             ? speciesMoveData
             : speciesMoveData[formIndex!] // TODO: is this bang correct?
           : null;`;
-  const moveDataReplacement = `        const selectedStarterIndex = this.getSelectedStarterIndex(species);
+  const moveDataReplacement = `        const selectedStarterIndex = starterIndexOverride ?? this.getSelectedStarterIndex(species);
         const selectedStarterMoveset =
           selectedStarterIndex >= 0 ? this.starters[selectedStarterIndex].moveset : undefined;
         const speciesMoveData = starterDataEntry.moveset;
@@ -626,6 +724,392 @@ if (!starterSource.includes("const selectedStarterMoveset =")) {
     moveDataAnchor,
     moveDataReplacement,
     "the selected starter moveset source",
+  );
+}
+
+if (!starterSource.includes("// Keep form-adjusted moves on the same selected copy.")) {
+  const movesetFinalizeAnchor = `    if (!this.starterMoveset) {
+      this.starterMoveset = this.speciesStarterMoves.slice(0, 4) as StarterMoveset;
+    }
+
+    for (let m = 0; m < 4; m++) {`;
+  const movesetFinalizeReplacement = `    if (!this.starterMoveset) {
+      this.starterMoveset = this.speciesStarterMoves.slice(0, 4) as StarterMoveset;
+    }
+
+    // Keep form-adjusted moves on the same selected copy.
+    this.updateSelectedStarterMoveset(species.speciesId, starterIndexOverride);
+
+    for (let m = 0; m < 4; m++) {`;
+  starterSource = replaceRequired(
+    starterSource,
+    movesetFinalizeAnchor,
+    movesetFinalizeReplacement,
+    "the finalized starter moveset",
+  );
+}
+
+if (!starterSource.includes("const selectedNickname =")) {
+  const renameSourceAnchor =
+    '              let nickname = starterAttributes.nickname ? String(starterAttributes.nickname) : "";';
+  const renameSourceReplacement = `              const selectedNickname =
+                editableStarterIndex >= 0 ? this.starters[editableStarterIndex].nickname : starterAttributes.nickname;
+              let nickname = selectedNickname ? String(selectedNickname) : "";`;
+  starterSource = replaceRequired(
+    starterSource,
+    renameSourceAnchor,
+    renameSourceReplacement,
+    "the rename dialog's nickname source",
+  );
+
+  const renameWriteAnchor = `                      starterAttributes.nickname = sanitizedName;
+                      originalStarterAttributes.nickname = sanitizedName;
+                      const name = decodeURIComponent(escape(atob(starterAttributes.nickname)));`;
+  const renameWriteReplacement = `                      starterAttributes.nickname = sanitizedName;
+                      originalStarterAttributes.nickname = sanitizedName;
+                      if (editableStarterIndex >= 0) {
+                        this.starters[editableStarterIndex].nickname = sanitizedName;
+                      }
+                      const name = decodeURIComponent(escape(atob(sanitizedName)));`;
+  starterSource = replaceRequired(
+    starterSource,
+    renameWriteAnchor,
+    renameWriteReplacement,
+    "the rename dialog's nickname update",
+  );
+}
+
+if (!starterSource.includes("setSpecies(species: PokemonSpecies | null, starterIndexOverride?: number)")) {
+  starterSource = replaceRequired(
+    starterSource,
+    "  setSpecies(species: PokemonSpecies | null) {",
+    "  setSpecies(species: PokemonSpecies | null, starterIndexOverride?: number) {",
+    "the setSpecies signature",
+  );
+}
+
+if (
+  !starterSource.includes(
+    "const selectedStarterIndex = species == null ? -1 : (starterIndexOverride ?? this.getEditableStarterIndex(species));",
+  )
+) {
+  const selectedStarterContextAnchor = `    const starterAttributes: StarterAttributes | null = species
+      ? { ...this.starterPreferences[species.speciesId] }
+      : null;`;
+  const selectedStarterContextReplacement = `${selectedStarterContextAnchor}
+    const selectedStarterIndex = species == null ? -1 : (starterIndexOverride ?? this.getEditableStarterIndex(species));
+    const selectedStarter = selectedStarterIndex >= 0 ? this.starters[selectedStarterIndex] : null;`;
+  starterSource = replaceRequired(
+    starterSource,
+    selectedStarterContextAnchor,
+    selectedStarterContextReplacement,
+    "the setSpecies selected-record context",
+  );
+}
+
+if (!starterSource.includes("const displayedNickname = selectedStarter?.nickname ?? starterAttributes?.nickname;")) {
+  const nicknameDisplayAnchor = `      if (starterAttributes?.nickname) {
+        const name = decodeURIComponent(escape(atob(starterAttributes.nickname)));
+        this.pokemonNameText.setText(name);
+      } else {
+        this.pokemonNameText.setText(species.name);
+      }`;
+  const nicknameDisplayReplacement = `      const displayedNickname = selectedStarter?.nickname ?? starterAttributes?.nickname;
+      if (displayedNickname) {
+        const name = decodeURIComponent(escape(atob(displayedNickname)));
+        this.pokemonNameText.setText(name);
+      } else {
+        this.pokemonNameText.setText(species.name);
+      }`;
+  starterSource = replaceRequired(
+    starterSource,
+    nicknameDisplayAnchor,
+    nicknameDisplayReplacement,
+    "the displayed starter nickname",
+  );
+}
+
+if (!starterSource.includes("defaultProps.formIndex = selectedStarter.formIndex;")) {
+  const selectedDisplayPropsAnchor = `        const defaultDexAttr = this.getCurrentDexProps(species.speciesId);
+        const defaultProps = globalScene.gameData.getSpeciesDexAttrProps(species, defaultDexAttr);
+        const variant = defaultProps.variant;`;
+  const selectedDisplayPropsReplacement = `        const defaultDexAttr = this.getCurrentDexProps(species.speciesId);
+        const defaultProps = globalScene.gameData.getSpeciesDexAttrProps(species, defaultDexAttr);
+        if (selectedStarter) {
+          defaultProps.shiny = selectedStarter.shiny;
+          defaultProps.variant = selectedStarter.variant;
+          defaultProps.formIndex = selectedStarter.formIndex;
+          defaultProps.female = selectedStarter.female ?? false;
+        }
+        const variant = defaultProps.variant;`;
+  starterSource = replaceRequired(
+    starterSource,
+    selectedDisplayPropsAnchor,
+    selectedDisplayPropsReplacement,
+    "the selected record's shiny and form display properties",
+  );
+}
+
+if (!starterSource.includes("if (selectedStarterIndex >= 0 && selectedStarter)")) {
+  const selectedRecordAnchor = `        const starterIndex = this.getSelectedStarterIndex(species);
+
+        const props = globalScene.gameData.getSpeciesDexAttrProps(species, defaultDexAttr);
+
+        if (starterIndex > -1) {
+          const starter = this.starters[starterIndex];
+          this.setSpeciesDetails(
+            species,
+            {
+              shiny: starter.shiny,
+              formIndex: starter.formIndex,
+              female: starter.female,
+              variant: starter.variant,
+              abilityIndex: starter.abilityIndex,
+              natureIndex: starter.nature,
+              teraType: starter.teraType,
+            },
+            false,
+          );`;
+  const selectedRecordReplacement = `        const props = defaultProps;
+
+        if (selectedStarterIndex >= 0 && selectedStarter) {
+          this.setSpeciesDetails(
+            species,
+            {
+              shiny: selectedStarter.shiny,
+              formIndex: selectedStarter.formIndex,
+              female: selectedStarter.female,
+              variant: selectedStarter.variant,
+              abilityIndex: selectedStarter.abilityIndex,
+              natureIndex: selectedStarter.nature,
+              teraType: selectedStarter.teraType,
+            },
+            false,
+            selectedStarterIndex,
+          );`;
+  starterSource = replaceRequired(
+    starterSource,
+    selectedRecordAnchor,
+    selectedRecordReplacement,
+    "the selected record's setSpecies display",
+  );
+}
+
+if (!starterSource.includes("this.updateSelectedStarterMoveset(species.speciesId, selectedStarterIndex);")) {
+  starterSource = replaceRequired(
+    starterSource,
+    "          this.updateSelectedStarterMoveset(species.speciesId);",
+    "          this.updateSelectedStarterMoveset(species.speciesId, selectedStarterIndex);",
+    "the setSpecies moveset synchronization",
+  );
+}
+
+if (!starterSource.includes("const displayedFormIndex = selectedStarter?.formIndex ?? props.formIndex;")) {
+  const displayedFormAnchor = `        if (props.formIndex != null) {
+          // If switching forms while the pokemon is in the team, update its moveset
+          this.updateSelectedStarterMoveset(species.speciesId, selectedStarterIndex);
+        }
+
+        const speciesForm = getPokemonSpeciesForm(species.speciesId, props.formIndex);`;
+  const displayedFormReplacement = `        const displayedFormIndex = selectedStarter?.formIndex ?? props.formIndex;
+        if (displayedFormIndex != null) {
+          // If switching forms while the pokemon is in the team, update its moveset
+          this.updateSelectedStarterMoveset(species.speciesId, selectedStarterIndex);
+        }
+
+        const speciesForm = getPokemonSpeciesForm(species.speciesId, displayedFormIndex);`;
+  starterSource = replaceRequired(
+    starterSource,
+    displayedFormAnchor,
+    displayedFormReplacement,
+    "the selected record's displayed form",
+  );
+}
+
+if (!starterSource.includes("              teraType: starterAttributes?.tera,\n            },\n            false,\n            selectedStarterIndex,")) {
+  const defaultDetailsAnchor = `              teraType: starterAttributes?.tera,
+            },
+            false,
+          );`;
+  const defaultDetailsReplacement = `              teraType: starterAttributes?.tera,
+            },
+            false,
+            selectedStarterIndex,
+          );`;
+  starterSource = replaceRequired(
+    starterSource,
+    defaultDetailsAnchor,
+    defaultDetailsReplacement,
+    "the next-copy default setSpeciesDetails call",
+  );
+}
+
+if (!starterSource.includes("              teraType: selectedStarter.teraType,")) {
+  const staleSelectedDetailsAnchor = `              teraType: starter.teraType,
+            },
+            false,
+            starterIndex,
+          );`;
+  const staleSelectedDetailsReplacement = `              teraType: selectedStarter.teraType,
+            },
+            false,
+            selectedStarterIndex,
+          );`;
+  starterSource = replaceRequired(
+    starterSource,
+    staleSelectedDetailsAnchor,
+    staleSelectedDetailsReplacement,
+    "a previously patched setSpeciesDetails call",
+  );
+}
+
+if (!starterSource.includes("this.setSpecies(this.lastSpecies, editableStarterIndex);")) {
+  const pokedexAttributesAnchor = `                const attributes = {
+                  shiny: starterAttributes.shiny,
+                  variant: starterAttributes.variant,
+                  form: starterAttributes.form,
+                  female: starterAttributes.female,
+                };`;
+  const pokedexAttributesReplacement = `                const currentProps = globalScene.gameData.getSpeciesDexAttrProps(this.lastSpecies, this.dexAttrCursor);
+                const attributes = {
+                  shiny: currentProps.shiny,
+                  variant: currentProps.variant,
+                  form: currentProps.formIndex,
+                  female: currentProps.female,
+                };`;
+  starterSource = replaceRequired(
+    starterSource,
+    pokedexAttributesAnchor,
+    pokedexAttributesReplacement,
+    "the Pokédex overlay's current starter attributes",
+  );
+
+  const pokedexReturnAnchor = `                    this.setSpecies(this.lastSpecies);
+                  }
+                });`;
+  const pokedexReturnReplacement = `                    this.setSpecies(this.lastSpecies, editableStarterIndex);
+                  }
+                });`;
+  starterSource = replaceRequired(
+    starterSource,
+    pokedexReturnAnchor,
+    pokedexReturnReplacement,
+    "the Pokédex return callback",
+  );
+}
+
+if (
+  !starterSource.includes(
+    "        const props = globalScene.gameData.getSpeciesDexAttrProps(this.lastSpecies, this.dexAttrCursor);\n"
+      + "        switch (button)",
+  )
+) {
+  const cyclePropsAnchor = `        const props = globalScene.gameData.getSpeciesDexAttrProps(
+          this.lastSpecies,
+          this.getCurrentDexProps(this.lastSpecies.speciesId),
+        );
+        switch (button)`;
+  const cyclePropsReplacement = `        const props = globalScene.gameData.getSpeciesDexAttrProps(this.lastSpecies, this.dexAttrCursor);
+        switch (button)`;
+  starterSource = replaceRequired(
+    starterSource,
+    cyclePropsAnchor,
+    cyclePropsReplacement,
+    "the current editable starter properties",
+  );
+}
+
+if (!starterSource.includes("              if (props.shiny === false) {")) {
+  starterSource = replaceRequired(
+    starterSource,
+    "              if (starterAttributes.shiny === false) {",
+    "              if (props.shiny === false) {",
+    "the selected copy's shiny state",
+  );
+}
+
+if (!starterSource.includes("                const newVariant = props.variant;")) {
+  const shinyVariantAnchor = `                const newProps = globalScene.gameData.getSpeciesDexAttrProps(
+                  this.lastSpecies,
+                  this.getCurrentDexProps(this.lastSpecies.speciesId),
+                );
+                const newVariant = starterAttributes.variant
+                  ? (starterAttributes.variant as Variant)
+                  : newProps.variant;`;
+  const shinyVariantReplacement = "                const newVariant = props.variant;";
+  starterSource = replaceRequired(
+    starterSource,
+    shinyVariantAnchor,
+    shinyVariantReplacement,
+    "the selected copy's shiny variant",
+  );
+}
+
+if (
+  !starterSource.includes(
+    "              const speciesForm = getPokemonSpeciesForm(this.lastSpecies.speciesId, props.formIndex);",
+  )
+) {
+  starterSource = replaceRequired(
+    starterSource,
+    "              const speciesForm = getPokemonSpeciesForm(this.lastSpecies.speciesId, starterAttributes.form ?? 0);",
+    "              const speciesForm = getPokemonSpeciesForm(this.lastSpecies.speciesId, props.formIndex);",
+    "the selected copy's form for Tera cycling",
+  );
+}
+
+if (
+  !starterSource.includes(
+    "                                natureIndex: n,\n"
+      + "                              },\n"
+      + "                              true,\n"
+      + "                              editableStarterIndex,",
+  )
+) {
+  const natureMenuRefreshAnchor = `                            this.setSpeciesDetails(this.lastSpecies, {
+                              natureIndex: n,
+                            });`;
+  const natureMenuRefreshReplacement = `                            this.setSpeciesDetails(
+                              this.lastSpecies,
+                              {
+                                natureIndex: n,
+                              },
+                              true,
+                              editableStarterIndex,
+                            );`;
+  starterSource = replaceRequired(
+    starterSource,
+    natureMenuRefreshAnchor,
+    natureMenuRefreshReplacement,
+    "the nested nature-menu refresh",
+  );
+}
+
+const passiveRefreshAnchor = `                ui.setMode(UiMode.STARTER_SELECT);
+                this.setSpeciesDetails(this.lastSpecies);`;
+const passiveRefreshReplacement = `                ui.setMode(UiMode.STARTER_SELECT);
+                this.setSpeciesDetails(this.lastSpecies, {}, true, editableStarterIndex);`;
+if (starterSource.includes(passiveRefreshAnchor)) {
+  starterSource = replaceRequired(
+    starterSource,
+    passiveRefreshAnchor,
+    passiveRefreshReplacement,
+    "the passive-toggle refresh",
+  );
+}
+
+const unlockPassiveRefreshAnchor = `                    ui.setMode(UiMode.STARTER_SELECT);
+                    this.setSpeciesDetails(this.lastSpecies);
+                    audioManager.playSound("se/buy");`;
+const unlockPassiveRefreshReplacement = `                    ui.setMode(UiMode.STARTER_SELECT);
+                    this.setSpeciesDetails(this.lastSpecies, {}, true, editableStarterIndex);
+                    audioManager.playSound("se/buy");`;
+if (starterSource.includes(unlockPassiveRefreshAnchor)) {
+  starterSource = replaceRequired(
+    starterSource,
+    unlockPassiveRefreshAnchor,
+    unlockPassiveRefreshReplacement,
+    "the passive-unlock refresh",
   );
 }
 
@@ -682,11 +1166,44 @@ if (
   );
 }
 
-if (starterSource.includes("this.starterSpecies.indexOf(species)")) {
-  fail(
-    "A species-first starter lookup remains after patching; "
-    + "review the current starter-selection implementation.",
-  );
+const requiredPerCopyBehavior = [
+  ["const editableStarterIndex = this.getEditableStarterIndex(this.lastSpecies);", "stable edit-slot capture"],
+  ["this.switchMoveHandler(i, sm, m, editableStarterIndex);", "move-menu slot forwarding"],
+  ["this.updateSelectedStarterMoveset(speciesId, starterIndexOverride);", "move update before refresh"],
+  ["// Keep form-adjusted moves on the same selected copy.", "form-adjusted moveset synchronization"],
+  ["const selectedIndex = starterIndexOverride ?? this.getEditableStarterIndex(species);", "moveset target"],
+  ["starter.shiny = props.shiny;", "shiny record update"],
+  ["starter.variant = props.variant;", "variant record update"],
+  ["starter.female = props.female;", "gender record update"],
+  ["starter.formIndex = props.formIndex;", "form record update"],
+  ["starter.abilityIndex = this.abilityCursor;", "ability record update"],
+  ["starter.nature = this.natureCursor;", "nature record update"],
+  ["starter.teraType = this.teraCursor;", "Tera record update"],
+  ["this.starters[editableStarterIndex].passive = nextPassiveEnabled;", "passive record update"],
+  ["this.starters[editableStarterIndex].nickname = sanitizedName;", "nickname record update"],
+  ["starterIndexOverride ?? this.getSelectedStarterIndex(species);", "moveset record source"],
+  ["selectedStarter?.nickname ?? starterAttributes?.nickname", "nickname record source"],
+  ["const displayedFormIndex = selectedStarter?.formIndex ?? props.formIndex;", "form record display"],
+];
+for (const [snippet, description] of requiredPerCopyBehavior) {
+  if (!starterSource.includes(snippet)) {
+    fail(`Missing ${description}; refusing to leave duplicate starter state partially shared.`);
+  }
+}
+
+const forbiddenSpeciesWideBehavior = [
+  ["this.starterSpecies.indexOf(species)", "species-first starter lookup"],
+  ["this.switchMoveHandler(i, sm, m);", "move callback without a captured slot"],
+  ["this.setSpeciesDetails(this.lastSpecies, { forSeen: false });\n    this.updateSelectedStarterMoveset(speciesId);",
+    "move refresh before record update"],
+  ["              if (starterAttributes.shiny === false) {", "species-preference shiny cycle"],
+  ["              const speciesForm = getPokemonSpeciesForm(this.lastSpecies.speciesId, starterAttributes.form ?? 0);",
+    "species-preference form cycle"],
+];
+for (const [snippet, description] of forbiddenSpeciesWideBehavior) {
+  if (starterSource.includes(snippet)) {
+    fail(`A stale ${description} remains after patching.`);
+  }
 }
 
 fs.writeFileSync(starterSelectTarget, starterSource, "utf8");
