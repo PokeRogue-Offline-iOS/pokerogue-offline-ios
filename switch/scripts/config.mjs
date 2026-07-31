@@ -8,6 +8,7 @@ export const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 export const UPSTREAM_URL = "https://github.com/pagefaultgames/pokerogue.git";
 export const UPSTREAM_COMMIT = "0d94c5bbbc7a4fc67014c480e31dab1cfdf7ceb4";
 export const UPSTREAM_VERSION = "1.12.0.10";
+export const SILVERSHADOW_VERSION = "1.0.2";
 export const ASSETS_COMMIT = "909b43612324622608023b3beb2f24f4ef159c1d";
 export const LOCALES_COMMIT = "c2f9c794ce17f1445d14357a4995353447e9df55";
 
