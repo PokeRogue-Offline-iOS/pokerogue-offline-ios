@@ -279,6 +279,36 @@ if (!starterSource.includes("starterIndexOverride?: number,")) {
 
 if (
   !starterSource.includes(
+    "if (activeOverrides.ALLOW_DUPLICATE_STARTERS_OVERRIDE) {\n"
+      + "          // Duplicate teams have an explicit Remove One action",
+  )
+) {
+  const cancelRemovalAnchor = `      } else if (this.starterSpecies.length > 0) {
+        this.popStarter(this.starterSpecies.length - 1);
+        success = true;
+        this.updateInstructions();
+      } else {`;
+  const cancelRemovalReplacement = `      } else if (this.starterSpecies.length > 0) {
+        if (activeOverrides.ALLOW_DUPLICATE_STARTERS_OVERRIDE) {
+          // Duplicate teams have an explicit Remove One action on both the
+          // species grid and team panel. B should back out, not silently delete.
+          this.tryExit();
+        } else {
+          this.popStarter(this.starterSpecies.length - 1);
+          this.updateInstructions();
+        }
+        success = true;
+      } else {`;
+  starterSource = replaceRequired(
+    starterSource,
+    cancelRemovalAnchor,
+    cancelRemovalReplacement,
+    "the duplicate-mode Cancel behavior",
+  );
+}
+
+if (
+  !starterSource.includes(
     "!isDupe || activeOverrides.ALLOW_DUPLICATE_STARTERS_OVERRIDE",
   )
 ) {
@@ -355,7 +385,8 @@ if (!starterSource.includes("const canAddSelectedStarter =")) {
           }`;
   const optionsReplacement = `          const duplicatesAllowed = activeOverrides.ALLOW_DUPLICATE_STARTERS_OVERRIDE;
           const canAddSelectedStarter =
-            (!isDupe || duplicatesAllowed)
+            !this.starterIconsCursorObj.visible
+            && (!isDupe || duplicatesAllowed)
             && isValidForChallenge
             && currentPartyValue + newCost <= this.getValueLimit()
             && this.starterSpecies.length < PLAYER_PARTY_MAX_SIZE;
@@ -737,8 +768,11 @@ if (!starterSource.includes("// Keep form-adjusted moves on the same selected co
       this.starterMoveset = this.speciesStarterMoves.slice(0, 4) as StarterMoveset;
     }
 
-    // Keep form-adjusted moves on the same selected copy.
-    this.updateSelectedStarterMoveset(species.speciesId, starterIndexOverride);
+    // Keep form-adjusted moves on the same selected copy. Navigation also calls
+    // this method with no species selected, so do not dereference that state.
+    if (species) {
+      this.updateSelectedStarterMoveset(species.speciesId, starterIndexOverride);
+    }
 
     for (let m = 0; m < 4; m++) {`;
   starterSource = replaceRequired(
@@ -1171,6 +1205,9 @@ const requiredPerCopyBehavior = [
   ["this.switchMoveHandler(i, sm, m, editableStarterIndex);", "move-menu slot forwarding"],
   ["this.updateSelectedStarterMoveset(speciesId, starterIndexOverride);", "move update before refresh"],
   ["// Keep form-adjusted moves on the same selected copy.", "form-adjusted moveset synchronization"],
+  ["if (species) {\n      this.updateSelectedStarterMoveset(species.speciesId, starterIndexOverride);", "null-safe moveset synchronization"],
+  ["!this.starterIconsCursorObj.visible\n            && (!isDupe || duplicatesAllowed)", "main-grid-only duplicate adding"],
+  ["// species grid and team panel. B should back out, not silently delete.", "safe duplicate-mode Cancel behavior"],
   ["const selectedIndex = starterIndexOverride ?? this.getEditableStarterIndex(species);", "moveset target"],
   ["starter.shiny = props.shiny;", "shiny record update"],
   ["starter.variant = props.variant;", "variant record update"],
@@ -1196,6 +1233,8 @@ const forbiddenSpeciesWideBehavior = [
   ["this.switchMoveHandler(i, sm, m);", "move callback without a captured slot"],
   ["this.setSpeciesDetails(this.lastSpecies, { forSeen: false });\n    this.updateSelectedStarterMoveset(speciesId);",
     "move refresh before record update"],
+  ["// Keep form-adjusted moves on the same selected copy.\n    this.updateSelectedStarterMoveset",
+    "null-unsafe form-adjusted moveset synchronization"],
   ["              if (starterAttributes.shiny === false) {", "species-preference shiny cycle"],
   ["              const speciesForm = getPokemonSpeciesForm(this.lastSpecies.speciesId, starterAttributes.form ?? 0);",
     "species-preference form cycle"],
