@@ -1,0 +1,25 @@
+PokeRogue-Offline — Licensing Notice
+=====================================
+
+This repository does not include a general open-source license. In the
+absence of a LICENSE file, no rights beyond GitHub's default Terms of
+Service (viewing and forking within GitHub) are granted to this
+repository's original content. Using, modifying, redistributing, or
+incorporating this repository's original code into other projects
+requires permission from the copyright holder.
+
+This applies with particular emphasis to:
+
+    patches/all/node/fix-daily-seed.js
+
+which carries its own copyright notice and is explicitly not licensed
+for reuse or redistribution, independent of the licensing status of any
+other file in this repository, now or in the future.
+
+Separately: this project applies patches to a freshly-cloned copy of
+pagefaultgames/pokerogue (https://github.com/pagefaultgames/pokerogue),
+which is licensed under the GNU Affero General Public License v3.0.
+Nothing in this notice affects the license terms governing pokerogue's
+own source code or any combined work distributed under those terms.
+
+Contact: Discord — scooom

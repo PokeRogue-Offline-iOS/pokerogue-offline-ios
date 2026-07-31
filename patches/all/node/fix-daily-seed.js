@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 /**
+ * Copyright (c) 2026 Scooom. All rights reserved.
+ *
+ * This file is not licensed for reuse, redistribution, or inclusion in
+ * other projects, forked or otherwise. Contact via Discord (scooom) for
+ * permission requests.
+ */
+/**
  * Patch: fix-daily-seed.js
  *
  * Makes the offline daily run use the same seed as the live website.
