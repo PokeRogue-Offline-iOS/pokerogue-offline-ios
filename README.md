@@ -103,8 +103,9 @@ All sandbox options:
 - **Unlock Starter on Select** permanently changes save data. Export your save before using it; disabling the option does not remove prior unlocks.
 - Futuba's literal **Pandemic** implementation is intentionally not included because it creates 5,000 Pokérus selections and UI cursors. **All Starters Have Pokérus** provides the deterministic result without that allocation.
 - **Infinite Player HP** acts at the shared HP-damage boundary, so direct hits,
-  recoil, drain, status/weather damage, Perish Song, OHKO moves, and
-  self-damage all finish their normal effect flow but deal zero actual damage.
+  confusion self-hits, recoil, drain, status/weather damage, Perish Song, OHKO
+  moves, and self-damage all finish their normal effect flow but deal zero
+  actual damage. It prevents new damage but does not heal HP already missing.
 - **Player OHKO** adds damage only after a move successfully produces positive
   damage. Cheat-added boss damage stops at the current shield, and a final-bar
   boss is left at 1 HP unless the move's original damage was naturally lethal.

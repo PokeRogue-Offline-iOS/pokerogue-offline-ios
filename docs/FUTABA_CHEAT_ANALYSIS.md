@@ -554,9 +554,9 @@ Select.
   starter, restart the app, confirm persistence, and confirm no candy/passive or
   alternate forms were granted.
 - [ ] Infinite Player HP: test both player slots in a double battle against
-  direct damage, OHKO moves, burn/poison/weather, Perish Song, recoil,
-  self-destruct, and draining moves; confirm actual damage remains zero and the
-  opponent versions remain normal.
+  direct damage, confusion self-hits loaded from an existing save, OHKO moves,
+  burn/poison/weather, Perish Song, recoil, self-destruct, and draining moves;
+  confirm actual damage remains zero and the opponent versions remain normal.
 - [ ] Infinite Player PP: test ordinary use, Pressure, Spite/Eerie Spell, and
   Grudge on multiple party members; apply PP Up/PP Max and confirm maximum PP
   still increases while enemy PP continues to decrease normally.

@@ -173,4 +173,31 @@ if (!moveSource.includes("Do not leave an orphaned delayed heal")) {
 }
 fs.writeFileSync(moveTarget, moveSource, "utf8");
 
+const tagsTarget = path.join("pokerogue-src", "src", "data", "battler-tags.ts");
+let tagsSource = readNormalized(tagsTarget);
+if (!tagsSource.includes('import { activeOverrides } from "#app/overrides";')) {
+  const anchor = 'import { getPokemonNameWithAffix } from "#app/messages";';
+  tagsSource = replaceRequired(
+    tagsSource,
+    anchor,
+    `${anchor}\nimport { activeOverrides } from "#app/overrides";`,
+    "the messages import in battler-tags.ts",
+  );
+}
+if (!tagsSource.includes("Infinite Player HP preserves the confusion effect")) {
+  const anchor = `      phaseManager.queueMessage(i18next.t("battlerTags:confusedLapseHurtItself"));
+      pokemon.damageAndUpdate(damage, { result: HitResult.CONFUSION });`;
+  tagsSource = replaceRequired(
+    tagsSource,
+    anchor,
+    `      phaseManager.queueMessage(i18next.t("battlerTags:confusedLapseHurtItself"));
+      // Infinite Player HP preserves the confusion effect and lost turn while
+      // forcing its self-hit to enter the damage animation as zero damage.
+      const appliedDamage = pokemon.isPlayer() && activeOverrides.INFINITE_PLAYER_HP_OVERRIDE ? 0 : damage;
+      pokemon.damageAndUpdate(appliedDamage, { result: HitResult.CONFUSION });`,
+    "ConfusedTag's self-damage application",
+  );
+}
+fs.writeFileSync(tagsTarget, tagsSource, "utf8");
+
 console.log("Infinite Player HP patch applied successfully.");
