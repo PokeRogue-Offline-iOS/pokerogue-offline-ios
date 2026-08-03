@@ -23,6 +23,14 @@ SilverShadow PokeRogue Offline is based on the PokeRogue Offline work by
 Scooom and its contributors. Thank you to its maintainers and community for
 the offline build and patching foundation used by this fork.
 
+The parent repository does not publish a general open-source license for its
+original content. Its July 31, 2026 notice specifically reserves all rights to
+patches/all/node/fix-daily-seed.js and prohibits that file's reuse without
+permission. That file is not included in this build. SilverShadow's Daily Run
+implementation uses patches/all/node/daily-run-seed.js, publishes seed data
+from this fork's own workflow and seed branch, and does not request seed data
+from the parent repository or Scooom's service.
+
 nx.js
 -----
 Project: https://github.com/TooTallNate/nx.js

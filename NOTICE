@@ -1,0 +1,46 @@
+SilverShadow PokeRogue Offline - Licensing and Provenance Notice
+================================================================
+
+Parent repository
+-----------------
+This project is a GitHub fork of:
+
+    https://github.com/PokeRogue-Offline/pokerogue-offline
+
+On July 31, 2026, that repository published commit
+71a93fa104ca7db487e5a6bc1e3fce5fd320b96f with a notice stating that it
+does not provide a general open-source license for its original content. The
+notice also states specifically that this parent-repository file is all rights
+reserved and may not be reused, redistributed, or included in another project
+without permission from Scooom:
+
+    patches/all/node/fix-daily-seed.js
+
+That restricted file is intentionally absent from this fork's current source
+tree and build inputs.
+
+SilverShadow Daily Run implementation
+-------------------------------------
+This fork implements Daily Run seed retrieval in these files:
+
+    .github/workflows/publish-daily-seed.yml
+    patches/all/node/daily-run-seed.js
+    new-files/src/system/offline/daily-run-seed.ts
+    new-files/test/tests/system/offline/daily-run-seed.test.ts
+
+The workflow requests the seed from the official PokeRogue API and publishes a
+dated JSON document to this fork's own seed branch. The game client requests
+that document from silvershadowkat/pokerogue-offline. It does not request seed
+data from PokeRogue-Offline/pokerogue-offline or from a service operated by
+Scooom.
+
+Other components
+----------------
+The game source patched at build time comes from pagefaultgames/pokerogue.
+That project publishes file-level licensing information and licenses its game
+source under the GNU Affero General Public License v3.0-only unless otherwise
+noted. Platform packages include their applicable license texts and third-party
+notices.
+
+This notice records provenance and upstream restrictions. It does not grant
+new rights to third-party material and is not a substitute for legal advice.

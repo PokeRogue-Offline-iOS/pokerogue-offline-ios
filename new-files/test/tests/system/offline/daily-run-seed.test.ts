@@ -34,12 +34,16 @@ describe("System - Offline - daily-run-seed", () => {
 
   it("validates and caches this fork's dated seed feed", async () => {
     const storage = installStorage();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ date: "2026-07-31", seed: "official-seed" }))),
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ date: "2026-07-31", seed: "official-seed" })),
     );
+    vi.stubGlobal("fetch", fetchMock);
 
     await expect(refreshDailyRunSeed(new Date("2026-07-31T12:00:00Z"))).resolves.toBe("official-seed");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/silvershadowkat/pokerogue-offline/seed/docs/daily-seed.json",
+      expect.objectContaining({ cache: "no-store" }),
+    );
     expect(storage.get(DAILY_SEED_STORAGE_KEYS.date)).toBe("2026-07-31");
     expect(storage.get(DAILY_SEED_STORAGE_KEYS.seed)).toBe("official-seed");
     expect(Number(storage.get(DAILY_SEED_STORAGE_KEYS.fetchedAt))).toBeGreaterThan(0);

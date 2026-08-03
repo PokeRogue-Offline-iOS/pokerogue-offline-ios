@@ -79,42 +79,50 @@ source = source.replace(
   `import { createOfflineDailySeed, getDailyRunSeed } from "#system/offline/daily-run-seed";\n${voucherImport}`,
 );
 
-const offlineSeedPattern = /([ \t]*\} else \{\n(?:[ \t]*\/\/[^\n]*\n)*[ \t]*let seed[^\n]*btoa\(new Date[\s\S]*?generateDaily\(seed\);\n[ \t]*\})/;
-const match = source.match(offlineSeedPattern);
+// Match the pinned pagefaultgames/pokerogue source text directly. This avoids
+// carrying over code or matching logic from PokeRogue-Offline's restricted
+// fix-daily-seed.js patch.
+const originalOfflineBranch = `      } else {
+        // Grab first 10 chars of ISO date format (YYYY-MM-DD) and convert to base64
+        let seed: string = btoa(new Date().toISOString().slice(0, 10));
+        if (activeOverrides.DAILY_RUN_SEED_OVERRIDE != null) {
+          seed =
+            typeof activeOverrides.DAILY_RUN_SEED_OVERRIDE === "string"
+              ? activeOverrides.DAILY_RUN_SEED_OVERRIDE
+              : JSON.stringify(activeOverrides.DAILY_RUN_SEED_OVERRIDE);
+        }
+        generateDaily(seed);
+      }`;
 
-if (!match) {
-  fail("Could not find the offline Daily Run seed block in title-phase.ts");
+if (!source.includes(originalOfflineBranch)) {
+  fail("Could not find the pinned offline Daily Run branch in title-phase.ts");
 }
 
-const indent = match[1].match(/^([ \t]*)/)[1];
-const bodyIndent = `${indent}  `;
-const continuationIndent = `${bodyIndent}  `;
+const silverOfflineBranch = `      } else {
+        // silver-daily-seed: prefer this fork's independently published live seed.
+        if (activeOverrides.DAILY_RUN_SEED_OVERRIDE != null) {
+          const seed =
+            typeof activeOverrides.DAILY_RUN_SEED_OVERRIDE === "string"
+              ? activeOverrides.DAILY_RUN_SEED_OVERRIDE
+              : JSON.stringify(activeOverrides.DAILY_RUN_SEED_OVERRIDE);
+          generateDaily(seed);
+          return;
+        }
 
-const replacement = `${indent}} else {
-${bodyIndent}// silver-daily-seed: prefer this fork's independently published live seed.
-${bodyIndent}if (activeOverrides.DAILY_RUN_SEED_OVERRIDE != null) {
-${continuationIndent}const seed =
-${continuationIndent}  typeof activeOverrides.DAILY_RUN_SEED_OVERRIDE === "string"
-${continuationIndent}    ? activeOverrides.DAILY_RUN_SEED_OVERRIDE
-${continuationIndent}    : JSON.stringify(activeOverrides.DAILY_RUN_SEED_OVERRIDE);
-${continuationIndent}generateDaily(seed);
-${continuationIndent}return;
-${bodyIndent}}
+        globalScene.ui.setMode(UiMode.MESSAGE);
+        globalScene.ui.showText("Fetching daily seed...", null, null, null, true);
+        getDailyRunSeed()
+          .catch(error => {
+            console.warn("Live Daily Run seed unavailable; using the offline seed.", error);
+            return createOfflineDailySeed();
+          })
+          .then(seed => {
+            globalScene.ui.clearText();
+            generateDaily(seed);
+          });
+      }`;
 
-${bodyIndent}globalScene.ui.setMode(UiMode.MESSAGE);
-${bodyIndent}globalScene.ui.showText("Fetching daily seed...", null, null, null, true);
-${bodyIndent}getDailyRunSeed()
-${continuationIndent}.catch(error => {
-${continuationIndent}  console.warn("Live Daily Run seed unavailable; using the offline seed.", error);
-${continuationIndent}  return createOfflineDailySeed();
-${continuationIndent}})
-${continuationIndent}.then(seed => {
-${continuationIndent}  globalScene.ui.clearText();
-${continuationIndent}  generateDaily(seed);
-${continuationIndent}});
-${indent}}`;
-
-source = source.replace(match[1], replacement);
+source = source.replace(originalOfflineBranch, silverOfflineBranch);
 fs.writeFileSync(titlePhasePath, source, "utf8");
 
 console.log(`Written: ${helperTargetPath}`);
