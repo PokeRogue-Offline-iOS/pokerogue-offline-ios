@@ -10,7 +10,9 @@ Then run from the patched PokéRogue source:
 
 ```bash
 pnpm exec vitest run test/tests/system/touch-controls/silvershadow-touch-input.test.ts
-pnpm biome:ci src/system/touch-controls/silvershadow-touch-input.ts test/tests/system/touch-controls/silvershadow-touch-input.test.ts src/touch-controls.ts
+pnpm exec vitest run test/tests/system/touch-controls/silvershadow-dpad-visual.test.ts
+pnpm exec vitest run test/tests/system/touch-controls/silvershadow-touch-visual-integration.test.ts
+pnpm biome:ci src/system/touch-controls test/tests/system/touch-controls src/touch-controls.ts
 pnpm typecheck
 VITE_BYPASS_LOGIN=1 pnpm build:app
 ```
@@ -20,6 +22,15 @@ vertical dominance, the equal-axis boundary, neutral-to-direction,
 direction-to-direction, direction-to-neutral, duplicate moves, D-pad ownership,
 up/cancel cleanup, simultaneous D-pad/action input, independent action pointers,
 shared-action hold counts, and visibility-loss-style reset.
+
+The visual-pose tests cover exact center, neutral micro-movement, continuously
+increasing tilt, maximum clamping, outside-artwork pointers, four cardinals,
+diagonal leaning, symmetry, invalid dimensions, finite output, smoothstep
+endpoints, and monotonic distance-to-tilt response. The integration contract
+checks stable geometry, frame coalescing, cleanup resets, redundant artwork
+suppression, independent button classes, D-pad/button coexistence, auto-hide,
+configuration mode, reduced motion, fallback markup, current mappings, and the
+Start display label.
 
 ## Android device setup
 
@@ -62,12 +73,55 @@ default-position tests.
 14. Connect and use a physical controller, then use keyboard input on a desktop
     build if available. Confirm neither behavior changed.
 
+## Rocking D-pad device checklist
+
+1. Touch exact center: no game movement; neutral state; level or nearly level face.
+2. Move slightly within neutral: tiny rock; no game input or full red accent.
+3. Continue outward: the cardinal direction activates and tilt increases smoothly.
+4. Move farther: tilt grows progressively but remains capped.
+5. Circle around the D-pad: the face rocks continuously while game input stays cardinal-only.
+6. Hold near a diagonal: both visual axes lean while only one digital direction is active.
+7. Move beyond the artwork: tilt remains capped and ownership stays stable.
+8. Release or cancel: input releases and the face returns smoothly to level.
+
+## Action-button device checklist
+
+9. Press every currently visible button individually; confirm the correct action and matching depressed visual.
+10. Hold two buttons; both visuals and supported inputs remain active.
+11. Hold three buttons; each visual state remains independent.
+12. Release one of several held buttons; only that button returns to idle.
+13. Hold the D-pad plus one, two, and three buttons; rocking and all pressed states coexist.
+14. Slide off a button; existing pointer semantics remain unchanged and no visual sticks.
+15. Cancel or lose capture; input and the pressed visual both reset.
+
+The contextual set includes A, B, F, R, C, G, E, N, V, info/stats controls,
+and Start (`MENU`). Speed Up and Slow Down are documented future controls and
+are not expected in this build.
+
+## Lifecycle, layout, and performance checklist
+
+16. Open the notification shade while holding controls.
+17. Open the app switcher while holding controls.
+18. Lock and unlock the screen while holding controls.
+19. Rotate orientation during or immediately after input.
+20. Enter and leave Move Touch Controls; the D-pad remains level while dragging.
+21. Wait for the two-second auto-hide; no tilt or glow remains.
+22. Wake hidden D-pad and action controls with the first touch; that touch activates them.
+23. Verify saved positions in portrait and landscape.
+24. Verify translucency and labels on bright and dark scenes.
+25. Rapidly circle the D-pad while multi-button tapping; look for frame drops or delayed input.
+
+Expected throughout: no stuck direction, button, tilt, or glow; no noticeable
+gameplay slowdown; cardinal indication remains clear; and controls remain
+translucent and readable. Repeat with reduced motion enabled and confirm visual
+states remain clear even though interpolation is immediate.
+
 ## Regression and fallback checks
 
 - Temporarily rename the copied neutral D-pad image in a local test build.
   Confirm the original inline SVG controls become visible and usable instead
   of leaving a dead overlay.
-- Confirm A/B and context-specific Menu, Stats, cycle, and settings-tab buttons
+- Confirm A/B and context-specific Start (`MENU`), Stats, cycle, and settings-tab buttons
   still appear only on their existing UI modes.
 - Confirm customized portrait/landscape positions continue to load and save.
 - Confirm action and D-pad hit slop does not visibly enlarge any artwork or

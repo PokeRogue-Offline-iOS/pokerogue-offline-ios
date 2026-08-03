@@ -2,10 +2,16 @@
 
 ## Scope
 
-This first pass adapts the proven continuous D-pad behavior from Gen1Recomp's
-`dev` branch at reference commit `8e5501a`. It changes only the on-screen touch
-input layer. Keyboard, physical-controller, PokéRogue UI, and gameplay logic
-continue to use their existing paths.
+The first pass adapted the continuous D-pad behavior from Gen1Recomp's `dev`
+branch at reference commit `8e5501a`. That digital input foundation was then
+hardware-tested successfully on Android: continuous sliding, center neutral,
+cardinal resolution, pointer ownership, D-pad plus action input, and independent
+multi-touch action buttons all worked without a known input regression.
+
+The second pass preserves that proven input code and adds a visual-only rocking
+pose plus a unified SilverShadow material for the D-pad and every existing
+contextual action button. Keyboard, physical-controller, PokéRogue UI, and
+gameplay logic continue to use their existing paths.
 
 The reference files reviewed were:
 
@@ -68,11 +74,109 @@ The game-facing repeat interval remains PokéRogue's existing 250 ms. The
 overlay continues to emit `controller_type: "keyboard"` and `isTouch: true` so
 no gameplay contract or binding logic changes.
 
+## Rocking architecture
+
+Digital resolution remains unchanged:
+
+```text
+pointer coordinates
+  -> SilverShadowTouchInputState
+  -> cardinal direction or neutral
+  -> existing PokéRogue input events
+```
+
+Rocking is a separate visual-only path:
+
+```text
+raw pointer coordinates
+  -> calculateDpadVisualPose
+  -> latest-pose requestAnimationFrame scheduler
+  -> CSS custom properties
+  -> transformed #dpadPivot
+```
+
+`#dpad` remains the full stable hit region. The stationary `#dpadGeometry`
+wrapper is 84% of that region and is the only element measured by
+`getBoundingClientRect()`. Its descendants are `#dpadVisual`, a stationary
+`#dpadSocket`, a translated `#dpadShadow`, and the transformed `#dpadPivot`
+containing `#dpadFace`. The pivot and face are never used for input geometry.
+All decorative descendants have `pointer-events: none`.
+
+The cross-shaped face is an inline, resolution-independent SVG. It uses a dark
+charcoal base, restrained silver edge and groove, a raised center cap, and four
+red directional accent strokes. Only the accent matching the existing cardinal
+resolver becomes fully visible. Diagonal finger positions may tilt both axes,
+but still emit exactly one cardinal direction.
+
+## Visual-pose calculation and constants
+
+`silvershadow-dpad-visual.ts` computes distance from the stable center using
+`hypot(dx, dy)`, divides it by half the visible width, and clamps the result to
+0..1. Direction is the raw normalized displacement. A clamped smoothstep curve,
+`t * t * (3 - 2 * t)`, maps distance to tilt, shadow displacement, and scale
+compression. This gives near-level motion close to center, moderate motion at
+half radius, and the maximum pose at the edge without overshoot outside it.
+
+Named TypeScript constants:
+
+- Maximum active tilt: `6deg`
+- Maximum digitally-neutral micro-tilt: `0.75deg`
+- Maximum shadow offset: `2.5px`
+- Maximum scale compression: `1%`
+
+Named CSS constants:
+
+- Perspective: `460px`
+- Active movement response: `42ms`
+- Release-to-level duration: `120ms`
+- Button press duration: `45ms`
+- Button release duration: `80ms`
+- Button pressed scale: `0.97`
+- Button pressed translation: `1px`
+
+CSS rotation signs are documented in the pose module: upward DOM displacement
+produces positive `rotateX`, and rightward displacement produces positive
+`rotateY`, so the touched arm visually sinks.
+
+Pointer movement only replaces the pending target pose. A frame is requested
+only when none is already pending, applies the newest pose, and then clears its
+ID. There is no idle or permanent animation loop.
+
+## Unified SilverShadow visual system
+
+Shared CSS tokens define the material and timing:
+
+- `--ss-control-idle-opacity: 0.3`
+- `--ss-control-neutral-opacity: 0.4`
+- `--ss-control-active-opacity: 0.58`
+- `--ss-control-face` and `--ss-control-face-raised`: charcoal layers
+- `--ss-control-edge` and `--ss-control-edge-muted`: silver edging
+- `--ss-control-accent`: restrained SilverShadow red
+- `--ss-control-shadow`: compact local shadow
+- `--ss-control-label`: high-contrast label color
+- shared press/release duration tokens listed above
+
+Every existing `.apad-button` keeps its original DOM node, mapping, position,
+hit region, pointer capture, and independent active class. CSS supplies a dark
+translucent face, silver outer and inner rings, local depth shading, and a red
+pressed edge. Pressing a button changes only that node's `active` class, so two
+or three simultaneous buttons remain visually independent. Release of one
+pointer removes its visual only when no other pointer still owns that same
+button.
+
+The existing A, B, F, R, C, G, E, N, V, information/statistics, and menu
+contexts are all styled through the shared class. The visible `Menu` label is
+now `Start`, while its `MENU` mapping and behavior are unchanged. Speed Up and
+Slow Down are not present in the current touch DOM and are intentionally
+deferred; they are the two known controls needed for the expected future
+13-control set and must receive explicit mappings before being added.
+
 ## Visuals and hit regions
 
-The five D-pad images are the CC0 Xelu assets already used by Gen1Recomp. The
-visible neutral art uses 30% opacity; an active directional image uses 55%.
-Existing PokéRogue action buttons use the same 30% idle / 55% active baseline.
+The five D-pad images are the CC0 Xelu assets already used by Gen1Recomp. They
+remain as fallback artwork. The primary SVG D-pad uses 30% idle, 40% captured
+but digitally neutral, and 58% active opacity. Action buttons use the same 30%
+idle and 58% active philosophy.
 
 The D-pad pointer region keeps the existing full `2 * --controls-size` square,
 while the visible art is 84% of that square. The resolver's 16% dead zone is
@@ -80,21 +184,35 @@ based on visible art width, not the larger hit region. Action buttons gain 15%
 invisible hit slop on each edge through a pseudo-element; their visible size is
 unchanged.
 
-To temporarily tune opacity during development, edit the `0.3` and `0.55`
-values in the SilverShadow block injected into `index.css` by
+To tune opacity during development, edit the three shared opacity tokens in the
+SilverShadow block injected into `index.css` by
 `patches/all/node/silvershadow-touch-controls.js`.
 
 ## Lifecycle and fallback
 
 Pointer-up, pointer-cancel, and lost pointer capture release their pointer.
 Document visibility loss, window blur, page hide, `InputsController.loseFocus`,
-control disablement, an overlay-visible-to-hidden transition, Phaser scene
-shutdown, and Phaser scene destruction release every held touch input.
+orientation change, control disablement, an overlay-visible-to-hidden
+transition, configuration mode, Phaser scene shutdown, and Phaser scene
+destruction release every held touch input and return the face to level.
+Auto-hide clears transient visual state before fading while leaving hit regions
+available for the first waking touch.
+
+`prefers-reduced-motion: reduce` changes all visual transitions to zero
+duration. Cardinal accents, opacity changes, labels, pointer ownership, and
+digital input remain active.
 
 The enhanced path uses Pointer Events and pointer capture. If Pointer Events,
 the expected DOM nodes, or the neutral artwork are unavailable, the enhancement
 removes its CSS class and binds the preserved upstream SVG/isolated-button
-listeners. The original SVG remains in `index.html` as that fallback.
+listeners. If only the layered visual structure is unavailable, enhanced input
+continues with the flat Gen1Recomp images and existing button visuals. The
+original upstream SVG remains in `index.html` as the final fallback.
+
+Performance is limited to local transforms and opacity: cached element
+references, one coalesced animation frame for D-pad movement, no permanent
+loop, no Phaser-canvas changes, no blur filter, no large shadow, no layout
+animation, and button writes only when pressed state changes.
 
 ## SilverShadow patch layout
 
@@ -105,10 +223,11 @@ Patch order in `scripts/apply-patches.sh` is:
 3. `silvershadow-touch-controls.js`
 4. `sandbox-economy-settings.js`
 
-The new touch patch copies the pure source module, its test, and five images
-from `new-files/`, then patches `src/touch-controls.ts`, `index.html`, and
-`index.css`. Required paths and upstream/preceding-patch anchors are checked;
-missing or duplicated anchors terminate patching with a clear error.
+The touch patch copies both pure source modules, their tests, an integration
+contract test, and five fallback images from `new-files/`, then patches
+`src/touch-controls.ts`, `index.html`, and `index.css`. Required paths and
+upstream/preceding-patch anchors are checked; missing or duplicated anchors
+terminate patching with a clear error.
 
 ## License compliance
 
@@ -118,12 +237,13 @@ public-domain artwork notice. Only the five required D-pad images were copied.
 
 ## Known differences and future work
 
-This baseline keeps PokéRogue's existing action-button art, layout editor,
-repeat timing, settings, and input event contract. It does not port
-Gen1Recomp's launcher editor, size range, orientation-specific scale setting,
-START/SELECT art, or controller-driven overlay hiding.
+This iteration keeps PokéRogue's existing layout editor, repeat timing,
+settings, and input event contract. It does not port Gen1Recomp's launcher
+editor, size range, orientation-specific scale setting, or controller-driven
+overlay hiding. The browser cannot infer CSS failure reliably; therefore the
+flat and upstream fallback layers remain in markup and are selected when the
+rocking layer cannot initialize.
 
-Potential later additions include optional haptics, directional hysteresis,
-custom SilverShadow artwork, pressed animations, per-control sizing, richer
-layout customization, and expanded device/accessibility settings. Those are
-intentionally excluded until this pointer/lifecycle baseline is hardware-tested.
+Potential later additions include explicitly mapped Speed Up and Slow Down
+touch controls, optional haptics, directional hysteresis, per-control sizing,
+richer layout customization, and expanded device/accessibility settings.
