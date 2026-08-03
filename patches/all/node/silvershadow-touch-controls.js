@@ -59,6 +59,12 @@ const visualHelperRelativePath = path.join(
   "touch-controls",
   "silvershadow-dpad-visual.ts",
 );
+const hapticsHelperRelativePath = path.join(
+  "src",
+  "system",
+  "touch-controls",
+  "silvershadow-touch-haptics.ts",
+);
 const testRelativePath = path.join(
   "test",
   "tests",
@@ -80,6 +86,13 @@ const visualIntegrationTestRelativePath = path.join(
   "touch-controls",
   "silvershadow-touch-visual-integration.test.ts",
 );
+const hapticsTestRelativePath = path.join(
+  "test",
+  "tests",
+  "system",
+  "touch-controls",
+  "silvershadow-touch-haptics.test.ts",
+);
 
 copyRequired(
   path.join(repositoryRoot, "new-files", helperRelativePath),
@@ -100,6 +113,14 @@ copyRequired(
 copyRequired(
   path.join(repositoryRoot, "new-files", visualIntegrationTestRelativePath),
   path.join("pokerogue-src", visualIntegrationTestRelativePath),
+);
+copyRequired(
+  path.join(repositoryRoot, "new-files", hapticsHelperRelativePath),
+  path.join("pokerogue-src", hapticsHelperRelativePath),
+);
+copyRequired(
+  path.join(repositoryRoot, "new-files", hapticsTestRelativePath),
+  path.join("pokerogue-src", hapticsTestRelativePath),
 );
 
 const dpadAssets = [
@@ -123,6 +144,7 @@ let touchSource = readFile(touchControlsPath);
 const silverImports = [
   `import type { DpadVisualPose } from "#system/touch-controls/silvershadow-dpad-visual";`,
   `import { calculateDpadVisualPose } from "#system/touch-controls/silvershadow-dpad-visual";`,
+  `import { SilverShadowTouchHaptics } from "#system/touch-controls/silvershadow-touch-haptics";`,
   `import { SilverShadowTouchInputState } from "#system/touch-controls/silvershadow-touch-input";`,
 ];
 if (!silverImports.every(silverImport => touchSource.includes(silverImport))) {
@@ -169,10 +191,16 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
   private readonly legacyInputIntervals = new Map<string, ReturnType<typeof setInterval>>();
   private readonly enhancedInputIntervals = new Map<string, ReturnType<typeof setInterval>>();
   private readonly actionPointerNodes = new Map<number, HTMLElement>();
-  private readonly touchState = new SilverShadowTouchInputState({
-    press: key => this.pressEnhancedKey(key),
-    release: key => this.releaseEnhancedKey(key),
+  private readonly touchHaptics = new SilverShadowTouchHaptics({
+    isEnabled: () => globalScene.enableVibration,
   });
+  private readonly touchState = new SilverShadowTouchInputState(
+    {
+      press: key => this.pressEnhancedKey(key),
+      release: key => this.releaseEnhancedKey(key),
+    },
+    this.touchHaptics,
+  );
   private enhancedAbortController: AbortController | null = null;
   private readonly lifecycleAbortController = new AbortController();
   private fallbackInitialized = false;
@@ -408,7 +436,7 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
         centerX: geometryRect.left + geometryRect.width / 2,
         centerY: geometryRect.top + geometryRect.height / 2,
         // Keep the hardware-proven dead-zone geometry at 84% even though the
-        // stationary artwork wrapper is now a slightly larger 88%.
+        // stationary artwork wrapper is now a larger 96%.
         inputWidth: hitRect.width * TouchControl.dpadInputWidthRatio,
         visualWidth: geometryRect.width,
       };
@@ -577,6 +605,7 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
     if (this.legacyButtonLock.has(key) || !this.emitTouchInput("input_down", key)) {
       return;
     }
+    this.touchHaptics.trigger(["UP", "RIGHT", "DOWN", "LEFT"].includes(key) ? "direction-change" : "button-press");
     const previous = this.legacyInputIntervals.get(key);
     if (previous) {
       clearInterval(previous);
@@ -618,6 +647,7 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
       controller_type: "keyboard",
       button: Button[key],
       isTouch: true,
+      silverShadowHapticHandled: true,
     });
     return true;
   }
@@ -771,6 +801,50 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
 
 writeFile(touchControlsPath, touchSource);
 
+// SilverShadow already delivers one accepted-transition haptic. Suppress only
+// the older UI-direction vibration for those events so a touch never doubles.
+const uiInputsPath = path.join("pokerogue-src", "src", "ui-inputs.ts");
+let uiInputsSource = readFile(uiInputsPath);
+if (!uiInputsSource.includes("silverShadowHapticHandled")) {
+  uiInputsSource = replaceRequired(
+    uiInputsSource,
+    "  private inputsController: InputsController;",
+    "  private inputsController: InputsController;\n  private silverShadowHapticHandled = false;",
+    "UiInputs field anchor in src/ui-inputs.ts",
+  );
+  uiInputsSource = replaceRequired(
+    uiInputsSource,
+    `        const actions = this.getActionsKeyDown();
+        if (!Object.hasOwn(actions, event.button)) {
+          return;
+        }
+        actions[event.button]();`,
+    `        const actions = this.getActionsKeyDown();
+        if (!Object.hasOwn(actions, event.button)) {
+          return;
+        }
+        this.silverShadowHapticHandled = event.silverShadowHapticHandled === true;
+        try {
+          actions[event.button]();
+        } finally {
+          this.silverShadowHapticHandled = false;
+        }`,
+    "input-down dispatch in src/ui-inputs.ts",
+  );
+  uiInputsSource = replaceRequired(
+    uiInputsSource,
+    `if (inputSuccess && globalScene.enableVibration && typeof navigator.vibrate !== "undefined")`,
+    `if (
+      inputSuccess
+      && globalScene.enableVibration
+      && !this.silverShadowHapticHandled
+      && typeof navigator.vibrate !== "undefined"
+    )`,
+    "legacy UI vibration condition in src/ui-inputs.ts",
+  );
+}
+writeFile(uiInputsPath, uiInputsSource);
+
 const htmlPath = path.join("pokerogue-src", "index.html");
 let htmlSource = readFile(htmlPath);
 if (!htmlSource.includes('id="dpadArtwork"')) {
@@ -785,6 +859,7 @@ if (!htmlSource.includes('id="dpadArtwork"')) {
 \t\t\t\t\t\t\t\t\t<svg viewBox="0 0 100 100" focusable="false">
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-face-base" d="M38 4Q34 4 34 8V34H8Q4 34 4 38V62Q4 66 8 66H34V92Q34 96 38 96H62Q66 96 66 92V66H92Q96 66 96 62V38Q96 34 92 34H66V8Q66 4 62 4Z" />
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-face-edge" d="M38 4Q34 4 34 8V34H8Q4 34 4 38V62Q4 66 8 66H34V92Q34 96 38 96H62Q66 96 66 92V66H92Q96 66 96 62V38Q96 34 92 34H66V8Q66 4 62 4Z" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-face-highlight" d="M38 4Q34 4 34 8V34H8Q4 34 4 38V62Q4 66 8 66H34V92Q34 96 38 96H62Q66 96 66 92V66H92Q96 66 96 62V38Q96 34 92 34H66V8Q66 4 62 4Z" />
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-groove" d="M40 12H60V40H88V60H60V88H40V60H12V40H40Z" />
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-halo ss-dpad-accent-up" d="M42 20L50 12L58 20" />
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-core ss-dpad-accent-up" d="M42 20L50 12L58 20" />
@@ -839,12 +914,13 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   --ss-control-face-raised: rgba(37, 41, 48, 0.9);
   --ss-control-edge: rgba(221, 228, 237, 0.82);
   --ss-control-edge-muted: rgba(221, 228, 237, 0.48);
+  --ss-control-socket-edge: rgba(221, 228, 237, 0.2);
   --ss-control-accent: rgb(240, 44, 62);
   --ss-control-shadow: rgba(0, 0, 0, 0.62);
   --ss-control-label: rgba(248, 249, 252, 0.98);
   --ss-control-press-duration: 45ms;
   --ss-control-release-duration: 80ms;
-  --dpad-perspective: 460px;
+  --dpad-perspective: 430px;
   --dpad-movement-duration: 38ms;
   --dpad-release-duration: 115ms;
 }
@@ -870,8 +946,8 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
 /* Flat Gen1Recomp image remains available if the layered visual cannot initialize. */
 #touchControls.silvershadow-touch-upgrade #dpadArtwork {
   display: block;
-  width: 88%;
-  height: 88%;
+  width: 96%;
+  height: 96%;
   object-fit: contain;
   opacity: var(--ss-control-idle-opacity);
   pointer-events: none;
@@ -885,12 +961,12 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   opacity: var(--ss-control-active-opacity);
 }
 
-/* Stable 88% visual geometry wrapper: digital input still uses its proven 84%. */
+/* Stable 96% visual geometry wrapper: digital input still uses its proven 84%. */
 #touchControls.silvershadow-rocking-visuals #dpadGeometry {
   position: relative;
   display: block;
-  width: 88%;
-  height: 88%;
+  width: 96%;
+  height: 96%;
   pointer-events: none;
 }
 
@@ -923,15 +999,21 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   opacity: var(--ss-control-active-opacity);
 }
 
-#dpadSocket,
 #dpadShadow,
 #dpadPivot {
   position: absolute;
   inset: 4%;
 }
 
-#dpadSocket::before,
-#dpadSocket::after,
+#dpadSocket {
+  position: absolute;
+  inset: 11%;
+  box-sizing: border-box;
+  border: 1px solid var(--ss-control-socket-edge);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(3, 4, 6, 0.5) 0 34%, rgba(3, 4, 6, 0.28) 52%, transparent 72%);
+}
+
 #dpadShadow::before,
 #dpadShadow::after {
   position: absolute;
@@ -940,7 +1022,6 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   border-radius: 8%;
 }
 
-#dpadSocket::before,
 #dpadShadow::before {
   top: 0;
   left: 34%;
@@ -948,18 +1029,11 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   height: 100%;
 }
 
-#dpadSocket::after,
 #dpadShadow::after {
   top: 34%;
   left: 0;
   width: 100%;
   height: 32%;
-}
-
-#dpadSocket::before,
-#dpadSocket::after {
-  background: rgba(3, 4, 6, 0.48);
-  border: 1px solid var(--ss-control-edge-muted);
 }
 
 #dpadShadow {
@@ -1004,7 +1078,14 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
 .ss-dpad-face-edge {
   fill: none;
   stroke: var(--ss-control-edge);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
+}
+
+.ss-dpad-face-highlight {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-width: 0.65;
+  transform: translate(-0.5px, -0.7px);
 }
 
 .ss-dpad-groove {

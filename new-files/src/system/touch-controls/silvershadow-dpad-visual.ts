@@ -31,10 +31,10 @@ export interface DpadVisualConfig {
  * timings are CSS tokens because they do not participate in pose calculation.
  */
 export const SILVERSHADOW_DPAD_VISUAL_DEFAULTS: Readonly<DpadVisualConfig> = Object.freeze({
-  maximumTiltDegrees: 7.5,
-  maximumNeutralTiltDegrees: 0.9,
-  maximumShadowOffsetPx: 3.25,
-  maximumCompressionRatio: 0.012,
+  maximumTiltDegrees: 8.5,
+  maximumNeutralTiltDegrees: 1,
+  maximumShadowOffsetPx: 4,
+  maximumCompressionRatio: 0.014,
   maximumLightStrength: 1,
   neutralLightMaximum: 0.12,
   primaryLightFloor: 0.72,

@@ -63,10 +63,10 @@ describe("System - Touch controls - D-pad visual pose", () => {
   });
 
   it.each([
-    [0, -50, 7.5, 0],
-    [0, 50, -7.5, 0],
-    [-50, 0, 0, -7.5],
-    [50, 0, 0, 7.5],
+    [0, -50, 8.5, 0],
+    [0, 50, -8.5, 0],
+    [-50, 0, 0, -8.5],
+    [50, 0, 0, 8.5],
   ] as const)("maps cardinal displacement (%s, %s) to tilt (%s, %s)", (dx, dy, tiltX, tiltY) => {
     const pose = calculateDpadVisualPose(dx, dy, width, "UP");
     expect(pose.tiltXDegrees).toBeCloseTo(tiltX);

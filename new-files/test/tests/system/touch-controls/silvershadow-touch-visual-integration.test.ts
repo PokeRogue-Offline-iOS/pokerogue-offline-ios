@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 const runtime = readFileSync("src/touch-controls.ts", "utf8");
 const markup = readFileSync("index.html", "utf8");
 const styles = readFileSync("index.css", "utf8");
+const uiInputs = readFileSync("src/ui-inputs.ts", "utf8");
+const settings = readFileSync("src/system/settings/settings.ts", "utf8");
+const gameData = readFileSync("src/system/game-data.ts", "utf8");
 
 describe("System - Touch controls - visual integration contract", () => {
   it("keeps geometry stationary and never measures transformed artwork", () => {
@@ -15,6 +18,8 @@ describe("System - Touch controls - visual integration contract", () => {
     expect(runtime).not.toContain("this.dpadVisual?.getBoundingClientRect()");
     expect(markup.indexOf('id="dpadGeometry"')).toBeLessThan(markup.indexOf('id="dpadPivot"'));
     expect(styles).toContain("#touchControls.silvershadow-rocking-visuals #dpadGeometry");
+    expect(styles).toContain("width: 96%");
+    expect(styles).toContain("Stable 96% visual geometry wrapper");
   });
 
   it("coalesces pointer movement into a single pending animation frame", () => {
@@ -63,6 +68,16 @@ describe("System - Touch controls - visual integration contract", () => {
     expect(styles).toContain("opacity: var(--ss-dpad-light-strength)");
   });
 
+  it("keeps the proven chevrons unchanged while moving the clearer face outline", () => {
+    for (const path of ["M42 20L50 12L58 20", "M80 42L88 50L80 58", "M42 80L50 88L58 80", "M20 42L12 50L20 58"]) {
+      expect(markup.match(new RegExp(path, "g"))).toHaveLength(2);
+    }
+    expect(markup.indexOf('class="ss-dpad-face-highlight"')).toBeGreaterThan(markup.indexOf('id="dpadPivot"'));
+    expect(styles).toContain("--ss-control-socket-edge");
+    expect(styles).toContain("#dpadSocket {");
+    expect(styles).not.toContain("#dpadSocket::before");
+  });
+
   it("clears transient state for auto-hide and configuration mode", () => {
     expect(runtime).toContain("this.resetTransientTouchVisuals()");
     expect(runtime).toContain("if (isConfigMode)");
@@ -94,6 +109,40 @@ describe("System - Touch controls - visual integration contract", () => {
     }
     expect(markup).toContain('<div id="apadMenu" class="apad-button apad-rectangle apad-small" data-key="MENU">');
     expect(markup).toContain('<span class="apad-label">Start</span>');
+  });
+
+  it("routes every existing independent action node through accepted-pointer haptics", () => {
+    const buttonIds = [
+      "apadAction",
+      "apadCancel",
+      "apadPreviousTab",
+      "apadNextTab",
+      "apadOpenFilters",
+      "apadMenu",
+      "apadCycleForm",
+      "apadCycleGender",
+      "apadCycleShiny",
+      "apadCycleAbility",
+      "apadCycleNature",
+      "apadCycleTera",
+      "apadInfo",
+      "apadStats",
+    ];
+    for (const id of buttonIds) {
+      expect(markup).toMatch(new RegExp(`id="${id}"[^>]+data-key="[A-Z_]+"`));
+    }
+    expect(runtime).toContain('document.querySelectorAll("[data-key]")');
+    expect(runtime).toContain("this.touchState.pressAction(event.pointerId, key)");
+    expect(runtime).toContain("silverShadowHapticHandled: true");
+    expect(uiInputs).toContain("!this.silverShadowHapticHandled");
+  });
+
+  it("uses the existing immediate and persisted vibration setting", () => {
+    expect(settings).toContain("key: SettingKeys.Vibration");
+    expect(settings).toContain('globalScene.enableVibration = Setting[index].options[value].value !== "Disabled"');
+    expect(gameData).toContain("this.loadSettings()");
+    expect(gameData).toContain("public saveSetting(setting: string, valueIndex: number)");
+    expect(runtime).toContain("isEnabled: () => globalScene.enableVibration");
   });
 
   it("retains active indication with reduced motion", () => {

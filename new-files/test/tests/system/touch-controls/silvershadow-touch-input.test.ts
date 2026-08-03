@@ -43,12 +43,14 @@ describe("System - Touch controls - direction resolver", () => {
 describe("System - Touch controls - multi-pointer state", () => {
   const press = vi.fn<(key: string) => void>();
   const release = vi.fn<(key: string) => void>();
+  const triggerHaptic = vi.fn<(kind: "direction-change" | "button-press") => void>();
   let state: SilverShadowTouchInputState;
 
   beforeEach(() => {
     press.mockReset();
     release.mockReset();
-    state = new SilverShadowTouchInputState({ press, release });
+    triggerHaptic.mockReset();
+    state = new SilverShadowTouchInputState({ press, release }, { trigger: triggerHaptic });
   });
 
   it("captures a neutral pointer and activates after sliding", () => {
@@ -60,6 +62,7 @@ describe("System - Touch controls - multi-pointer state", () => {
     state.moveDpad(1, 90, 50, 50, 50, 100);
     expect(state.activeDirection).toBe("RIGHT");
     expect(press).toHaveBeenCalledWith("RIGHT");
+    expect(triggerHaptic).toHaveBeenCalledExactlyOnceWith("direction-change");
   });
 
   it("releases then presses when sliding direction-to-direction", () => {
@@ -68,6 +71,7 @@ describe("System - Touch controls - multi-pointer state", () => {
 
     expect(press.mock.calls).toEqual([["RIGHT"], ["UP"]]);
     expect(release.mock.calls).toEqual([["RIGHT"]]);
+    expect(triggerHaptic.mock.calls).toEqual([["direction-change"], ["direction-change"]]);
   });
 
   it("releases when sliding direction-to-neutral", () => {
@@ -76,6 +80,7 @@ describe("System - Touch controls - multi-pointer state", () => {
 
     expect(state.activeDirection).toBeNull();
     expect(release).toHaveBeenCalledExactlyOnceWith("RIGHT");
+    expect(triggerHaptic).toHaveBeenCalledExactlyOnceWith("direction-change");
   });
 
   it("does not repeat transitions within the same direction", () => {
@@ -85,6 +90,7 @@ describe("System - Touch controls - multi-pointer state", () => {
 
     expect(press).toHaveBeenCalledExactlyOnceWith("RIGHT");
     expect(release).not.toHaveBeenCalled();
+    expect(triggerHaptic).toHaveBeenCalledExactlyOnceWith("direction-change");
   });
 
   it("prevents a second pointer from stealing D-pad ownership", () => {
@@ -102,6 +108,7 @@ describe("System - Touch controls - multi-pointer state", () => {
     expect(release).toHaveBeenCalledExactlyOnceWith("RIGHT");
     expect(state.dpadOwner).toBeNull();
     expect(state.activeDirection).toBeNull();
+    expect(triggerHaptic).toHaveBeenCalledExactlyOnceWith("direction-change");
   });
 
   it("cleans up D-pad ownership on pointer-cancel", () => {
@@ -110,6 +117,7 @@ describe("System - Touch controls - multi-pointer state", () => {
 
     expect(release).toHaveBeenCalledExactlyOnceWith("UP");
     expect(state.dpadOwner).toBeNull();
+    expect(triggerHaptic).toHaveBeenCalledExactlyOnceWith("direction-change");
   });
 
   it("holds the D-pad and an action button simultaneously", () => {
@@ -119,12 +127,14 @@ describe("System - Touch controls - multi-pointer state", () => {
     expect(state.isHeld("LEFT")).toBe(true);
     expect(state.isHeld("ACTION")).toBe(true);
     expect(press.mock.calls).toEqual([["LEFT"], ["ACTION"]]);
+    expect(triggerHaptic.mock.calls).toEqual([["direction-change"], ["button-press"]]);
   });
 
   it("tracks multiple action-button pointers independently", () => {
     expect(state.pressAction(2, "ACTION")).toBe(true);
     expect(state.pressAction(3, "CANCEL")).toBe(true);
     expect(state.actionPointerCount).toBe(2);
+    expect(triggerHaptic.mock.calls).toEqual([["button-press"], ["button-press"]]);
 
     state.releasePointer(2);
     expect(state.isHeld("ACTION")).toBe(false);
@@ -139,6 +149,7 @@ describe("System - Touch controls - multi-pointer state", () => {
     state.pressAction(2, "ACTION");
     state.pressAction(3, "ACTION");
     expect(press).toHaveBeenCalledExactlyOnceWith("ACTION");
+    expect(triggerHaptic).toHaveBeenCalledTimes(2);
 
     state.releasePointer(2);
     expect(release).not.toHaveBeenCalled();
@@ -158,5 +169,17 @@ describe("System - Touch controls - multi-pointer state", () => {
     expect(new Set(release.mock.calls.flat())).toEqual(new Set(["DOWN", "ACTION", "CANCEL"]));
     expect(state.dpadOwner).toBeNull();
     expect(state.actionPointerCount).toBe(0);
+    expect(triggerHaptic).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not haptic on neutral capture, rejected pointers, release, cancel, or reset", () => {
+    expect(state.captureDpad(1, 50, 50, 50, 50, 100)).toBe(true);
+    expect(state.captureDpad(2, 90, 50, 50, 50, 100)).toBe(false);
+    expect(state.pressAction(1, "ACTION")).toBe(false);
+    expect(state.releasePointer(1)).toBe(true);
+    expect(state.cancelPointer(99)).toBe(false);
+    state.reset();
+
+    expect(triggerHaptic).not.toHaveBeenCalled();
   });
 });

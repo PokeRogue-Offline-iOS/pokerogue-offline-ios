@@ -12,6 +12,10 @@ export interface TouchInputSink {
   release(key: string): void;
 }
 
+export interface TouchHapticSink {
+  trigger(kind: "direction-change" | "button-press"): void;
+}
+
 /**
  * Resolve one cardinal direction from a point relative to the D-pad center.
  *
@@ -47,12 +51,17 @@ export function resolveDpadDirection(
  * platform-free so lifecycle and transition behavior can be unit tested.
  */
 export class SilverShadowTouchInputState {
+  private readonly sink: TouchInputSink;
+  private readonly haptics: TouchHapticSink | undefined;
   private dpadPointerId: number | null = null;
   private dpadDirection: CardinalDirection | null = null;
   private readonly actionPointers = new Map<number, string>();
   private readonly heldCounts = new Map<string, number>();
 
-  constructor(private readonly sink: TouchInputSink) {}
+  constructor(sink: TouchInputSink, haptics?: TouchHapticSink) {
+    this.sink = sink;
+    this.haptics = haptics;
+  }
 
   public get dpadOwner(): number | null {
     return this.dpadPointerId;
@@ -113,6 +122,7 @@ export class SilverShadowTouchInputState {
 
     this.actionPointers.set(pointerId, key);
     this.hold(key);
+    this.haptics?.trigger("button-press");
     return true;
   }
 
@@ -164,6 +174,7 @@ export class SilverShadowTouchInputState {
     this.dpadDirection = direction;
     if (direction !== null) {
       this.hold(direction);
+      this.haptics?.trigger("direction-change");
     }
   }
 

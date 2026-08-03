@@ -11,6 +11,7 @@ Then run from the patched PokéRogue source:
 ```bash
 pnpm exec vitest run test/tests/system/touch-controls/silvershadow-touch-input.test.ts
 pnpm exec vitest run test/tests/system/touch-controls/silvershadow-dpad-visual.test.ts
+pnpm exec vitest run test/tests/system/touch-controls/silvershadow-touch-haptics.test.ts
 pnpm exec vitest run test/tests/system/touch-controls/silvershadow-touch-visual-integration.test.ts
 pnpm biome:ci src/system/touch-controls test/tests/system/touch-controls src/touch-controls.ts
 pnpm typecheck
@@ -29,11 +30,17 @@ cardinals, diagonal leaning and adjacent light, primary/secondary weighting,
 opposite-direction exclusion, symmetry, invalid dimensions, finite normalized
 output, smoothstep endpoints, cardinal-only resolver independence, no input
 events from visual calculations, and monotonic response. The integration
-contract checks stable 84% digital versus 88% visual geometry, frame
+contract checks stable 84% digital versus 96% visual geometry, frame
 coalescing, four independent chevron variables, open-chevron markup, cleanup
 resets, redundant artwork suppression, independent button classes,
 D-pad/button coexistence, auto-hide, configuration mode, reduced motion,
-fallback markup, current mappings, and the Start display label.
+fallback markup, current mappings, the Start display label, all current button
+nodes, the persisted vibration setting, and duplicate-vibration suppression.
+Haptic tests cover disabled no-op, cached native-first light impact, direction
+and button browser durations, rejected native promises, live setting recheck,
+and browser API failure. Input-state tests verify exact accepted-transition
+counts and silence for neutral, repeated, rejected, release, cancel, and reset
+paths.
 
 ## Android device setup
 
@@ -78,9 +85,10 @@ default-position tests.
 
 ## Visual-refinement Android checklist
 
-1. Confirm the D-pad is slightly larger and visually balanced against the
+1. Confirm the D-pad is noticeably larger and visually balanced against the
    right-side cluster in portrait and landscape.
-2. Confirm rocking is easier to notice but remains restrained.
+2. Confirm the circular stationary socket stays subordinate and the moving
+   cross outline, highlight, shadow, and cap make rocking easier to read.
 3. Move slightly from center: expect small rocking and faint lighting with no
    game input inside neutral.
 4. Move farther outward: expect stronger rocking and brighter lighting.
@@ -113,6 +121,42 @@ default-position tests.
     button glow, or tilt may remain stale.
 20. Rapidly circle the D-pad while multi-button tapping: animation and gameplay
     should remain smooth.
+
+Do not accept any change to the four open-chevron proportions or to the smooth
+lighting/fading behavior while sliding; those are the hardware-approved visual
+baseline for this iteration.
+
+## Haptic Android checklist
+
+Set `Vibrations` to Auto before starting:
+
+1. Touch exact center and move within neutral: expect no haptic.
+2. Cross from neutral into each cardinal: expect one light haptic per accepted
+   cardinal, never a stream while holding or moving inside the same sector.
+3. Slide directly from one cardinal to another: expect one new haptic at each
+   actual dominant-axis transition.
+4. Slide cardinal to neutral and release/cancel: expect no haptic.
+5. Hold near a diagonal and vary only the visual lean/secondary chevron: expect
+   no extra feedback until the digital cardinal changes.
+6. Press every current action/context button once: A, B, Start, F, G, R, E, N,
+   V, C, info/statistics, and settings-tab variants should each pulse once.
+7. Hold a button through repeat behavior: expect no repeated haptic.
+8. Press two and then three buttons simultaneously: expect one independent
+   pulse for each accepted pointerdown; releasing one is silent and does not
+   affect the others.
+9. Hold D-pad plus multiple buttons: feedback counts remain independent and no
+   pointer is stolen.
+10. Disable `Vibrations` while the app remains open and repeat the tests:
+    feedback must stop immediately without restarting. Re-enable it and verify
+    feedback returns immediately.
+11. Restart the app after selecting Disabled and again after selecting Auto:
+    each choice must persist.
+12. Exercise notification shade, app switcher, lock/unlock, rotation, lost
+    capture, auto-hide, and Move Touch Controls: cleanup must be silent and the
+    next genuine accepted press must work normally.
+
+Speed Up and Slow Down are game actions but do not yet have touch DOM buttons;
+they are not part of this device haptic acceptance pass.
 
 Release or cancellation must still release input and return the face, shadow,
 and all four chevrons smoothly to their zero pose.
