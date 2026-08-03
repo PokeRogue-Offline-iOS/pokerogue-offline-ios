@@ -15,6 +15,7 @@ const loadingScenePath = path.join("pokerogue-src", "src", "loading-scene.ts");
 const phasePath = path.join("pokerogue-src", "src", "phase.ts");
 const phaseManagerPath = path.join("pokerogue-src", "src", "phase-manager.ts");
 const sceneBasePath = path.join("pokerogue-src", "src", "scene-base.ts");
+const audioManagerPath = path.join("pokerogue-src", "src", "audio", "audio-manager.ts");
 const backgroundMusicPath = path.join("pokerogue-src", "src", "audio", "background-music.ts");
 const attemptCapturePhasePath = path.join("pokerogue-src", "src", "phases", "attempt-capture-phase.ts");
 const encounterPhasePath = path.join("pokerogue-src", "src", "phases", "encounter-phase.ts");
@@ -1231,6 +1232,51 @@ if (!backgroundMusic.includes(bgmCacheRemoveReplacement)) {
 }
 write(backgroundMusicPath, backgroundMusic);
 
+let audioManager = read(audioManagerPath);
+const bgmHandoffAnchor = `    const previous = this.currentBgm;
+    const newBgm = new BackgroundMusic(resolvedName, loop, loopPoint);
+    this.currentBgm = newBgm;
+
+    globalScene.ui.bgmBar.setBgmToBgmBar(resolvedName);
+
+    const volume = this.getVolume(VolumeSetting.BGM);
+
+    if (fadeOutPrevious && previous?.isPlaying) {
+      previous.fadeOut(fadeDuration, true);
+      newBgm.playAfterDelay(fixedInt(fadeDuration + 250), volume);
+    } else {
+      previous?.destroy();
+      newBgm.play(volume);
+    }`;
+const bgmHandoffReplacement = `    const previous = this.currentBgm;
+    const shouldOverlapForFade = Boolean(fadeOutPrevious && previous?.isPlaying);
+    if (!shouldOverlapForFade) {
+      // BackgroundMusic starts decoding in its constructor. Release the old
+      // decoded track first on non-fading transitions so two full BGM buffers
+      // do not overlap during ordinary encounter/battle handoffs.
+      previous?.destroy();
+    }
+    const newBgm = new BackgroundMusic(resolvedName, loop, loopPoint);
+    this.currentBgm = newBgm;
+
+    globalScene.ui.bgmBar.setBgmToBgmBar(resolvedName);
+
+    const volume = this.getVolume(VolumeSetting.BGM);
+
+    if (shouldOverlapForFade) {
+      previous!.fadeOut(fadeDuration, true);
+      newBgm.playAfterDelay(fixedInt(fadeDuration + 250), volume);
+    } else {
+      newBgm.play(volume);
+    }`;
+if (!audioManager.includes(bgmHandoffReplacement)) {
+  if (!audioManager.includes(bgmHandoffAnchor)) {
+    fail("Could not find the AudioManager BGM handoff anchor");
+  }
+  audioManager = audioManager.replace(bgmHandoffAnchor, bgmHandoffReplacement);
+}
+write(audioManagerPath, audioManager);
+
 let partyHealPhase = read(partyHealPhasePath);
 const partyHealAnchor = `      const healSound = this.resumeBgm
         ? audioManager.replaceBgmUntilEnd("bw/heal")
@@ -1342,7 +1388,7 @@ const rerollStartReplacement = `  start() {
     const switchApi = (globalThis as any).Switch;
     const memory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
     const nativeUsedMiB = memory ? memory.nativeHeapUsed / 1048576 : 0;
-    if (this.rerollCount > 0 && !this.switchRerollCleanupDelayComplete && nativeUsedMiB >= 2250) {
+    if (this.rerollCount > 0 && !this.switchRerollCleanupDelayComplete && nativeUsedMiB >= 2450) {
       this.switchRerollCleanupDelayComplete = true;
       const delayMs = nativeUsedMiB >= 2600 ? 2500 : nativeUsedMiB >= 2450 ? 1500 : 1000;
       let gcRequested = false;
@@ -1390,13 +1436,9 @@ const rerollRequestAnchor = `    globalScene.reroll = true;
 const rerollRequestReplacement = `    const switchApi = (globalThis as any).Switch;
     const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
     const switchRerollState = this as any;
-    if (switchRerollState.switchRerollBlockedForMemory) {
-      globalScene.ui.playError();
-      return false;
-    }
     let switchMemory = typeof switchApi?.memoryUsage === "function" ? switchApi.memoryUsage() : null;
     const switchNativeUsedBeforeGcMiB = switchMemory ? switchMemory.nativeHeapUsed / 1048576 : 0;
-    const switchRerollRecoveryThresholdMiB = 2250;
+    const switchRerollRecoveryThresholdMiB = 2450;
     if (switchNativeUsedBeforeGcMiB >= switchRerollRecoveryThresholdMiB) {
       let gcRequested = false;
       try {
@@ -1424,9 +1466,8 @@ const rerollRequestReplacement = `    const switchApi = (globalThis as any).Swit
       }, true);
     }
     const switchNativeUsedMiB = switchMemory ? switchMemory.nativeHeapUsed / 1048576 : 0;
-    const switchRerollSafetyLimitMiB = 2250;
+    const switchRerollSafetyLimitMiB = 2600;
     if (switchNativeUsedMiB >= switchRerollSafetyLimitMiB) {
-      switchRerollState.switchRerollBlockedForMemory = true;
       switchDiagnostics?.checkpoint?.("reward:reroll-blocked-memory", {
         rerollCount: this.rerollCount,
         nativeUsedMiB: Math.round(switchNativeUsedMiB * 100) / 100,
@@ -1434,7 +1475,7 @@ const rerollRequestReplacement = `    const switchApi = (globalThis as any).Swit
           ? Math.round((switchMemory.nativeHeapFree / 1048576) * 100) / 100
           : null,
         safetyLimitMiB: switchRerollSafetyLimitMiB,
-        latched: true,
+        latched: false,
       }, true);
       globalScene.ui.playError();
       return false;

@@ -14,7 +14,7 @@ source "$(dirname "$0")/patch-lib.sh"
 
 # --- All platforms ------------------------------------------------------------
 # Offline client modifications
-apply_patch "fix-daily-seed.js"       all
+apply_patch "daily-run-seed.js"       all
 apply_patch "offline-banner.js"       all
 apply_patch "update-check.js"         all
 apply_patch "update-title-labels.js"  all

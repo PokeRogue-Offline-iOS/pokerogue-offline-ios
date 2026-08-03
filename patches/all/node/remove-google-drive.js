@@ -2,8 +2,8 @@
 
 /**
  * Removes Google Drive and Google OAuth functionality added by
- * app-settings-menu.js while retaining the Offline settings tab,
- * daily-seed tools, Clear All Data, and custom sandbox settings.
+ * app-settings-menu.js while retaining the Offline settings tab, Clear All
+ * Data, and custom sandbox settings.
  */
 
 const fs = require("fs");
@@ -88,22 +88,12 @@ const handlerPath = path.join(
   "offline-settings-ui-handler.ts",
 );
 
-const handlerSource = `import { globalScene } from "#app/global-scene";
-import { UiMode } from "#enums/ui-mode";
+const handlerSource = `import { UiMode } from "#enums/ui-mode";
 import type { Setting } from "#system/settings";
 import { SettingKeys, SettingType } from "#system/settings";
 import { BaseSettingsUiHandler } from "#ui/base-settings-ui-handler";
 
-const DAILY_SEED_URL =
-  "https://pokerogue-offline.github.io/pokerogue-offline/daily-seed.txt";
-
-const DAILY_SEED_KEY = "daily_seed";
-const DAILY_SEED_DATE_KEY = "daily_seed_date";
-const DAILY_SEED_FETCHED_AT_KEY = "daily_seed_fetched_at";
-
 export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
-  private forceSeedInProgress = false;
-
   constructor(mode: UiMode | null = null) {
     super(SettingType.APP, mode);
     this.title = "Offline";
@@ -128,114 +118,15 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     }
   }
 
-  private static formatRelative(target: Date, now: Date): string {
-    const differenceMs = target.getTime() - now.getTime();
-    const past = differenceMs <= 0;
-
-    const totalMinutesRaw = Math.floor(
-      Math.abs(differenceMs) / 60000,
-    );
-
-    const totalMinutes =
-      totalMinutesRaw - (totalMinutesRaw % 5);
-
-    if (totalMinutes < 5) {
-      return past ? "just now" : "in a moment";
-    }
-
-    const days = Math.floor(totalMinutes / 1440);
-    const hours = Math.floor((totalMinutes % 1440) / 60);
-    const minutes = totalMinutes % 60;
-
-    let body: string;
-
-    if (days > 0) {
-      body = hours > 0
-        ? \`\${days}d \${hours}h\`
-        : \`\${days}d\`;
-    } else if (hours > 0) {
-      body = minutes > 0
-        ? \`\${hours}h \${minutes}m\`
-        : \`\${hours}h\`;
-    } else {
-      body = \`\${minutes}m\`;
-    }
-
-    return past ? \`\${body} ago\` : \`in \${body}\`;
-  }
-
-  private refreshDailySeedInfo(): void {
-    const seed = localStorage.getItem(DAILY_SEED_KEY);
-    const cachedDate = localStorage.getItem(
-      DAILY_SEED_DATE_KEY,
-    );
-
-    const fetchedAtRaw = localStorage.getItem(
-      DAILY_SEED_FETCHED_AT_KEY,
-    );
-
-    this.setRowText(
-      SettingKeys.Offline_Daily_Seed_Value,
-      seed ?? "None",
-    );
-
-    if (!seed || !cachedDate) {
-      this.setRowText(
-        SettingKeys.Offline_Daily_Seed_Fetched,
-        "—",
-      );
-
-      this.setRowText(
-        SettingKeys.Offline_Daily_Seed_Expires,
-        "—",
-      );
-
-      return;
-    }
-
-    const now = new Date();
-    const expiry = new Date(
-      \`\${cachedDate}T00:00:00.000Z\`,
-    );
-
-    expiry.setUTCDate(expiry.getUTCDate() + 1);
-
-    this.setRowText(
-      SettingKeys.Offline_Daily_Seed_Expires,
-      OfflineSettingsUiHandler.formatRelative(expiry, now),
-    );
-
-    const fetchedAtMs = fetchedAtRaw
-      ? Number(fetchedAtRaw)
-      : Number.NaN;
-
-    this.setRowText(
-      SettingKeys.Offline_Daily_Seed_Fetched,
-      Number.isFinite(fetchedAtMs)
-        ? OfflineSettingsUiHandler.formatRelative(
-            new Date(fetchedAtMs),
-            now,
-          )
-        : "unknown",
-    );
-  }
-
   public override show(args: any[]): boolean {
     const result = super.show(args);
-    this.refreshDailySeedInfo();
     return result;
   }
 
-  protected override activateSetting(
-    setting: Setting,
-  ): boolean {
+  protected override activateSetting(setting: Setting): boolean {
     switch (setting.key) {
       case SettingKeys.Offline_Clear_Data:
         this.handleClearDataPress();
-        return true;
-
-      case SettingKeys.Offline_Force_Daily_Seed:
-        this.handleForceDailySeedPress();
         return true;
     }
 
@@ -268,80 +159,6 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
         );
       },
     );
-  }
-
-  private handleForceDailySeedPress(): void {
-    if (this.forceSeedInProgress) {
-      return;
-    }
-
-    this.forceSeedInProgress = true;
-
-    this.setRowText(
-      SettingKeys.Offline_Force_Daily_Seed,
-      "Updating…",
-    );
-
-    fetch(DAILY_SEED_URL)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(\`HTTP \${response.status}\`);
-        }
-
-        return response.text();
-      })
-      .then(fetchedSeed => {
-        const seed = fetchedSeed.trim();
-        const todayUtc = new Date()
-          .toISOString()
-          .slice(0, 10);
-
-        localStorage.setItem(
-          DAILY_SEED_DATE_KEY,
-          todayUtc,
-        );
-
-        localStorage.setItem(
-          DAILY_SEED_KEY,
-          seed,
-        );
-
-        localStorage.setItem(
-          DAILY_SEED_FETCHED_AT_KEY,
-          Date.now().toString(),
-        );
-
-        this.refreshDailySeedInfo();
-
-        this.showText(
-          "Daily seed updated.",
-          0,
-          () => this.showText("", 0),
-          1500,
-        );
-      })
-      .catch(error => {
-        console.error(
-          "Force daily seed fetch failed:",
-          error,
-        );
-
-        this.showText(
-          "Could not fetch daily seed.",
-          0,
-          () => this.showText("", 0),
-          1500,
-        );
-      })
-      .finally(() => {
-        this.setRowText(
-          SettingKeys.Offline_Force_Daily_Seed,
-          "Update",
-        );
-
-        this.forceSeedInProgress = false;
-        globalScene.ui.playSelect();
-      });
   }
 }
 `;

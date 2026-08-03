@@ -116,6 +116,18 @@ export class FetchXMLHttpRequest {
     this.controller?.abort();
   }
 
+  /**
+   * Releases the completed response body once its consumer has copied or
+   * decoded it into the destination cache. Native XMLHttpRequest objects do
+   * not expose this hook; the Switch loader uses it to avoid keeping large
+   * SD-card ArrayBuffers alive until a later V8 collection.
+   */
+  releaseResponse(): void {
+    this.response = null;
+    this.responseText = "";
+    this.responseXML = null;
+  }
+
   addEventListener(type: string, listener: XhrListener | null): void {
     if (!listener) {
       return;

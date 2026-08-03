@@ -134,6 +134,20 @@ BGM playback and looping now work in tested gameplay. Sound-effect, cry,
 suspend/resume, device-change, and very long-session audio behavior have not
 been exhaustively tested across all content and hardware arrangements.
 
+An August 2, 2026 application-mode run reached wave 8 before Atmosphere
+reported `2162-0004` (the fatal report itself was wrapped as `2345-0008`). The
+game log showed native usage rising from about 316 MiB at bootstrap to 2.59 GiB
+and V8 external memory reaching about 418 MiB immediately after the rival
+encounter BGM loaded. The crash occurred while the battle BGM was beginning to
+replace it; there was no JavaScript exception and the rival dialogue is not a
+demonstrated cause.
+
+The next build caps the nx.js/Skia GPU resource cache at 256 MiB instead of the
+512 MiB application default, releases completed SD-card XHR bodies as soon as
+Phaser has populated its cache, and destroys a non-fading previous BGM before
+the replacement starts decoding. These are evidence-driven mitigations, not
+yet hardware verification of long-session stability.
+
 ### Slow black-screen startup and reload
 
 Cold startup takes approximately 35-45 seconds before the first visible game
@@ -146,9 +160,10 @@ reliable early loading indicator, so a slow load resembles a freeze.
 Normal gameplay has been smooth enough to continue testing, but many
 back-to-back battles and long sessions have not been comprehensively stressed.
 Repeated infinite/free rerolls or extreme Claim All Rewards use can exhaust
-native memory. The current guard blocks further rerolls near the dangerous
-threshold and latches for the reward phase, but unlimited reward stress is not
-safe.
+native memory. The reward UI now reuses its option objects, delays a repeat
+reroll under pressure, and blocks an individual reroll at 2600 MiB native use.
+The guard rechecks instead of permanently latching, so a later collection can
+restore the action. Unlimited reward stress is still not considered safe.
 
 ### Incorrect controller prompt artwork
 
@@ -191,14 +206,17 @@ small and driven by the first reproducible failure.
 
 Recommended order:
 
-1. Add memory snapshots at game-ready, settings reload, animation loading, and
-   Plus interception; add a last-gasp native-boundary marker.
-2. Add Phaser loader-error logging and wait for required animation texture
+1. Re-run the August 2 route through the first rival battle and continue across
+   multiple biome/BGM transitions. Confirm each loader batch reports released
+   response bodies, non-fading BGM destruction precedes the next load, and the
+   post-collection native/external baseline does not trend upward each wave.
+2. Stress normal rewards and moderate rerolls separately; confirm the reroll
+   guard can recover after pressure drops and does not block the first reroll
+   at the former 2250 MiB threshold.
+3. Add Phaser loader-error logging and wait for required animation texture
    keys before playback.
-3. Reproduce the rival-battle Plus failure without first enabling all cheats
+4. Reproduce the rival-battle Plus failure without first enabling all cheats
    to separate input handling from memory pressure.
-4. Repair audio with a minimized nx.js decode/playback test before changing
-   PokéRogue audio code.
 5. Add an early loading indicator without touching the WebGL-owned fatal
    screen.
 6. Replace keyboard/Xbox prompt artwork with Switch-specific prompts.

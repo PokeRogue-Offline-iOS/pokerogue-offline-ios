@@ -38,30 +38,12 @@ import * as offlineBackup from "#system/offline/google-drive-backup";
  * logic touched, but the actual runtime behavior of reaching into those
  * rows post-construction hasn't been confirmed on a real device/build.
  */
-// Must stay in sync with patches/all/node/fix-daily-seed.js — that patch
-// owns the actual daily-run seed consumption, this handler only reads/writes
-// the same three localStorage keys to display and force-refresh the cache.
-const DAILY_SEED_URL = "https://pokerogue-offline.github.io/pokerogue-offline/daily-seed.txt";
-const DAILY_SEED_KEY = "daily_seed";
-const DAILY_SEED_DATE_KEY = "daily_seed_date";
-const DAILY_SEED_FETCHED_AT_KEY = "daily_seed_fetched_at";
-
 export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   /** Rows that get greyed out and made inert while signed out. */
   private static readonly LOCKABLE_KEYS = [
     SettingKeys.Offline_Backup_Save,
     SettingKeys.Offline_Restore_Backup,
     SettingKeys.Offline_Include_Current_Run,
-  ];
-
-  /**
-   * Rows that are always greyed out / inert, regardless of Google sign-in
-   * state — pure info rows for the daily seed cache, unrelated to Drive.
-   */
-  private static readonly ALWAYS_LOCKED_KEYS = [
-    SettingKeys.Offline_Daily_Seed_Value,
-    SettingKeys.Offline_Daily_Seed_Fetched,
-    SettingKeys.Offline_Daily_Seed_Expires,
   ];
 
   /**
@@ -79,9 +61,6 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
    * on top of the first.
    */
   private connectInProgress = false;
-
-  /** True while a Force Daily Seed fetch is in flight — prevents a double-tap. */
-  private forceSeedInProgress = false;
 
   constructor(mode: UiMode | null = null) {
     super(SettingType.APP, mode);
@@ -142,75 +121,6 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     for (const key of OfflineSettingsUiHandler.LOCKABLE_KEYS) {
       this.setRowLocked(key, locked);
     }
-    for (const key of OfflineSettingsUiHandler.ALWAYS_LOCKED_KEYS) {
-      this.setRowLocked(key, true);
-    }
-  }
-
-  /**
-   * Formats the (always non-negative) gap between `target` and `now` as a
-   * relative string, floored to 5-minute increments — e.g. "1h 45m ago",
-   * "in 3h", "just now". Sub-5-minute gaps collapse to "just now"/"in a
-   * moment" rather than showing "0m", since a 5-minute floor can't
-   * distinguish "2 minutes ago" from "right now" anyway.
-   */
-  private static formatRelative(target: Date, now: Date): string {
-    const diffMs = target.getTime() - now.getTime();
-    const past = diffMs <= 0;
-    const totalMinutesRaw = Math.floor(Math.abs(diffMs) / 60000);
-    const totalMinutes = totalMinutesRaw - (totalMinutesRaw % 5); // floor to nearest 5
-
-    if (totalMinutes < 5) {
-      return past ? "just now" : "in a moment";
-    }
-
-    const days = Math.floor(totalMinutes / 1440);
-    const hours = Math.floor((totalMinutes % 1440) / 60);
-    const mins = totalMinutes % 60;
-
-    let body: string;
-    if (days > 0) {
-      body = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-    } else if (hours > 0) {
-      body = mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-    } else {
-      body = `${mins}m`;
-    }
-
-    return past ? `${body} ago` : `in ${body}`;
-  }
-
-  /**
-   * Reads the daily seed cache (written by fix-daily-seed.js, or by
-   * handleForceDailySeedPress below) and reflects it in three read-only
-   * rows: the seed value itself, when it was fetched, and when it expires.
-   * Expiry is the next UTC midnight after the cached date, since that's
-   * when fix-daily-seed.js's own date check invalidates the cache.
-   */
-  private refreshDailySeedInfo(): void {
-    const seed = localStorage.getItem(DAILY_SEED_KEY);
-    const cachedDate = localStorage.getItem(DAILY_SEED_DATE_KEY);
-    const fetchedAtRaw = localStorage.getItem(DAILY_SEED_FETCHED_AT_KEY);
-
-    this.setRowText(SettingKeys.Offline_Daily_Seed_Value, seed ?? "None");
-
-    if (!seed || !cachedDate) {
-      this.setRowText(SettingKeys.Offline_Daily_Seed_Fetched, "—");
-      this.setRowText(SettingKeys.Offline_Daily_Seed_Expires, "—");
-      return;
-    }
-
-    const now = new Date();
-
-    const expiry = new Date(`${cachedDate}T00:00:00.000Z`);
-    expiry.setUTCDate(expiry.getUTCDate() + 1);
-    this.setRowText(SettingKeys.Offline_Daily_Seed_Expires, OfflineSettingsUiHandler.formatRelative(expiry, now));
-
-    const fetchedAtMs = fetchedAtRaw ? Number(fetchedAtRaw) : Number.NaN;
-    this.setRowText(
-      SettingKeys.Offline_Daily_Seed_Fetched,
-      Number.isFinite(fetchedAtMs) ? OfflineSettingsUiHandler.formatRelative(new Date(fetchedAtMs), now) : "unknown",
-    );
   }
 
   /** Guard for the top of every action handler except Connect itself. */
@@ -253,7 +163,6 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
 
     this.refreshDisplay();
     this.refreshDriveLastPlayed();
-    this.refreshDailySeedInfo();
 
     // Attempt a silent reconnect if we're not already signed in this
     // session. On Electron this is fast and popup-free when a stored
@@ -297,9 +206,6 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
         return true;
       case SettingKeys.Offline_Clear_Data:
         this.handleClearDataPress();
-        return true;
-      case SettingKeys.Offline_Force_Daily_Seed:
-        this.handleForceDailySeedPress();
         return true;
     }
     return super.activateSetting(setting);
@@ -437,44 +343,4 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     );
   }
 
-  /**
-   * Force-fetches the daily seed regardless of what's cached, overwriting
-   * daily_seed / daily_seed_date / daily_seed_fetched_at on success. Not
-   * gated behind Google sign-in — this has nothing to do with Drive.
-   * Deliberately does NOT go through title-phase.ts's handler; this is a
-   * standalone refresh of the same cache that handler reads from.
-   */
-  private handleForceDailySeedPress(): void {
-    if (this.forceSeedInProgress) {
-      return;
-    }
-    this.forceSeedInProgress = true;
-    this.setRowText(SettingKeys.Offline_Force_Daily_Seed, "Updating…");
-
-    fetch(DAILY_SEED_URL)
-      .then(r => {
-        if (!r.ok) {
-          throw new Error(`HTTP ${r.status}`);
-        }
-        return r.text();
-      })
-      .then(fetchedSeed => {
-        const seed = fetchedSeed.trim();
-        const todayUtc = new Date().toISOString().slice(0, 10);
-        localStorage.setItem(DAILY_SEED_DATE_KEY, todayUtc);
-        localStorage.setItem(DAILY_SEED_KEY, seed);
-        localStorage.setItem(DAILY_SEED_FETCHED_AT_KEY, Date.now().toString());
-        this.refreshDailySeedInfo();
-        this.showText("Daily seed updated.", 0, () => this.showText("", 0), 1500);
-      })
-      .catch(err => {
-        console.error("Force daily seed fetch failed:", err);
-        this.showText("Could not fetch daily seed. Check the console for details.", 0, () => this.showText("", 0), 1500);
-      })
-      .finally(() => {
-        this.setRowText(SettingKeys.Offline_Force_Daily_Seed, "Update");
-        this.forceSeedInProgress = false;
-        globalScene.ui.playSelect();
-      });
-  }
 }

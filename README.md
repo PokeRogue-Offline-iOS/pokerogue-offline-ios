@@ -51,8 +51,13 @@ claims use the normal game interface and animation flow for stability.
 - Play without a constant internet connection after the game files are installed.
 - Save data is stored locally on the device.
 - User data and active sessions can be manually imported and exported.
-- The real server Daily Run seed is requested when available, but a connection is not required to play.
+- The live Daily Run seed is mirrored from PokéRogue's official API by this fork's own workflow and cached by the app.
+  If that feed is unavailable, the game immediately falls back to a deterministic UTC-date seed and remains playable offline.
 - The app is built from current PokéRogue source with SilverShadow patches applied during the build.
+
+The **Publish Daily Run Seed** workflow requests the seed directly from PokéRogue's official API at 00:15 UTC and
+publishes a dated JSON payload to this fork's own `seed` branch. After enabling Actions on a new fork, run that workflow
+once manually to create the branch immediately; the app does not request another PokéRogue Offline repository or service.
 
 ### SilverShadow Android Branding
 

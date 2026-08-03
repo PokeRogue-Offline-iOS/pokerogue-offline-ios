@@ -13,8 +13,11 @@ It is not a stable port. BGM playback and looping now work in tested gameplay,
 but long-session audio behavior is not exhaustively validated. Move animations
 can still use Phaser's missing-texture placeholder, cold boot and main-menu
 refresh can show a black screen for roughly 35-45 seconds, controller prompts
-are not always Switch-specific, and extreme repeated reward rerolls can exhaust
-native memory. The authoritative evidence, resolved blockers, known bugs, and
+are not always Switch-specific, and long sessions can still reach native/GPU
+memory pressure during asset and BGM transitions. The port now releases
+completed SD-card loader responses promptly, avoids ordinary two-BGM decode
+overlap, and caps the Skia GPU cache, but the result still needs extended
+hardware validation. The authoritative evidence, resolved blockers, known bugs, and
 next investigation order are in
 [`SWITCH_ALPHA_STATUS.md`](SWITCH_ALPHA_STATUS.md).
 

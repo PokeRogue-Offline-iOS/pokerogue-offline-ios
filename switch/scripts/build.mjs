@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { readFile, stat } from "node:fs/promises";
+import { copyFile, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,6 +7,7 @@ const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const sourceRoot = path.join(projectRoot, "src");
 const phaserEntry = path.join(projectRoot, "node_modules", "phaser", "dist", "phaser.esm.js");
 const mainSource = path.join(sourceRoot, "main.ts");
+const runtimeConfig = path.join(projectRoot, "nxjs.ini");
 
 // Supplying file contents through a plugin keeps the build reproducible in
 // restricted desktop sandboxes whose native esbuild process cannot enumerate
@@ -46,6 +47,8 @@ await build({
   plugins: [sandboxFileLoader],
   logLevel: "info",
 });
+
+await copyFile(runtimeConfig, path.join(projectRoot, "romfs", "nxjs.ini"));
 
 async function resolveLocal(resolveDir, specifier) {
   const candidate = path.resolve(resolveDir, specifier);

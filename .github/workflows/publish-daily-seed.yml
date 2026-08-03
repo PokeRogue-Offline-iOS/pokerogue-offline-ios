@@ -1,0 +1,83 @@
+name: Publish Daily Run Seed
+
+on:
+  schedule:
+    - cron: "15 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-daily-run-seed
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out this fork
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch the authoritative seed
+        env:
+          SEED_API_URL: https://api.pokerogue.net/daily/seed
+        run: |
+          set -euo pipefail
+
+          seed="$(curl --fail --silent --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --header "Origin: https://pokerogue.net" \
+            --header "Referer: https://pokerogue.net/" \
+            "$SEED_API_URL")"
+
+          if [[ -z "$seed" || ${#seed} -gt 131072 ]]; then
+            echo "The PokéRogue API returned an invalid Daily Run seed." >&2
+            exit 1
+          fi
+
+          jq --null-input \
+            --arg date "$(date -u +%F)" \
+            --arg seed "$seed" \
+            '{date: $date, seed: $seed}' \
+            > "$RUNNER_TEMP/daily-seed.json"
+
+      - name: Publish to this fork's seed branch
+        env:
+          PUBLISHED_SEED: ${{ runner.temp }}/daily-seed.json
+        run: |
+          set -euo pipefail
+
+          publish_dir="$(mktemp -d)"
+          trap 'git worktree remove --force "$publish_dir" >/dev/null 2>&1 || true' EXIT
+
+          if git ls-remote --exit-code --heads origin seed >/dev/null 2>&1; then
+            git fetch origin seed
+            git worktree add --force -B seed "$publish_dir" origin/seed
+          else
+            git worktree add --detach "$publish_dir"
+            git -C "$publish_dir" switch --orphan seed
+            git -C "$publish_dir" rm -rf .
+          fi
+
+          mkdir -p "$publish_dir/docs"
+          cp "$PUBLISHED_SEED" "$publish_dir/docs/daily-seed.json"
+
+          git -C "$publish_dir" config user.name "github-actions[bot]"
+          git -C "$publish_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$publish_dir" add docs/daily-seed.json
+
+          if git -C "$publish_dir" diff --cached --quiet; then
+            echo "The published Daily Run seed is already current."
+            exit 0
+          fi
+
+          git -C "$publish_dir" commit -m "chore: publish Daily Run seed"
+          git -C "$publish_dir" push origin HEAD:seed

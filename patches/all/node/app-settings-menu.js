@@ -60,12 +60,8 @@
  *        makes it show up as a 6th tab in the real Settings screen.
  *
  *   6. src/system/settings/settings.ts
- *        Append SettingType.APP; append 10 SettingKeys entries; append 10
- *        Setting entries (grouped: 3 locked action/toggle rows, 1 read-only
- *        info row, 1 always-on action row, then 1 always-on action row +
- *        3 always-on read-only info rows — Value, Fetched, Expires — for
- *        the daily seed cache) to the shared Setting[] array, all
- *        type: APP so they only ever show up on our tab.
+ *        Append SettingType.APP and the Offline-tab settings to the shared
+ *        Setting[] array.
  *
  *   7. src/ui/settings/base-settings-ui-handler.ts
  *        Widen `settingLabels`, `optionValueLabels`, `optionCursors`, and
@@ -246,7 +242,7 @@ if (settingsSrc.includes("SettingType.APP")) {
     `export enum SettingType {\n  GENERAL,\n  DISPLAY,\n  AUDIO,\n  APP,\n}`,
   );
 
-  // 6b. SettingKeys — append 6 new keys.
+  // 6b. SettingKeys — append the Offline-tab keys.
   const KEYS_ANCHOR = `Prefer_Baton_Pass: "PREFER_BATON_PASS",\n};`;
   requireAnchor(settingsSrc, KEYS_ANCHOR, "SettingKeys object in settings.ts");
   settingsSrc = settingsSrc.replace(
@@ -258,15 +254,11 @@ if (settingsSrc.includes("SettingType.APP")) {
   Offline_Include_Current_Run: "OFFLINE_INCLUDE_CURRENT_RUN",
   Offline_Drive_Last_Played: "OFFLINE_DRIVE_LAST_PLAYED",
   Offline_Clear_Data: "OFFLINE_CLEAR_DATA",
-  Offline_Force_Daily_Seed: "OFFLINE_FORCE_DAILY_SEED",
-  Offline_Daily_Seed_Value: "OFFLINE_DAILY_SEED_VALUE",
-  Offline_Daily_Seed_Fetched: "OFFLINE_DAILY_SEED_FETCHED",
-  Offline_Daily_Seed_Expires: "OFFLINE_DAILY_SEED_EXPIRES",
   Offline_Update_Pop_Ups: "OFFLINE_UPDATE_POP_UPS",
 };`,
   );
 
-  // 6c. Setting[] array — append 6 new rows, locked ones grouped together.
+  // 6c. Setting[] array — append the Offline-tab rows.
   const SETTING_ANCHOR = `  {
     key: SettingKeys.Prefer_Baton_Pass,
     label: i18next.t("settings:preferBatonPass"),
@@ -333,35 +325,6 @@ if (settingsSrc.includes("SettingType.APP")) {
     default: 0,
     type: SettingType.APP,
     activatable: true,
-  },
-  {
-    key: SettingKeys.Offline_Force_Daily_Seed,
-    label: "Force Daily Seed",
-    options: [{ value: "0", label: "Update" }],
-    default: 0,
-    type: SettingType.APP,
-    activatable: true,
-  },
-  {
-    key: SettingKeys.Offline_Daily_Seed_Value,
-    label: "Daily Seed Value",
-    options: [{ value: "0", label: "None" }],
-    default: 0,
-    type: SettingType.APP,
-  },
-  {
-    key: SettingKeys.Offline_Daily_Seed_Fetched,
-    label: "Daily Seed Fetched",
-    options: [{ value: "0", label: "—" }],
-    default: 0,
-    type: SettingType.APP,
-  },
-  {
-    key: SettingKeys.Offline_Daily_Seed_Expires,
-    label: "Daily Seed Expires",
-    options: [{ value: "0", label: "—" }],
-    default: 0,
-    type: SettingType.APP,
   },
   {
     key: SettingKeys.Offline_Update_Pop_Ups,

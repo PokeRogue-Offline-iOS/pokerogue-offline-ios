@@ -49,6 +49,8 @@ interface LoaderBatch {
   lastCompleted: string[];
   textureKeys: Set<string>;
   failures: number;
+  releasedResponseBytes: number;
+  releasedResponses: number;
 }
 
 interface RuntimeCounters {
@@ -374,6 +376,55 @@ function normalizeLoaderFile(file: any): Record<string, unknown> {
   };
 }
 
+function loaderFileId(key: unknown, type: unknown): string {
+  return `${String(type)}\u0000${String(key)}`;
+}
+
+function loaderResponseSize(value: unknown): number {
+  if (typeof value === "string") {
+    return new TextEncoder().encode(value).byteLength;
+  }
+  if (value instanceof ArrayBuffer) {
+    return value.byteLength;
+  }
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    return value.size;
+  }
+  return 0;
+}
+
+function releaseLoaderResponse(file: any): number {
+  const xhr = file?.xhrLoader;
+  if (!xhr) {
+    return 0;
+  }
+
+  let bytes = 0;
+  try {
+    bytes = loaderResponseSize(xhr.response);
+  } catch {
+    // The response may be a partially initialized native object after a load
+    // failure. Cleanup should remain best-effort in that case.
+  }
+
+  try {
+    if (typeof xhr.releaseResponse === "function") {
+      xhr.releaseResponse();
+    } else {
+      xhr.response = null;
+      xhr.responseText = "";
+      xhr.responseXML = null;
+    }
+    // Phaser has already populated the destination cache before it emits
+    // filecomplete. Detach its XHR now instead of retaining the compressed
+    // SD-card response until the entire File/XHR cycle is garbage-collected.
+    file.xhrLoader = null;
+  } catch {
+    return 0;
+  }
+  return bytes;
+}
+
 function pushSample(samples: string[], value: string): void {
   samples.push(value);
   if (samples.length > MAX_LOADER_SAMPLES) {
@@ -387,14 +438,15 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
   }
   loader.__silverShadowDiagnosticsInstalled = true;
   let activeBatch: LoaderBatch | null = null;
-  const queuedAudioFiles = new Map<string, any>();
+  const queuedFiles = new Map<string, any>();
 
   loader.on("addfile", (key: unknown, type: unknown, _activeLoader: any, file: any) => {
-    if (String(type) !== "audio") {
+    const normalizedType = String(type);
+    queuedFiles.set(loaderFileId(key, normalizedType), file);
+    if (normalizedType !== "audio") {
       return;
     }
     const normalizedKey = String(key);
-    queuedAudioFiles.set(normalizedKey, file);
     audio("loader-queued", {
       scene: sceneName,
       key: normalizedKey,
@@ -413,6 +465,8 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
       lastCompleted: [],
       textureKeys: new Set<string>(),
       failures: 0,
+      releasedResponseBytes: 0,
+      releasedResponses: 0,
     };
     appendLog("INFO", "Loader batch started", {
       id: activeBatch.id,
@@ -425,8 +479,9 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
   loader.on("filecomplete", (key: unknown, type: unknown, data: unknown) => {
     const normalizedKey = String(key);
     const normalizedType = String(type);
+    const fileId = loaderFileId(normalizedKey, normalizedType);
+    const file = queuedFiles.get(fileId);
     if (normalizedType === "audio") {
-      const file = queuedAudioFiles.get(normalizedKey);
       const decoded = normalizeAudioBuffer(data);
       decodedAudioBuffers.set(normalizedKey, decoded);
       audio("loader-complete", {
@@ -436,7 +491,12 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
         decoded,
         decodedCacheEntries: decodedAudioBuffers.size,
       });
-      queuedAudioFiles.delete(normalizedKey);
+    }
+    const releasedBytes = releaseLoaderResponse(file);
+    queuedFiles.delete(fileId);
+    if (activeBatch && (file || releasedBytes > 0)) {
+      activeBatch.releasedResponses++;
+      activeBatch.releasedResponseBytes += releasedBytes;
     }
     if (!activeBatch) {
       return;
@@ -464,7 +524,6 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
     });
     if (String(file?.type) === "audio") {
       const key = String(file?.key ?? "unknown");
-      queuedAudioFiles.delete(key);
       audio(
         "loader-failed",
         {
@@ -474,6 +533,13 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
         },
         true,
       );
+    }
+    const fileId = loaderFileId(file?.key ?? "unknown", file?.type ?? "unknown");
+    const releasedBytes = releaseLoaderResponse(file);
+    queuedFiles.delete(fileId);
+    if (activeBatch && (file || releasedBytes > 0)) {
+      activeBatch.releasedResponses++;
+      activeBatch.releasedResponseBytes += releasedBytes;
     }
   });
 
@@ -505,9 +571,18 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
       missingTextures,
       missingTexturesTruncated:
         Boolean(batch) && missingTextures.length === MAX_MISSING_TEXTURES,
+      releasedResponses: batch?.releasedResponses ?? 0,
+      releasedResponseBytes: batch?.releasedResponseBytes ?? 0,
+      releasedResponseMiB: batch ? bytesToMiB(batch.releasedResponseBytes) : 0,
       memory: readMemorySnapshot(),
       webgl: readWebGlHealth(true),
     });
+    // Failed/aborted files may never emit filecomplete/loaderror. Ensure no
+    // stale response remains rooted by the per-loader tracking map.
+    for (const file of queuedFiles.values()) {
+      releaseLoaderResponse(file);
+    }
+    queuedFiles.clear();
     activeBatch = null;
   });
 
