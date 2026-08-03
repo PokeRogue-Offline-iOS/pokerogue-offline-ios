@@ -13,6 +13,11 @@ pose plus a unified SilverShadow material for the D-pad and every existing
 contextual action button. Keyboard, physical-controller, PokéRogue UI, and
 gameplay logic continue to use their existing paths.
 
+The refinement pass keeps that architecture and tunes only presentation: a
+slightly larger face, clearer rocking depth, brighter silver edging, premium
+pressed-button red edging, and continuous radial/angular D-pad chevron light.
+The three control-body opacity tokens are deliberately unchanged.
+
 The reference files reviewed were:
 
 - `src/core/TouchControls.lua`
@@ -96,17 +101,19 @@ raw pointer coordinates
 ```
 
 `#dpad` remains the full stable hit region. The stationary `#dpadGeometry`
-wrapper is 84% of that region and is the only element measured by
-`getBoundingClientRect()`. Its descendants are `#dpadVisual`, a stationary
+wrapper is now 88% of that region and is the only visual element measured by
+`getBoundingClientRect()`. Digital resolution independently retains the proven
+84%-of-hit-region width, so enlarging the face does not alter its dead zone or
+cardinal thresholds. Its descendants are `#dpadVisual`, a stationary
 `#dpadSocket`, a translated `#dpadShadow`, and the transformed `#dpadPivot`
 containing `#dpadFace`. The pivot and face are never used for input geometry.
 All decorative descendants have `pointer-events: none`.
 
 The cross-shaped face is an inline, resolution-independent SVG. It uses a dark
 charcoal base, restrained silver edge and groove, a raised center cap, and four
-red directional accent strokes. Only the accent matching the existing cardinal
-resolver becomes fully visible. Diagonal finger positions may tilt both axes,
-but still emit exactly one cardinal direction.
+outward open-chevron accents. Each chevron is two slanted SVG strokes with no
+inner base or fill. Diagonal finger positions may tilt both axes and illuminate
+two adjacent chevrons, but still emit exactly one cardinal direction.
 
 ## Visual-pose calculation and constants
 
@@ -114,21 +121,26 @@ but still emit exactly one cardinal direction.
 `hypot(dx, dy)`, divides it by half the visible width, and clamps the result to
 0..1. Direction is the raw normalized displacement. A clamped smoothstep curve,
 `t * t * (3 - 2 * t)`, maps distance to tilt, shadow displacement, and scale
-compression. This gives near-level motion close to center, moderate motion at
-half radius, and the maximum pose at the edge without overshoot outside it.
+compression and radial light strength. This gives near-level motion and faint
+light close to center, moderate response at half radius, and the maximum pose
+at the edge without overshoot outside it.
 
-Named TypeScript constants:
+Named TypeScript constants (previous -> refined):
 
-- Maximum active tilt: `6deg`
-- Maximum digitally-neutral micro-tilt: `0.75deg`
-- Maximum shadow offset: `2.5px`
-- Maximum scale compression: `1%`
+- Maximum active tilt: `6deg` -> `7.5deg`
+- Maximum digitally-neutral micro-tilt: `0.75deg` -> `0.9deg`
+- Maximum shadow offset: `2.5px` -> `3.25px`
+- Maximum scale compression: `1%` -> `1.2%`
+- Maximum normalized light strength: `1`
+- Digitally-neutral light cap: `0.12`
+- Primary cardinal light floor: `0.72`
+- Secondary angular weight: `0.55`
 
-Named CSS constants:
+Named CSS constants (previous -> refined where changed):
 
 - Perspective: `460px`
-- Active movement response: `42ms`
-- Release-to-level duration: `120ms`
+- Active movement response: `42ms` -> `38ms`
+- Release-to-level duration: `120ms` -> `115ms`
 - Button press duration: `45ms`
 - Button release duration: `80ms`
 - Button pressed scale: `0.97`
@@ -138,9 +150,18 @@ CSS rotation signs are documented in the pose module: upward DOM displacement
 produces positive `rotateX`, and rightward displacement produces positive
 `rotateY`, so the touched arm visually sinks.
 
+The light calculation uses the same smoothstep radial response as physical
+pose. In neutral, signed horizontal and vertical components are capped at
+`0.12`. Once a cardinal becomes active, it remains primary and receives a
+`0.72` minimum angular floor; the adjacent signed axis uses its normalized
+component times `0.55`, is capped below the primary, and never causes input.
+Opposite chevrons remain zero. The four resulting 0..1 strengths feed four CSS
+variables controlling a narrow core stroke and wider, low-alpha local halo.
+
 Pointer movement only replaces the pending target pose. A frame is requested
-only when none is already pending, applies the newest pose, and then clears its
-ID. There is no idle or permanent animation loop.
+only when none is already pending, applies tilt, scale, shadow, and all four
+light variables from the newest pose, and then clears its ID. There is no idle
+or permanent animation loop.
 
 ## Unified SilverShadow visual system
 
@@ -150,16 +171,18 @@ Shared CSS tokens define the material and timing:
 - `--ss-control-neutral-opacity: 0.4`
 - `--ss-control-active-opacity: 0.58`
 - `--ss-control-face` and `--ss-control-face-raised`: charcoal layers
-- `--ss-control-edge` and `--ss-control-edge-muted`: silver edging
-- `--ss-control-accent`: restrained SilverShadow red
+- `--ss-control-edge`: silver alpha `0.72` -> `0.82`
+- `--ss-control-edge-muted`: silver alpha `0.38` -> `0.48`
+- `--ss-control-accent`: SilverShadow red `rgba(222,45,62,0.95)` -> `rgb(240,44,62)`
 - `--ss-control-shadow`: compact local shadow
 - `--ss-control-label`: high-contrast label color
 - shared press/release duration tokens listed above
 
 Every existing `.apad-button` keeps its original DOM node, mapping, position,
 hit region, pointer capture, and independent active class. CSS supplies a dark
-translucent face, silver outer and inner rings, local depth shading, and a red
-pressed edge. Pressing a button changes only that node's `active` class, so two
+translucent face, brighter silver outer and inner rings, local depth shading,
+and a stronger red pressed edge plus inner lower-edge ring. Pressing a button
+changes only that node's `active` class, so two
 or three simultaneous buttons remain visually independent. Release of one
 pointer removes its visual only when no other pointer still owns that same
 button.
@@ -178,9 +201,10 @@ remain as fallback artwork. The primary SVG D-pad uses 30% idle, 40% captured
 but digitally neutral, and 58% active opacity. Action buttons use the same 30%
 idle and 58% active philosophy.
 
-The D-pad pointer region keeps the existing full `2 * --controls-size` square,
-while the visible art is 84% of that square. The resolver's 16% dead zone is
-based on visible art width, not the larger hit region. Action buttons gain 15%
+The D-pad pointer region keeps the existing full `2 * --controls-size` square.
+Visible art grows from 84% to 88% of that square, while the resolver deliberately
+continues using its former 84% reference width. The resolver's 16% dead zone and
+all input thresholds therefore remain unchanged. Action buttons gain 15%
 invisible hit slop on each edge through a pseudo-element; their visible size is
 unchanged.
 
@@ -199,7 +223,7 @@ Auto-hide clears transient visual state before fading while leaving hit regions
 available for the first waking touch.
 
 `prefers-reduced-motion: reduce` changes all visual transitions to zero
-duration. Cardinal accents, opacity changes, labels, pointer ownership, and
+duration. Continuous chevron strengths, opacity changes, labels, pointer ownership, and
 digital input remain active.
 
 The enhanced path uses Pointer Events and pointer capture. If Pointer Events,

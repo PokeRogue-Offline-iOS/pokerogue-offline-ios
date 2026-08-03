@@ -162,6 +162,7 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
 
   const enhancedClass = String.raw`export class TouchControl {
   // silvershadow-continuous-dpad
+  private static readonly dpadInputWidthRatio = 0.84;
   readonly events: Phaser.Events.EventEmitter;
   private disabled = false;
   private readonly legacyButtonLock = new Set<string>();
@@ -305,7 +306,7 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
             event.clientY,
             geometry.centerX,
             geometry.centerY,
-            geometry.width,
+            geometry.inputWidth,
           )
         ) {
           return;
@@ -333,7 +334,7 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
             event.clientY,
             geometry.centerX,
             geometry.centerY,
-            geometry.width,
+            geometry.inputWidth,
           )
         ) {
           return;
@@ -394,7 +395,7 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
     }
   }
 
-  private getDpadGeometry(): { centerX: number; centerY: number; width: number } | null {
+  private getDpadGeometry(): { centerX: number; centerY: number; inputWidth: number; visualWidth: number } | null {
     if (!this.dpadElement) {
       return null;
     }
@@ -402,17 +403,22 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
     // measured so visual rocking cannot feed back into digital input.
     const geometryRect = this.dpadGeometry?.getBoundingClientRect();
     if (geometryRect && geometryRect.width > 0) {
+      const hitRect = this.dpadElement.getBoundingClientRect();
       return {
         centerX: geometryRect.left + geometryRect.width / 2,
         centerY: geometryRect.top + geometryRect.height / 2,
-        width: geometryRect.width,
+        // Keep the hardware-proven dead-zone geometry at 84% even though the
+        // stationary artwork wrapper is now a slightly larger 88%.
+        inputWidth: hitRect.width * TouchControl.dpadInputWidthRatio,
+        visualWidth: geometryRect.width,
       };
     }
     const hitRect = this.dpadElement.getBoundingClientRect();
     return {
       centerX: hitRect.left + hitRect.width / 2,
       centerY: hitRect.top + hitRect.height / 2,
-      width: hitRect.width * 0.84,
+      inputWidth: hitRect.width * TouchControl.dpadInputWidthRatio,
+      visualWidth: hitRect.width * TouchControl.dpadInputWidthRatio,
     };
   }
 
@@ -443,13 +449,13 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
   private updateDpadVisualPose(
     pointerX: number,
     pointerY: number,
-    geometry: { centerX: number; centerY: number; width: number },
+    geometry: { centerX: number; centerY: number; inputWidth: number; visualWidth: number },
   ): void {
     this.scheduleDpadVisualPose(
       calculateDpadVisualPose(
         pointerX - geometry.centerX,
         pointerY - geometry.centerY,
-        geometry.width,
+        geometry.visualWidth,
         this.touchState.activeDirection,
       ),
     );
@@ -483,6 +489,10 @@ if (!touchSource.includes("silvershadow-continuous-dpad")) {
     this.dpadVisual.style.setProperty("--dpad-shadow-x", pose.shadowX.toFixed(3) + "px");
     this.dpadVisual.style.setProperty("--dpad-shadow-y", pose.shadowY.toFixed(3) + "px");
     this.dpadVisual.style.setProperty("--dpad-scale", (1 - pose.pressedDepth).toFixed(4));
+    this.dpadVisual.style.setProperty("--dpad-light-up", pose.lightUp.toFixed(4));
+    this.dpadVisual.style.setProperty("--dpad-light-right", pose.lightRight.toFixed(4));
+    this.dpadVisual.style.setProperty("--dpad-light-down", pose.lightDown.toFixed(4));
+    this.dpadVisual.style.setProperty("--dpad-light-left", pose.lightLeft.toFixed(4));
   }
 
   private resetDpadVisualPose(immediate = false): void {
@@ -776,10 +786,14 @@ if (!htmlSource.includes('id="dpadArtwork"')) {
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-face-base" d="M38 4Q34 4 34 8V34H8Q4 34 4 38V62Q4 66 8 66H34V92Q34 96 38 96H62Q66 96 66 92V66H92Q96 66 96 62V38Q96 34 92 34H66V8Q66 4 62 4Z" />
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-face-edge" d="M38 4Q34 4 34 8V34H8Q4 34 4 38V62Q4 66 8 66H34V92Q34 96 38 96H62Q66 96 66 92V66H92Q96 66 96 62V38Q96 34 92 34H66V8Q66 4 62 4Z" />
 \t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-groove" d="M40 12H60V40H88V60H60V88H40V60H12V40H40Z" />
-\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-up" d="M43 15H57" />
-\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-right" d="M85 43V57" />
-\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-down" d="M43 85H57" />
-\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-left" d="M15 43V57" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-halo ss-dpad-accent-up" d="M42 20L50 12L58 20" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-core ss-dpad-accent-up" d="M42 20L50 12L58 20" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-halo ss-dpad-accent-right" d="M80 42L88 50L80 58" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-core ss-dpad-accent-right" d="M80 42L88 50L80 58" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-halo ss-dpad-accent-down" d="M42 80L50 88L58 80" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-core ss-dpad-accent-down" d="M42 80L50 88L58 80" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-halo ss-dpad-accent-left" d="M20 42L12 50L20 58" />
+\t\t\t\t\t\t\t\t\t\t<path class="ss-dpad-accent ss-dpad-accent-core ss-dpad-accent-left" d="M20 42L12 50L20 58" />
 \t\t\t\t\t\t\t\t\t\t<circle class="ss-dpad-cap" cx="50" cy="50" r="10" />
 \t\t\t\t\t\t\t\t\t</svg>
 \t\t\t\t\t\t\t\t</div>
@@ -823,16 +837,16 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   --ss-control-active-opacity: 0.58;
   --ss-control-face: rgba(12, 14, 18, 0.9);
   --ss-control-face-raised: rgba(37, 41, 48, 0.9);
-  --ss-control-edge: rgba(210, 217, 226, 0.72);
-  --ss-control-edge-muted: rgba(210, 217, 226, 0.38);
-  --ss-control-accent: rgba(222, 45, 62, 0.95);
+  --ss-control-edge: rgba(221, 228, 237, 0.82);
+  --ss-control-edge-muted: rgba(221, 228, 237, 0.48);
+  --ss-control-accent: rgb(240, 44, 62);
   --ss-control-shadow: rgba(0, 0, 0, 0.62);
   --ss-control-label: rgba(248, 249, 252, 0.98);
   --ss-control-press-duration: 45ms;
   --ss-control-release-duration: 80ms;
   --dpad-perspective: 460px;
-  --dpad-movement-duration: 42ms;
-  --dpad-release-duration: 120ms;
+  --dpad-movement-duration: 38ms;
+  --dpad-release-duration: 115ms;
 }
 
 #touchControls.silvershadow-touch-upgrade #dpad {
@@ -856,8 +870,8 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
 /* Flat Gen1Recomp image remains available if the layered visual cannot initialize. */
 #touchControls.silvershadow-touch-upgrade #dpadArtwork {
   display: block;
-  width: 84%;
-  height: 84%;
+  width: 88%;
+  height: 88%;
   object-fit: contain;
   opacity: var(--ss-control-idle-opacity);
   pointer-events: none;
@@ -871,12 +885,12 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   opacity: var(--ss-control-active-opacity);
 }
 
-/* Stable 84% geometry wrapper: never apply a transform to this element. */
+/* Stable 88% visual geometry wrapper: digital input still uses its proven 84%. */
 #touchControls.silvershadow-rocking-visuals #dpadGeometry {
   position: relative;
   display: block;
-  width: 84%;
-  height: 84%;
+  width: 88%;
+  height: 88%;
   pointer-events: none;
 }
 
@@ -890,6 +904,10 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   --dpad-shadow-x: 0px;
   --dpad-shadow-y: 0px;
   --dpad-scale: 1;
+  --dpad-light-up: 0;
+  --dpad-light-right: 0;
+  --dpad-light-down: 0;
+  --dpad-light-left: 0;
   position: absolute;
   inset: 0;
   opacity: var(--ss-control-idle-opacity);
@@ -1002,18 +1020,37 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
 }
 
 .ss-dpad-accent {
+  --ss-dpad-light-strength: 0;
   fill: none;
   stroke: var(--ss-control-accent);
+  stroke-linejoin: round;
   stroke-linecap: round;
-  stroke-width: 4;
-  opacity: 0.14;
 }
 
-#dpad[data-active-direction="up"] .ss-dpad-accent-up,
-#dpad[data-active-direction="right"] .ss-dpad-accent-right,
-#dpad[data-active-direction="down"] .ss-dpad-accent-down,
-#dpad[data-active-direction="left"] .ss-dpad-accent-left {
-  opacity: 1;
+.ss-dpad-accent-up {
+  --ss-dpad-light-strength: var(--dpad-light-up);
+}
+
+.ss-dpad-accent-right {
+  --ss-dpad-light-strength: var(--dpad-light-right);
+}
+
+.ss-dpad-accent-down {
+  --ss-dpad-light-strength: var(--dpad-light-down);
+}
+
+.ss-dpad-accent-left {
+  --ss-dpad-light-strength: var(--dpad-light-left);
+}
+
+.ss-dpad-accent-halo {
+  stroke-width: 7;
+  opacity: calc(var(--ss-dpad-light-strength) * 0.34);
+}
+
+.ss-dpad-accent-core {
+  stroke-width: 3.2;
+  opacity: var(--ss-dpad-light-strength);
 }
 
 /* Existing button nodes remain independent hit regions; only their material changes. */
@@ -1058,18 +1095,23 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   border-color: var(--ss-control-accent);
   box-shadow:
     inset 0 2px 2px rgba(0, 0, 0, 0.6),
-    inset 0 -1px 0 rgba(222, 45, 62, 0.5),
+    inset 0 -2px 0 rgba(240, 44, 62, 0.68),
     0 1px 2px var(--ss-control-shadow);
   opacity: var(--ss-control-active-opacity);
   transform: translateY(1px) scale(0.97);
   transition-duration: var(--ss-control-press-duration);
 }
 
+#touchControls.silvershadow-rocking-visuals .apad-button.active::after {
+  border-color: rgba(240, 44, 62, 0.9);
+  box-shadow: inset 0 -2px 0 rgba(240, 44, 62, 0.38);
+}
+
 #touchControls.silvershadow-rocking-visuals .apad-button.active > .apad-label {
   color: #fff;
   text-shadow:
     0 1px 1px #000,
-    0 0 2px rgba(222, 45, 62, 0.72);
+    0 0 2px rgba(240, 44, 62, 0.8);
 }
 
 #touchControls.silvershadow-rocking-visuals #apadMenu > .apad-label {

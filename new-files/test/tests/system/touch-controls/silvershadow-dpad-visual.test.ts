@@ -3,10 +3,17 @@ import {
   SILVERSHADOW_DPAD_VISUAL_DEFAULTS,
   smoothstep,
 } from "#system/touch-controls/silvershadow-dpad-visual";
-import { describe, expect, it } from "vitest";
+import { resolveDpadDirection, SilverShadowTouchInputState } from "#system/touch-controls/silvershadow-touch-input";
+import { describe, expect, it, vi } from "vitest";
 
 describe("System - Touch controls - D-pad visual pose", () => {
   const width = 100;
+  const lightValues = (pose: ReturnType<typeof calculateDpadVisualPose>) => [
+    pose.lightUp,
+    pose.lightRight,
+    pose.lightDown,
+    pose.lightLeft,
+  ];
 
   it("returns a level finite pose at the exact center", () => {
     expect(calculateDpadVisualPose(0, 0, width, null)).toEqual({
@@ -18,6 +25,10 @@ describe("System - Touch controls - D-pad visual pose", () => {
       shadowX: 0,
       shadowY: 0,
       pressedDepth: 0,
+      lightUp: 0,
+      lightRight: 0,
+      lightDown: 0,
+      lightLeft: 0,
     });
   });
 
@@ -52,10 +63,10 @@ describe("System - Touch controls - D-pad visual pose", () => {
   });
 
   it.each([
-    [0, -50, 6, 0],
-    [0, 50, -6, 0],
-    [-50, 0, 0, -6],
-    [50, 0, 0, 6],
+    [0, -50, 7.5, 0],
+    [0, 50, -7.5, 0],
+    [-50, 0, 0, -7.5],
+    [50, 0, 0, 7.5],
   ] as const)("maps cardinal displacement (%s, %s) to tilt (%s, %s)", (dx, dy, tiltX, tiltY) => {
     const pose = calculateDpadVisualPose(dx, dy, width, "UP");
     expect(pose.tiltXDegrees).toBeCloseTo(tiltX);
@@ -108,5 +119,118 @@ describe("System - Touch controls - D-pad visual pose", () => {
     for (let index = 1; index < tilts.length; index++) {
       expect(tilts[index]).toBeGreaterThanOrEqual(tilts[index - 1]);
     }
+  });
+
+  it("increases directional light continuously with radial distance", () => {
+    const distances = [0, 10, 20, 30, 40, 50];
+    const strengths = distances.map(dx => calculateDpadVisualPose(dx, 0, width, "RIGHT").lightRight);
+    for (let index = 1; index < strengths.length; index++) {
+      expect(strengths[index]).toBeGreaterThan(strengths[index - 1]);
+    }
+  });
+
+  it("clamps directional light at the artwork edge and beyond", () => {
+    const edge = calculateDpadVisualPose(50, 0, width, "RIGHT");
+    const outside = calculateDpadVisualPose(500, 0, width, "RIGHT");
+    expect(edge.lightRight).toBe(SILVERSHADOW_DPAD_VISUAL_DEFAULTS.maximumLightStrength);
+    expect(outside.lightRight).toBe(edge.lightRight);
+  });
+
+  it.each([
+    [0, -50, "UP", "lightUp"],
+    [50, 0, "RIGHT", "lightRight"],
+    [0, 50, "DOWN", "lightDown"],
+    [-50, 0, "LEFT", "lightLeft"],
+  ] as const)("lights only the active cardinal at a pure %s/%s position", (dx, dy, direction, light) => {
+    const pose = calculateDpadVisualPose(dx, dy, width, direction);
+    expect(pose[light]).toBe(1);
+    expect(lightValues(pose).filter(value => value > 0)).toHaveLength(1);
+  });
+
+  it("lights both adjacent chevrons for a diagonal visual position", () => {
+    const pose = calculateDpadVisualPose(35, -35, width, "UP");
+    expect(pose.lightUp).toBeGreaterThan(0);
+    expect(pose.lightRight).toBeGreaterThan(0);
+    expect(pose.lightUp).toBeGreaterThan(pose.lightRight);
+    expect(pose.lightDown).toBe(0);
+    expect(pose.lightLeft).toBe(0);
+  });
+
+  it("weights the adjacent diagonal light below the primary light", () => {
+    const pose = calculateDpadVisualPose(40, -30, width, "RIGHT");
+    expect(pose.lightRight).toBeGreaterThan(pose.lightUp);
+    expect(pose.lightUp).toBeCloseTo(0.55 * 0.6);
+  });
+
+  it("never illuminates the direction opposite the active cardinal", () => {
+    const samples = [
+      calculateDpadVisualPose(30, -40, width, "UP"),
+      calculateDpadVisualPose(30, 40, width, "DOWN"),
+      calculateDpadVisualPose(-40, -30, width, "LEFT"),
+      calculateDpadVisualPose(40, 30, width, "RIGHT"),
+    ];
+    expect(samples[0].lightDown).toBe(0);
+    expect(samples[1].lightUp).toBe(0);
+    expect(samples[2].lightRight).toBe(0);
+    expect(samples[3].lightLeft).toBe(0);
+  });
+
+  it("keeps neutral preview lighting subtle and directionally local", () => {
+    const pose = calculateDpadVisualPose(8, -8, width, null);
+    expect(pose.lightUp).toBeGreaterThan(0);
+    expect(pose.lightRight).toBeGreaterThan(0);
+    expect(Math.max(...lightValues(pose))).toBeLessThanOrEqual(SILVERSHADOW_DPAD_VISUAL_DEFAULTS.neutralLightMaximum);
+    expect(pose.lightDown).toBe(0);
+    expect(pose.lightLeft).toBe(0);
+  });
+
+  it("keeps every light finite and within its normalized range", () => {
+    for (const [dx, dy] of [
+      [1, 1],
+      [50, 0],
+      [-500, 500],
+    ]) {
+      const pose = calculateDpadVisualPose(dx, dy, width, "DOWN");
+      for (const light of lightValues(pose)) {
+        expect(Number.isFinite(light)).toBe(true);
+        expect(light).toBeGreaterThanOrEqual(0);
+        expect(light).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("does not alter the cardinal-only digital resolver result", () => {
+    const samples = [
+      [40, -30, "RIGHT"],
+      [30, -40, "UP"],
+      [-40, 30, "LEFT"],
+      [-30, 40, "DOWN"],
+    ] as const;
+    for (const [dx, dy, expected] of samples) {
+      const direction = resolveDpadDirection(dx, dy, width);
+      calculateDpadVisualPose(dx, dy, width, direction);
+      expect(direction).toBe(expected);
+      expect(["UP", "RIGHT", "DOWN", "LEFT"]).toContain(direction);
+    }
+  });
+
+  it("does not emit additional input events when visual lighting updates", () => {
+    const press = vi.fn();
+    const release = vi.fn();
+    const input = new SilverShadowTouchInputState({ press, release });
+    expect(input.captureDpad(7, 30, -40, 0, 0, width)).toBe(true);
+    expect(input.activeDirection).toBe("UP");
+
+    for (const [dx, dy] of [
+      [30, -40],
+      [35, -35],
+      [40, -30],
+    ]) {
+      calculateDpadVisualPose(dx, dy, width, input.activeDirection);
+    }
+
+    expect(press).toHaveBeenCalledTimes(1);
+    expect(press).toHaveBeenCalledWith("UP");
+    expect(release).not.toHaveBeenCalled();
   });
 });

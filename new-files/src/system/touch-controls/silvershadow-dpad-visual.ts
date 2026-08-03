@@ -9,6 +9,10 @@ export interface DpadVisualPose {
   shadowX: number;
   shadowY: number;
   pressedDepth: number;
+  lightUp: number;
+  lightRight: number;
+  lightDown: number;
+  lightLeft: number;
 }
 
 export interface DpadVisualConfig {
@@ -16,6 +20,10 @@ export interface DpadVisualConfig {
   maximumNeutralTiltDegrees: number;
   maximumShadowOffsetPx: number;
   maximumCompressionRatio: number;
+  maximumLightStrength: number;
+  neutralLightMaximum: number;
+  primaryLightFloor: number;
+  secondaryLightWeight: number;
 }
 
 /**
@@ -23,10 +31,14 @@ export interface DpadVisualConfig {
  * timings are CSS tokens because they do not participate in pose calculation.
  */
 export const SILVERSHADOW_DPAD_VISUAL_DEFAULTS: Readonly<DpadVisualConfig> = Object.freeze({
-  maximumTiltDegrees: 6,
-  maximumNeutralTiltDegrees: 0.75,
-  maximumShadowOffsetPx: 2.5,
-  maximumCompressionRatio: 0.01,
+  maximumTiltDegrees: 7.5,
+  maximumNeutralTiltDegrees: 0.9,
+  maximumShadowOffsetPx: 3.25,
+  maximumCompressionRatio: 0.012,
+  maximumLightStrength: 1,
+  neutralLightMaximum: 0.12,
+  primaryLightFloor: 0.72,
+  secondaryLightWeight: 0.55,
 });
 
 const levelPose: Readonly<DpadVisualPose> = Object.freeze({
@@ -38,6 +50,10 @@ const levelPose: Readonly<DpadVisualPose> = Object.freeze({
   shadowX: 0,
   shadowY: 0,
   pressedDepth: 0,
+  lightUp: 0,
+  lightRight: 0,
+  lightDown: 0,
+  lightLeft: 0,
 });
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -48,6 +64,48 @@ function clamp(value: number, minimum: number, maximum: number): number {
 export function smoothstep(value: number): number {
   const clamped = clamp(Number.isFinite(value) ? value : 0, 0, 1);
   return clamped * clamped * (3 - 2 * clamped);
+}
+
+interface DirectionalLights {
+  up: number;
+  right: number;
+  down: number;
+  left: number;
+}
+
+function calculateDirectionalLights(
+  unitX: number,
+  unitY: number,
+  response: number,
+  activeDirection: CardinalDirection | null,
+  config: DpadVisualConfig,
+): DirectionalLights {
+  const maximumLight = clamp(config.maximumLightStrength, 0, 1);
+  const neutralLightMaximum = clamp(config.neutralLightMaximum, 0, maximumLight);
+  const primaryLightFloor = clamp(config.primaryLightFloor, 0, 1);
+  const secondaryLightWeight = clamp(config.secondaryLightWeight, 0, 1);
+  const horizontalInfluence = Math.abs(unitX);
+  const verticalInfluence = Math.abs(unitY);
+  const lights: DirectionalLights = { up: 0, right: 0, down: 0, left: 0 };
+  const verticalLight = unitY < 0 ? "up" : "down";
+  const horizontalLight = unitX < 0 ? "left" : "right";
+
+  if (activeDirection === null) {
+    lights[verticalLight] = Math.min(response * verticalInfluence * maximumLight, neutralLightMaximum);
+    lights[horizontalLight] = Math.min(response * horizontalInfluence * maximumLight, neutralLightMaximum);
+    return lights;
+  }
+
+  const primaryIsVertical = activeDirection === "UP" || activeDirection === "DOWN";
+  const primaryInfluence = primaryIsVertical ? verticalInfluence : horizontalInfluence;
+  const secondaryInfluence = primaryIsVertical ? horizontalInfluence : verticalInfluence;
+  const primaryStrength = response * (primaryLightFloor + (1 - primaryLightFloor) * primaryInfluence) * maximumLight;
+  const secondaryStrength = response * secondaryInfluence * secondaryLightWeight * maximumLight;
+  const primaryLight = activeDirection.toLowerCase() as keyof DirectionalLights;
+  const secondaryLight = primaryIsVertical ? horizontalLight : verticalLight;
+  lights[primaryLight] = clamp(primaryStrength, 0, maximumLight);
+  lights[secondaryLight] = Math.min(clamp(secondaryStrength, 0, maximumLight), lights[primaryLight] * 0.8);
+  return lights;
 }
 
 /**
@@ -72,6 +130,10 @@ export function calculateDpadVisualPose(
       config.maximumNeutralTiltDegrees,
       config.maximumShadowOffsetPx,
       config.maximumCompressionRatio,
+      config.maximumLightStrength,
+      config.neutralLightMaximum,
+      config.primaryLightFloor,
+      config.secondaryLightWeight,
     ].every(Number.isFinite)
   ) {
     return { ...levelPose };
@@ -93,6 +155,7 @@ export function calculateDpadVisualPose(
     activeDirection === null ? Math.min(maximumTilt * response, neutralTilt) : maximumTilt * response;
   const shadowMagnitude = Math.max(0, config.maximumShadowOffsetPx) * response;
   const compressionLimit = clamp(config.maximumCompressionRatio, 0, 1);
+  const lights = calculateDirectionalLights(unitX, unitY, response, activeDirection, config);
 
   return {
     normalizedX: unitX * normalizedDistance,
@@ -103,5 +166,9 @@ export function calculateDpadVisualPose(
     shadowX: -unitX * shadowMagnitude,
     shadowY: -unitY * shadowMagnitude,
     pressedDepth: compressionLimit * response,
+    lightUp: lights.up,
+    lightRight: lights.right,
+    lightDown: lights.down,
+    lightLeft: lights.left,
   };
 }

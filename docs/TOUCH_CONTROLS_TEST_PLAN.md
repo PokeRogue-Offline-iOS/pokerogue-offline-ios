@@ -24,13 +24,16 @@ up/cancel cleanup, simultaneous D-pad/action input, independent action pointers,
 shared-action hold counts, and visibility-loss-style reset.
 
 The visual-pose tests cover exact center, neutral micro-movement, continuously
-increasing tilt, maximum clamping, outside-artwork pointers, four cardinals,
-diagonal leaning, symmetry, invalid dimensions, finite output, smoothstep
-endpoints, and monotonic distance-to-tilt response. The integration contract
-checks stable geometry, frame coalescing, cleanup resets, redundant artwork
-suppression, independent button classes, D-pad/button coexistence, auto-hide,
-configuration mode, reduced motion, fallback markup, current mappings, and the
-Start display label.
+increasing tilt and light, maximum clamping, outside-artwork pointers, four
+cardinals, diagonal leaning and adjacent light, primary/secondary weighting,
+opposite-direction exclusion, symmetry, invalid dimensions, finite normalized
+output, smoothstep endpoints, cardinal-only resolver independence, no input
+events from visual calculations, and monotonic response. The integration
+contract checks stable 84% digital versus 88% visual geometry, frame
+coalescing, four independent chevron variables, open-chevron markup, cleanup
+resets, redundant artwork suppression, independent button classes,
+D-pad/button coexistence, auto-hide, configuration mode, reduced motion,
+fallback markup, current mappings, and the Start display label.
 
 ## Android device setup
 
@@ -73,16 +76,46 @@ default-position tests.
 14. Connect and use a physical controller, then use keyboard input on a desktop
     build if available. Confirm neither behavior changed.
 
-## Rocking D-pad device checklist
+## Visual-refinement Android checklist
 
-1. Touch exact center: no game movement; neutral state; level or nearly level face.
-2. Move slightly within neutral: tiny rock; no game input or full red accent.
-3. Continue outward: the cardinal direction activates and tilt increases smoothly.
-4. Move farther: tilt grows progressively but remains capped.
-5. Circle around the D-pad: the face rocks continuously while game input stays cardinal-only.
-6. Hold near a diagonal: both visual axes lean while only one digital direction is active.
-7. Move beyond the artwork: tilt remains capped and ownership stays stable.
-8. Release or cancel: input releases and the face returns smoothly to level.
+1. Confirm the D-pad is slightly larger and visually balanced against the
+   right-side cluster in portrait and landscape.
+2. Confirm rocking is easier to notice but remains restrained.
+3. Move slightly from center: expect small rocking and faint lighting with no
+   game input inside neutral.
+4. Move farther outward: expect stronger rocking and brighter lighting.
+5. Hold at or beyond the edge: expect maximum restrained lighting and a capped
+   transform.
+6. Compare bright and dark scenes: resting silver outlines should be easier to
+   locate on the D-pad, A/B, contextual, and utility controls.
+7. Confirm the charcoal control bodies retain the previous 30% idle, 40%
+   captured-neutral, and 58% active opacity philosophy.
+8. Check Up, Down, Left, and Right: every open chevron must point outward in
+   the correct direction.
+9. Inspect each chevron: it must have two slanted sides, no fill, and no inner
+   base stroke.
+10. Move slowly from center outward: the relevant chevron should brighten
+    progressively.
+11. Move slowly back inward: the chevron should dim progressively to zero at
+    exact center.
+12. Hold mostly Up with some Right: Up should be strong and Right softer.
+13. Hold mostly Right with some Down: Right should be strong and Down softer.
+14. Move slowly across diagonal boundaries: the actual dominant cardinal must
+    remain the brightest cue.
+15. Confirm navigation and movement remain cardinal-only even while two visual
+    chevrons are lit.
+16. Confirm no accidental double navigation or diagonal key combination occurs.
+17. Check every action button: the stronger red pressed edge should feel
+    satisfying without becoming distracting.
+18. Hold two or three buttons with the D-pad: every button visual remains
+    independent while rocking and lighting continue.
+19. Wait for auto-hide and exercise cancellation/lifecycle paths: no chevron,
+    button glow, or tilt may remain stale.
+20. Rapidly circle the D-pad while multi-button tapping: animation and gameplay
+    should remain smooth.
+
+Release or cancellation must still release input and return the face, shadow,
+and all four chevrons smoothly to their zero pose.
 
 ## Action-button device checklist
 

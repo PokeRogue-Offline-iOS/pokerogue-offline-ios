@@ -8,6 +8,9 @@ const styles = readFileSync("index.css", "utf8");
 describe("System - Touch controls - visual integration contract", () => {
   it("keeps geometry stationary and never measures transformed artwork", () => {
     expect(runtime).toContain("this.dpadGeometry?.getBoundingClientRect()");
+    expect(runtime).toContain("dpadInputWidthRatio = 0.84");
+    expect(runtime).toContain("inputWidth: hitRect.width * TouchControl.dpadInputWidthRatio");
+    expect(runtime).toContain("visualWidth: geometryRect.width");
     expect(runtime).not.toContain("this.dpadArtwork?.getBoundingClientRect()");
     expect(runtime).not.toContain("this.dpadVisual?.getBoundingClientRect()");
     expect(markup.indexOf('id="dpadGeometry"')).toBeLessThan(markup.indexOf('id="dpadPivot"'));
@@ -19,6 +22,9 @@ describe("System - Touch controls - visual integration contract", () => {
     expect(runtime).toContain("if (this.dpadVisualFrameId !== null)");
     expect(runtime).toContain("this.pendingDpadVisualPose = pose");
     expect(runtime).toContain("cancelAnimationFrame(this.dpadVisualFrameId)");
+    for (const direction of ["up", "right", "down", "left"]) {
+      expect(runtime).toContain(`--dpad-light-${direction}`);
+    }
   });
 
   it("resets visual pose for pointer and lifecycle cleanup", () => {
@@ -44,6 +50,17 @@ describe("System - Touch controls - visual integration contract", () => {
     expect(styles).toContain("#dpad.captured #dpadPivot");
     expect(styles).toContain(".apad-button.active");
     expect(runtime).toContain("this.updateDpadVisualPose(event.clientX, event.clientY, geometry)");
+  });
+
+  it("uses independent distance-sensitive open-chevron lighting", () => {
+    for (const direction of ["up", "right", "down", "left"]) {
+      expect(styles).toContain(`--ss-dpad-light-strength: var(--dpad-light-${direction})`);
+      expect(markup).toContain(`ss-dpad-accent-core ss-dpad-accent-${direction}`);
+      expect(markup).toContain(`ss-dpad-accent-halo ss-dpad-accent-${direction}`);
+    }
+    expect(markup).toContain('d="M42 20L50 12L58 20"');
+    expect(markup).not.toContain('d="M43 15H57"');
+    expect(styles).toContain("opacity: var(--ss-dpad-light-strength)");
   });
 
   it("clears transient state for auto-hide and configuration mode", () => {
@@ -82,6 +99,7 @@ describe("System - Touch controls - visual integration contract", () => {
   it("retains active indication with reduced motion", () => {
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(styles).toContain("transition-duration: 0ms");
-    expect(styles).toContain('#dpad[data-active-direction="up"] .ss-dpad-accent-up');
+    expect(styles).toContain("--dpad-light-up: 0");
+    expect(styles).toContain(".ss-dpad-accent-core");
   });
 });
