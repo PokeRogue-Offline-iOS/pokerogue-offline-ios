@@ -42,6 +42,7 @@ apply_patch "advanced-battle-cheats.js"     all
 apply_patch "advanced-capture-cheats.js"    all
 apply_patch "advanced-progression-cheats.js" all
 apply_patch "candy-jar-cheat.js"            all
+apply_patch "pokemon-editor.js"             all
 apply_patch "organize-cheat-settings.js"    all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all

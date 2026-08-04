@@ -172,7 +172,9 @@ All sandbox options:
 Technical behavior, version differences, validation results, and the manual test
 matrix are documented in [Futuba Cheat Analysis](docs/FUTABA_CHEAT_ANALYSIS.md).
 The newer battle, capture, evolution, TM, and multiplier behavior is documented
-in [Advanced Cheats](docs/ADVANCED_CHEATS.md).
+in [Advanced Cheats](docs/ADVANCED_CHEATS.md). The starter and active-party
+editor, saved builds, and unrestricted registry move browser are documented in
+[Pokemon Editor](docs/POKEMON_EDITOR.md).
 
 ## Additional Quality-of-Life Features
 
