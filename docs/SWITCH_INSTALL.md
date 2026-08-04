@@ -2,7 +2,7 @@
 
 The Switch Alpha reached gameplay on a tested Switch OLED. The indexed
 asset-pack layout and ranged-read compatibility fix have also launched on that
-hardware. Version 1.0.3 packages the same tested runtime path for public Alpha
+hardware. Version 2.0.0 packages the same tested runtime path for public Alpha
 testing; it is not a stable or comprehensively stress-tested release.
 
 ## Requirements

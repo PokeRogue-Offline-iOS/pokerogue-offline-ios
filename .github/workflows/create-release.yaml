@@ -373,6 +373,11 @@ jobs:
         id: version
         run: |
           VERSION=$(cat ipa-out/version.txt)
+          EXPECTED_VERSION=$(node scripts/read-release-version.js)
+          if [ "$VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "::error::iOS artifact version $VERSION does not match shared release version $EXPECTED_VERSION"
+            exit 1
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Found Version: ${VERSION}"
 
@@ -481,7 +486,8 @@ jobs:
       # `seed`, and that's the URL baked into shipped builds' AltStore source
       # and repo.json's own iconURL/website fields. `main` no longer carries
       # a copy, so check out `seed` and update its repo.json directly.
-      # appIcon.png is also re-copied from `main` in case the icon changed.
+      # appIcon.png is generated from the same Android-owned artwork used by
+      # every packaged platform.
       # -----------------------------------------------------------------------
       - name: Checkout seed branch
         if: ${{ steps.gate.outputs.is_release == 'true' }}
@@ -502,7 +508,7 @@ jobs:
       - name: Commit AltStore source to seed branch
         if: ${{ steps.gate.outputs.is_release == 'true' }}
         run: |
-          cp docs/appIcon.png seed-branch/docs/appIcon.png
+          cp configs/android/icon-main.png seed-branch/docs/appIcon.png
           cd seed-branch
           git config user.name "ScooomBot"
           git config user.email "scooombot@scooom.xyz"

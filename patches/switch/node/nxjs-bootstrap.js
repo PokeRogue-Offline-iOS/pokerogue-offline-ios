@@ -1923,8 +1923,12 @@ if (!modifierSelectUi.includes(modifierMarkClaimedReplacement)) {
 write(modifierSelectUiPath, modifierSelectUi);
 
 let title = read(titlePath);
+const silverShadowVersion = read(path.join("configs", "release-version.txt")).trim();
+if (!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(silverShadowVersion)) {
+  fail(`Invalid shared SilverShadow version: ${JSON.stringify(silverShadowVersion)}`);
+}
 for (const [placeholder, replacement] of [
-  ["SILVERSHADOW_VERSION_PLACEHOLDER", "1.0.3"],
+  ["SILVERSHADOW_VERSION_PLACEHOLDER", silverShadowVersion],
   ["BUILD_NUMBER_PLACEHOLDER", "Switch M2"],
 ]) {
   if (!title.includes(placeholder)) {

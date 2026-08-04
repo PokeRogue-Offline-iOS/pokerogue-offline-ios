@@ -13,9 +13,9 @@ Before installing an update, export your save data and active session as a preca
 
 The Switch build is an experimental homebrew Alpha. Read the installation and known-issues sections below before using it.
 
-## v1.0.3 Highlights
+## v2.0.0 Highlights
 
-Version 1.0.3 expands the Offline sandbox with starter customization, reward
+Version 2.0.0 expands the Offline sandbox with starter customization, reward
 generation, progression, and battle-debugging options. It also adds the first
 public Nintendo Switch Alpha package, including:
 
@@ -41,7 +41,7 @@ The expanded sandbox includes:
 - **Shiny Rate**, **Always Shiny**, **Rare Eggs**, **Instant Hatch**, and **Form
   Change Items** provide configurable generation and progression shortcuts.
 
-The experimental **Fast Reward UI** option was removed from v1.0.3. Reward
+The experimental **Fast Reward UI** option was removed from v2.0.0. Reward
 claims use the normal game interface and animation flow for stability.
 
 ## Features
@@ -376,7 +376,12 @@ The fat NRO already contains the nx.js runtime. No separate runtime NRO, NSP for
 
 Run the **Build PokeRogueOffline Switch NRO** workflow manually, or let it run for a matching pull request or push to `main`. The workflow builds the pinned, SilverShadow-patched PokÃ©Rogue source, creates a fat NRO, generates the Homebrew Menu icon from `configs/android/icon-main.png`, builds and verifies the four `.sspack` files, and uploads `SilverShadow-PokeRogue-vX.Y.Z-switch.zip`. The ZIP starts with the `switch/` directory and is ready to extract to an SD-card root.
 
-The shared release version comes from `SILVERSHADOW_VERSION` near the top of `.github/workflows/build-android.yml`. Updating that one value controls the Switch manifest, NRO metadata, artifact name, and ZIP filename as well as the Android release version. The workflow rejects an invalid version before beginning the large build.
+The shared release version comes from `configs/release-version.txt`. Updating
+that one file controls Android, iOS, Windows, macOS, Linux AppImage, Switch,
+release tags, native package metadata, title-screen banners, and artifact
+versioning. Every packaged icon is generated from
+`configs/android/icon-main.png`, or `configs/android/icon-dev.png` for supported
+development builds. The workflows reject an invalid version before packaging.
 
 ### Expected Loading Behavior
 

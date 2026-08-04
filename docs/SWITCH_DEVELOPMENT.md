@@ -146,7 +146,7 @@ the checksum and pack index, exactly four `.sspack` files, and none of the old
 many-file static asset directories.
 
 The workflow reads `SILVERSHADOW_VERSION` from
-`.github/workflows/build-android.yml`, exports it to the Switch build, and
+`configs/release-version.txt`, exports it to the Switch build, and
 temporarily applies it to `switch/package.json` while `nxjs-nro` generates the
 NRO metadata. It restores the checked-in metadata before release manifests are
 created. The same workflow regenerates `switch/icon.jpg` as a 256x256 JPEG

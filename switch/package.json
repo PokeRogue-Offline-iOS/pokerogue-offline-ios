@@ -1,6 +1,6 @@
 {
   "name": "silvershadow-pokerogue-switch",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "private": true,
   "description": "SilverShadow PokeRogue nx.js V8 Milestone 2 real-game bootstrap",
   "type": "module",
