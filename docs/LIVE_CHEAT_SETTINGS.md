@@ -27,6 +27,19 @@ value again without relying on boot-time or scene-initialization state.
 | Infinite Player HP | On the next player damage boundary |
 | Infinite Player PP | On the next player moveset, move-use, or PP-drain boundary |
 | Player OHKO | On the next first hit of a player damage move |
+| Never Miss | On the next player accuracy check |
+| Always Critical Hit | On the next player damage calculation |
+| Always Move First | On the next queued attack-order comparison |
+| No Charge / Recharge Turns | On the next player charge or recharge effect |
+| Full Heal After Every Battle | At the end of the next victorious battle |
+| Unlimited Poke Balls | On the next ball selection and throw |
+| Catch Trainer Pokemon | On the next trainer-battle ball eligibility check |
+| Catch Pokemon in Double Battles | On the next wild double-battle ball command |
+| Catch Bosses Through Shields | On the next boss-shield capture check |
+| Money Multiplier | On the next positive money gain |
+| EXP Multiplier | On the next per-Pokemon EXP award |
+| Ignore Evolution Requirements | On the next level-up evolution lookup |
+| Unlimited TM Compatibility | On the next TM generation or compatibility query |
 
 Turning a generator setting on does not rewrite already-generated state. For
 example, Always Shiny affects the next eligible Pokémon, Starting Level affects
@@ -43,6 +56,10 @@ after the setting changes.
 The settings UI appends an asterisk only to these two rows and performs its
 existing in-process reset when the Offline settings screen closes after either
 one changes.
+
+The complete advanced behavior, capture continuation design, setting
+categories, deferred arbitrary-starter-move design, and back-to-back manual
+test plan are documented in [ADVANCED_CHEATS.md](ADVANCED_CHEATS.md).
 
 ## Shop override correction
 

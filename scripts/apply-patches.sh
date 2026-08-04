@@ -38,6 +38,10 @@ apply_patch "player-ohko.js"                all
 apply_patch "infinite-player-pp.js"         all
 apply_patch "infinite-player-hp.js"         all
 apply_patch "live-cheat-settings.js"        all
+apply_patch "advanced-battle-cheats.js"     all
+apply_patch "advanced-capture-cheats.js"    all
+apply_patch "advanced-progression-cheats.js" all
+apply_patch "organize-cheat-settings.js"    all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all
 
