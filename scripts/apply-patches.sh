@@ -38,6 +38,11 @@ apply_patch "player-ohko.js"                all
 apply_patch "infinite-player-pp.js"         all
 apply_patch "infinite-player-hp.js"         all
 apply_patch "live-cheat-settings.js"        all
+apply_patch "advanced-battle-cheats.js"     all
+apply_patch "advanced-capture-cheats.js"    all
+apply_patch "advanced-progression-cheats.js" all
+apply_patch "candy-jar-cheat.js"            all
+apply_patch "organize-cheat-settings.js"    all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all
 
@@ -63,6 +68,10 @@ if [[ "$PLATFORM" == "switch" ]]; then
   # Google OAuth and Drive require a browser/native sign-in bridge and remote
   # network access. Keep those rows out of the strictly offline Switch build.
   apply_patch "remove-google-drive.js" switch
+
+  # remove-google-drive installs a compact local-only Offline handler. Reapply
+  # the idempotent shared patch so its native Candy Jar picker remains present.
+  apply_patch "candy-jar-cheat.js" all
 
   # Hand the real Phaser application the nx.js screen canvas and inject the
   # Switch Milestone 2 build label. Browser compatibility stays in the nx.js

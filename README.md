@@ -89,7 +89,8 @@ All sandbox options:
 
 - Default to **Off** or the normal game value
 - Are stored locally
-- Require a reload after being changed
+- Take effect at their next documented runtime boundary; only **60 Starter
+  Points** and **Allow Duplicate Starters** retain an in-process reload
 - Can be enabled together, except that reward claiming uses one mutually
   exclusive mode
 
@@ -101,6 +102,10 @@ All sandbox options:
 | **Free Rerolls** | Makes normal and locked reward rerolls cost zero. |
 | **Free Egg Gacha Pulls** | Egg Gacha pulls do not consume vouchers or tokens. |
 | **Guaranteed Capture** | Every valid Poké Ball throw captures the target while still consuming one ball. |
+| **Unlimited Poke Balls** | Allows every ball type to be thrown at zero count without consuming inventory. |
+| **Catch Trainer Pokemon** | Allows trainer-owned Pokemon to be captured while the battle continues through remaining opponents. |
+| **Catch Pokemon in Double Battles** | Adds target selection and continuation when capturing one opponent in a wild double battle. |
+| **Catch Bosses Through Shields** | Bypasses the remaining-shield capture check without bypassing other encounter restrictions. |
 | **Reward Claim Mode** | **Default** keeps the normal single choice, **Claim All** allows each generated slot to be taken once, and **Infinite** retains eligible rewards for repeated selection. |
 | **Max Luck (SSS)** | Sets effective party luck to 14, the maximum SSS value used by the luck and reward systems. |
 | **Pokémon Candy Multiplier** | Selects Default, 2x, 5x, 10x, 50x, or 100x species-candy awards while preserving the normal cap. |
@@ -118,12 +123,23 @@ All sandbox options:
 | **Infinite Player HP** | Makes every battle damage result zero for both player field slots; enemies retain normal damage. |
 | **Infinite Player PP** | Prevents move-use, Pressure, Grudge, and move-based PP depletion for the player's party without changing enemy PP or PP Up/PP Max upgrades. |
 | **Player OHKO** | Amplifies the first successful hit of a player damage move while preserving immunities, protection, substitutes, Endure effects, boss shields, and scripted boss caps. |
+| **Never Miss** | Makes player accuracy rolls succeed while preserving protection, immunity, reflection, and semi-invulnerable-state rules. |
+| **Always Critical Hit** | Marks every non-fixed player damage calculation as critical. |
+| **Always Move First** | Orders player attacks before opponent attacks while retaining normal order within each side. |
+| **No Charge / Recharge Turns** | Resolves player charging moves immediately and suppresses Hyper Beam-style recharge turns. |
+| **Full Heal After Every Battle** | Restores the full party's HP, PP, faint/status state, and confusion after a victory. |
+| **Money Multiplier** | Selects Default, 2x, 5x, 10x, or 100x for positive money gains without changing prices. |
+| **EXP Multiplier** | Selects Default, 2x, 4x, 8x, 16x, or 100x for each party member's EXP award. |
+| **Candy Jar Count** | Opens the native scrolling picker to set an exact 0-9,999 starting or live-run Candy Jar stack; the old 99-stack runtime cap is removed. |
+| **Ignore Evolution Requirements** | Makes the first matching formal evolution eligible on the next level-up event, one evolution per EXP award. |
+| **Unlimited TM Compatibility** | Makes the complete TM reward pool teachable to every player Pokemon. |
 
 ### Sandbox Notes
 
 - **Guaranteed Capture** does not bypass encounters where Poké Balls cannot normally be used, including Trainer battles and other restricted encounters.
 - **Pokémon Candy Multiplier** affects awarded species candy. It does not modify Rare Candy battle items or the separate **Candy Costs** setting.
 - **Candy Costs** applies to passive unlocks, both starter point reductions, and same-species eggs. Rebalanced costs are 25% of normal, rounded up; Free costs are zero.
+- **Candy Jar Count** affects both Rare Candy and Rarer Candy through their normal Candy Jar modifier. Outside a run it configures the next run; inside a run the row displays and edits the real current stack immediately.
 - **60 Starter Points** changes the point limit only. Combine it with **Allow Duplicate Starters** when selecting costly duplicate teams.
 - With duplicate starters enabled, species-grid customization prepares the next copy. Highlight a selected copy in the team panel to edit or remove that specific copy; adding another copy is done from the main species pool. Gender, moves, nature, ability, form, shiny variant, Tera type, and passive selection are stored per copy and survive save/continue.
 - Passive ownership is still unlocked once per species, while the enabled/disabled passive choice is stored independently on each selected duplicate.
@@ -155,6 +171,8 @@ All sandbox options:
 
 Technical behavior, version differences, validation results, and the manual test
 matrix are documented in [Futuba Cheat Analysis](docs/FUTABA_CHEAT_ANALYSIS.md).
+The newer battle, capture, evolution, TM, and multiplier behavior is documented
+in [Advanced Cheats](docs/ADVANCED_CHEATS.md).
 
 ## Additional Quality-of-Life Features
 
