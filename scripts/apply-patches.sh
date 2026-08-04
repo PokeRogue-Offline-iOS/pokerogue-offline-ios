@@ -23,6 +23,7 @@ apply_patch "app-settings-menu.js"          all
 apply_patch "remove-google-drive.js"        all
 apply_patch "offline-settings-navigation-fix.js" all
 apply_patch "auto-hide-touch-controls.js" all
+apply_patch "silvershadow-touch-controls.js" all
 apply_patch "sandbox-economy-settings.js"   all
 apply_patch "sandbox-progression-settings.js" all
 apply_patch "claim-all-rewards.js"          all

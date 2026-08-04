@@ -38,7 +38,9 @@ if (!fs.existsSync(TARGET)) {
   process.exit(1);
 }
 
-let src = fs.readFileSync(TARGET, "utf8");
+// Normalize Git's Windows checkout line endings before matching the pinned
+// upstream method. Other ordered patch scripts use the same convention.
+let src = fs.readFileSync(TARGET, "utf8").replace(/\r\n/g, "\n");
 
 if (src.includes("fix-android-image-paths")) {
   console.log("Android image path fix already present, skipping.");

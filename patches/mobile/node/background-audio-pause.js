@@ -36,16 +36,15 @@ if (source.includes("silvershadow-app-state-audio")) {
 }
 
 const importAnchor =
-  'import { isBeta, isDev } from "#constants/app-constants";';
+  'import { version } from "#package.json";';
 
 if (!source.includes(importAnchor)) {
-  fail("Could not find app-constants import in main.ts");
+  fail("Could not find package-version import in main.ts");
 }
 
 source = source.replace(
   importAnchor,
   `${importAnchor}
-import { globalScene } from "#app/global-scene";
 import { App } from "@capacitor/app";`,
 );
 
@@ -72,7 +71,7 @@ const audioReplacement = `  game.sound.pauseOnBlur = false;
       }
 
       appAudioPaused = true;
-      globalScene?.pauseBgm();
+      game.sound.pauseAll();
     };
 
     const resumeAppAudio = () => {
@@ -81,7 +80,7 @@ const audioReplacement = `  game.sound.pauseOnBlur = false;
       }
 
       appAudioPaused = false;
-      globalScene?.resumeBgm();
+      game.sound.resumeAll();
     };
 
     App.addListener("appStateChange", ({ isActive }) => {

@@ -1939,24 +1939,31 @@ for (const [placeholder, replacement] of [
 write(titlePath, title);
 
 let touchControls = read(touchControlsPath);
-const observerAnchor = `    const classObserver = new MutationObserver(() => {`;
-const observerReplacement = `    const classObserver = typeof MutationObserver === "undefined"
+const observerAnchor = `    this.autoHideObserver = new MutationObserver(() => {`;
+const observerReplacement = `    this.autoHideObserver = typeof MutationObserver === "undefined"
       ? null
       : new MutationObserver(() => {`;
-if (touchControls.includes(observerReplacement)) {
+const observerAnchorCount = touchControls.split(observerAnchor).length - 1;
+const observerReplacementCount = touchControls.split(observerReplacement).length - 1;
+if (observerReplacementCount === 1 && observerAnchorCount === 0) {
   console.log("nx.js optional touch-control observer guard already applied.");
-} else if (touchControls.includes(observerAnchor)) {
+} else if (observerReplacementCount === 0 && observerAnchorCount === 1) {
   touchControls = touchControls.replace(observerAnchor, observerReplacement);
 } else {
-  fail("Could not find the touch-control MutationObserver anchor");
+  fail(
+    `Expected exactly one SilverShadow touch-control MutationObserver anchor, found ${observerAnchorCount} unguarded and ${observerReplacementCount} guarded`,
+  );
 }
-const observeAnchor = `    classObserver.observe(touchControls, {`;
-const observeReplacement = `    classObserver?.observe(touchControls, {`;
-if (!touchControls.includes(observeReplacement)) {
-  if (!touchControls.includes(observeAnchor)) {
-    fail("Could not find the touch-control observer call anchor");
-  }
+const observeAnchor = `    this.autoHideObserver.observe(touchControls, {`;
+const observeReplacement = `    this.autoHideObserver?.observe(touchControls, {`;
+const observeAnchorCount = touchControls.split(observeAnchor).length - 1;
+const observeReplacementCount = touchControls.split(observeReplacement).length - 1;
+if (observeReplacementCount === 0 && observeAnchorCount === 1) {
   touchControls = touchControls.replace(observeAnchor, observeReplacement);
+} else if (!(observeReplacementCount === 1 && observeAnchorCount === 0)) {
+  fail(
+    `Expected exactly one SilverShadow touch-control observer call anchor, found ${observeAnchorCount} unguarded and ${observeReplacementCount} guarded`,
+  );
 }
 write(touchControlsPath, touchControls);
 
