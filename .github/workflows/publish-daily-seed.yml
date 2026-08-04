@@ -2,7 +2,9 @@ name: Publish Daily Run Seed
 
 on:
   schedule:
-    - cron: "15 0 * * *"
+    # Retry through the first three UTC hours. GitHub schedules can be delayed,
+    # and the official API is occasionally protected by a transient 403/5xx.
+    - cron: "15,45 0-2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
       - name: Check out this fork
@@ -29,25 +31,54 @@ jobs:
         run: |
           set -euo pipefail
 
-          seed="$(curl --fail --silent --show-error \
-            --retry 3 \
-            --retry-all-errors \
-            --connect-timeout 10 \
-            --max-time 30 \
-            --header "Origin: https://pokerogue.net" \
-            --header "Referer: https://pokerogue.net/" \
-            "$SEED_API_URL")"
-
-          if [[ -z "$seed" || ${#seed} -gt 131072 ]]; then
-            echo "The PokéRogue API returned an invalid Daily Run seed." >&2
+          seed=""
+          source="pokerogue-api"
+          client_version="$(sed -nE 's/^export const UPSTREAM_VERSION = "([^"]+)";/\1/p' switch/scripts/config.mjs)"
+          if [[ -z "$client_version" ]]; then
+            echo "Could not read the pinned PokeRogue client version." >&2
             exit 1
+          fi
+          for attempt in $(seq 1 8); do
+            if candidate="$(curl --fail --silent --show-error \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --header "Accept: text/plain" \
+              --header "Origin: https://pokerogue.net" \
+              --header "PKR-Client-Version: $client_version" \
+              --header "Referer: https://pokerogue.net/" \
+              --user-agent "SilverShadow-Daily-Seed-Publisher/2.0" \
+              "$SEED_API_URL")"; then
+              candidate="$(printf '%s' "$candidate" | tr -d '\r\n')"
+              if [[ -n "$candidate" && ${#candidate} -le 131072 && "$candidate" =~ ^[A-Za-z0-9+/=_-]+$ ]]; then
+                seed="$candidate"
+                break
+              fi
+            fi
+
+            echo "Official Daily Run seed fetch failed (attempt $attempt/8)." >&2
+            sleep $((attempt * 5))
+          done
+
+          if [[ -z "$seed" ]]; then
+            # Publish the same deterministic fallback used by the offline app,
+            # but mark it non-authoritative so clients do not cache it all day.
+            source="offline-fallback"
+            seed="$(printf '%s' "$(date -u +%F)" | base64 -w0)"
+            echo "::warning::Official seed remained unavailable; publishing a non-cacheable offline fallback."
           fi
 
           jq --null-input \
             --arg date "$(date -u +%F)" \
             --arg seed "$seed" \
-            '{date: $date, seed: $seed}' \
+            --arg source "$source" \
+            '{date: $date, seed: $seed, source: $source}' \
             > "$RUNNER_TEMP/daily-seed.json"
+
+          jq -e '
+            (.date | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))
+            and (.seed | type == "string" and length > 0)
+            and (.source == "pokerogue-api" or .source == "offline-fallback")
+          ' "$RUNNER_TEMP/daily-seed.json" >/dev/null
 
       - name: Publish to this fork's seed branch
         env:
@@ -55,8 +86,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          publish_dir="$(mktemp -d)"
-          trap 'git worktree remove --force "$publish_dir" >/dev/null 2>&1 || true' EXIT
+          publish_parent="$(mktemp -d)"
+          publish_dir="$publish_parent/seed"
+          trap 'git worktree remove --force "$publish_dir" >/dev/null 2>&1 || true; rm -rf "$publish_parent"' EXIT
 
           if git ls-remote --exit-code --heads origin seed >/dev/null 2>&1; then
             git fetch origin seed

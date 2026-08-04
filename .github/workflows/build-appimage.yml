@@ -167,10 +167,13 @@ jobs:
         id: appimage_path
         run: |
           FILE=$(find -type f -name "*.AppImage")
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          POKEROGUE_VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="./PokeRogueOffline-dev.AppImage"
+            OUTPUT="./${BASE}-dev.AppImage"
           else
-            OUTPUT="./PokeRogueOffline.AppImage"
+            OUTPUT="./${BASE}.AppImage"
           fi
           mv "$FILE" "$OUTPUT"
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT

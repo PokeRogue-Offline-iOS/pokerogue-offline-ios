@@ -55,9 +55,12 @@ claims use the normal game interface and animation flow for stability.
   If that feed is unavailable, the game immediately falls back to a deterministic UTC-date seed and remains playable offline.
 - The app is built from current PokéRogue source with SilverShadow patches applied during the build.
 
-The **Publish Daily Run Seed** workflow requests the seed directly from PokéRogue's official API at 00:15 UTC and
-publishes a dated JSON payload to this fork's own `seed` branch. After enabling Actions on a new fork, run that workflow
-once manually to create the branch immediately; the app does not request another PokéRogue Offline repository or service.
+The **Publish Daily Run Seed** workflow requests the seed directly from PokéRogue's official API several times during
+the first three UTC hours and publishes a dated JSON payload to this fork's own `seed` branch. It retries transient
+Cloudflare/API failures; if the official service remains unavailable, it publishes a marked, non-cacheable offline
+fallback that a later scheduled run can replace. After enabling Actions on a new fork, run that workflow once manually
+to create the branch immediately. The app reads this fork's raw `seed` branch URL and does not request another
+PokéRogue Offline repository or service.
 
 ### SilverShadow Android Branding
 
@@ -374,7 +377,7 @@ The fat NRO already contains the nx.js runtime. No separate runtime NRO, NSP for
 
 ### Building the Switch ZIP with GitHub Actions
 
-Run the **Build PokeRogueOffline Switch NRO** workflow manually, or let it run for a matching pull request or push to `main`. The workflow builds the pinned, SilverShadow-patched PokÃ©Rogue source, creates a fat NRO, generates the Homebrew Menu icon from `configs/android/icon-main.png`, builds and verifies the four `.sspack` files, and uploads `SilverShadow-PokeRogue-vX.Y.Z-switch.zip`. The ZIP starts with the `switch/` directory and is ready to extract to an SD-card root.
+Run the **Build PokeRogueOffline Switch NRO** workflow manually, or let it run for a matching pull request or push to `main`. The workflow builds the pinned, SilverShadow-patched PokÃ©Rogue source, creates a fat NRO, generates the Homebrew Menu icon from `configs/android/icon-main.png`, builds and verifies the four `.sspack` files, and uploads `SilverShadow-PokeRogue-v<upstream>-<SilverShadow>-switch.zip`. The ZIP starts with the `switch/` directory and is ready to extract to an SD-card root.
 
 The shared release version comes from `configs/release-version.txt`. Updating
 that one file controls Android, iOS, Windows, macOS, Linux AppImage, Switch,

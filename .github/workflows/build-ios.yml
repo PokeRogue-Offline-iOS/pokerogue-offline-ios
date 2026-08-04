@@ -252,10 +252,13 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r "build/App.app" Payload/
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          POKEROGUE_VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            IPA_NAME="PokeRogueOffline-dev.ipa"
+            IPA_NAME="${BASE}-dev.ipa"
           else
-            IPA_NAME="PokeRogueOffline.ipa"
+            IPA_NAME="${BASE}.ipa"
           fi
           zip -r "$IPA_NAME" Payload
           rm -rf Payload
@@ -283,6 +286,9 @@ jobs:
       - name: Write version artifact
         run: echo -n "${{ steps.silver_version.outputs.version }}" > version.txt
 
+      - name: Write upstream version artifact
+        run: echo -n "${{ steps.pokerogue_version.outputs.version }}" > upstream-version.txt
+
       - name: Upload IPA directly
         uses: actions/upload-artifact@v7
         with:
@@ -295,6 +301,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           path: version.txt
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload upstream version metadata directly
+        uses: actions/upload-artifact@v7
+        with:
+          path: upstream-version.txt
           archive: false
           if-no-files-found: error
           retention-days: 30

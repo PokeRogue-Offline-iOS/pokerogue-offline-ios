@@ -10,6 +10,12 @@ export const DAILY_SEED_STORAGE_KEYS = {
 interface PublishedDailySeed {
   date: string;
   seed: string;
+  source?: "pokerogue-api" | "offline-fallback";
+}
+
+interface ParsedDailySeed {
+  cacheable: boolean;
+  seed: string;
 }
 
 export interface DailySeedCacheSnapshot {
@@ -42,13 +48,15 @@ function readCurrentCachedSeed(date = new Date()): string | null {
   return snapshot.date === getUtcDateKey(date) && snapshot.seed ? snapshot.seed : null;
 }
 
-function parsePublishedSeed(payload: string, expectedDate: string): string {
+function parsePublishedSeed(payload: string, expectedDate: string): ParsedDailySeed {
   let published: PublishedDailySeed;
 
   try {
     published = JSON.parse(payload) as PublishedDailySeed;
   } catch (error) {
-    throw new Error("The daily seed feed returned invalid JSON.", { cause: error });
+    throw new Error("The daily seed feed returned invalid JSON.", {
+      cause: error,
+    });
   }
 
   if (published.date !== expectedDate) {
@@ -59,7 +67,18 @@ function parsePublishedSeed(payload: string, expectedDate: string): string {
     throw new Error("The daily seed feed returned an invalid seed.");
   }
 
-  return published.seed;
+  if (
+    published.source !== undefined
+    && published.source !== "pokerogue-api"
+    && published.source !== "offline-fallback"
+  ) {
+    throw new Error("The daily seed feed returned an invalid source.");
+  }
+
+  return {
+    cacheable: published.source !== "offline-fallback",
+    seed: published.seed,
+  };
 }
 
 export async function refreshDailyRunSeed(date = new Date()): Promise<string> {
@@ -77,11 +96,13 @@ export async function refreshDailyRunSeed(date = new Date()): Promise<string> {
       throw new Error(`Daily seed request failed with HTTP ${response.status}.`);
     }
 
-    const seed = parsePublishedSeed(await response.text(), expectedDate);
-    localStorage.setItem(DAILY_SEED_STORAGE_KEYS.date, expectedDate);
-    localStorage.setItem(DAILY_SEED_STORAGE_KEYS.seed, seed);
-    localStorage.setItem(DAILY_SEED_STORAGE_KEYS.fetchedAt, Date.now().toString());
-    return seed;
+    const published = parsePublishedSeed(await response.text(), expectedDate);
+    if (published.cacheable) {
+      localStorage.setItem(DAILY_SEED_STORAGE_KEYS.date, expectedDate);
+      localStorage.setItem(DAILY_SEED_STORAGE_KEYS.seed, published.seed);
+      localStorage.setItem(DAILY_SEED_STORAGE_KEYS.fetchedAt, Date.now().toString());
+    }
+    return published.seed;
   } finally {
     clearTimeout(timeoutId);
   }

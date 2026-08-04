@@ -305,8 +305,11 @@ jobs:
 
           VERSION_ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID/artifacts" \
             --jq '.artifacts[] | select(.name == "version.txt") | .id')
+          UPSTREAM_VERSION_ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$IOS_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "upstream-version.txt") | .id')
           mkdir -p ipa-out
           gh api "repos/$REPO/actions/artifacts/$VERSION_ARTIFACT_ID/zip" > ipa-out/version.txt
+          gh api "repos/$REPO/actions/artifacts/$UPSTREAM_VERSION_ARTIFACT_ID/zip" > ipa-out/upstream-version.txt
 
       - name: Download APK artifact
         env:
@@ -373,13 +376,33 @@ jobs:
         id: version
         run: |
           VERSION=$(cat ipa-out/version.txt)
+          UPSTREAM_VERSION=$(cat ipa-out/upstream-version.txt)
           EXPECTED_VERSION=$(node scripts/read-release-version.js)
           if [ "$VERSION" != "$EXPECTED_VERSION" ]; then
             echo "::error::iOS artifact version $VERSION does not match shared release version $EXPECTED_VERSION"
             exit 1
           fi
+          if ! [[ "$UPSTREAM_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::Invalid upstream PokeRogue version: $UPSTREAM_VERSION"
+            exit 1
+          fi
+          BASE_NAME="PokeRogueSilverShadow-v${UPSTREAM_VERSION}-${VERSION}-build${{ steps.build.outputs.number }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Found Version: ${VERSION}"
+          echo "upstream_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
+          echo "base_name=$BASE_NAME" >> $GITHUB_OUTPUT
+          echo "Found PokeRogue $UPSTREAM_VERSION / SilverShadow $VERSION"
+
+      - name: Apply combined artifact names
+        env:
+          BASE_NAME: ${{ steps.version.outputs.base_name }}
+          TAG: ${{ steps.suffix.outputs.tag }}
+        run: |
+          mv "PokeRogueOffline${TAG}.ipa" "${BASE_NAME}${TAG}.ipa"
+          mv "PokeRogueOffline${TAG}.apk" "${BASE_NAME}${TAG}.apk"
+          mv "PokeRogueOffline${TAG}.AppImage" "${BASE_NAME}${TAG}.AppImage"
+          mv "PokeRogueOffline${TAG}.exe" "${BASE_NAME}${TAG}.exe"
+          mv "PokeRogueOffline${TAG}-x64.dmg" "${BASE_NAME}${TAG}-x64.dmg"
+          mv "PokeRogueOffline${TAG}-arm64.dmg" "${BASE_NAME}${TAG}-arm64.dmg"
 
       # -----------------------------------------------------------------------
       # Non-release run (dev=true, or dev=false on a non-main branch): skip
@@ -391,7 +414,7 @@ jobs:
         if: ${{ steps.gate.outputs.is_release != 'true' }}
         uses: actions/upload-artifact@v7
         with:
-          path: PokeRogueOffline${{ steps.suffix.outputs.tag }}.ipa
+          path: ${{ steps.version.outputs.base_name }}${{ steps.suffix.outputs.tag }}.ipa
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -400,7 +423,7 @@ jobs:
         if: ${{ steps.gate.outputs.is_release != 'true' }}
         uses: actions/upload-artifact@v7
         with:
-          path: PokeRogueOffline${{ steps.suffix.outputs.tag }}.apk
+          path: ${{ steps.version.outputs.base_name }}${{ steps.suffix.outputs.tag }}.apk
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -409,7 +432,7 @@ jobs:
         if: ${{ steps.gate.outputs.is_release != 'true' }}
         uses: actions/upload-artifact@v7
         with:
-          path: PokeRogueOffline${{ steps.suffix.outputs.tag }}.AppImage
+          path: ${{ steps.version.outputs.base_name }}${{ steps.suffix.outputs.tag }}.AppImage
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -418,7 +441,7 @@ jobs:
         if: ${{ steps.gate.outputs.is_release != 'true' }}
         uses: actions/upload-artifact@v7
         with:
-          path: PokeRogueOffline${{ steps.suffix.outputs.tag }}.exe
+          path: ${{ steps.version.outputs.base_name }}${{ steps.suffix.outputs.tag }}.exe
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -427,7 +450,7 @@ jobs:
         if: ${{ steps.gate.outputs.is_release != 'true' }}
         uses: actions/upload-artifact@v7
         with:
-          path: PokeRogueOffline${{ steps.suffix.outputs.tag }}-x64.dmg
+          path: ${{ steps.version.outputs.base_name }}${{ steps.suffix.outputs.tag }}-x64.dmg
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -436,7 +459,7 @@ jobs:
         if: ${{ steps.gate.outputs.is_release != 'true' }}
         uses: actions/upload-artifact@v7
         with:
-          path: PokeRogueOffline${{ steps.suffix.outputs.tag }}-arm64.dmg
+          path: ${{ steps.version.outputs.base_name }}${{ steps.suffix.outputs.tag }}-arm64.dmg
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -457,20 +480,20 @@ jobs:
             <!-- changelog:start -->
             <!-- changelog:end -->
 
-            - **PokeRogueOffline.ipa** — iOS (sideload via SideStore / LiveContainer / Feather)
-            - **PokeRogueOffline.apk** — Android (sideload by enabling "Install unknown apps")
-            - **PokeRogueOffline.AppImage** — Linux AppImage
-            - **PokeRogueOffline.exe** — Windows Portable EXE
-            - **PokeRogueOffline-x64.dmg** — macOS (Intel)
-            - **PokeRogueOffline-arm64.dmg** — macOS (Apple Silicon)
+            - **${{ steps.version.outputs.base_name }}.ipa** — iOS (sideload via SideStore / LiveContainer / Feather)
+            - **${{ steps.version.outputs.base_name }}.apk** — Android (sideload by enabling "Install unknown apps")
+            - **${{ steps.version.outputs.base_name }}.AppImage** — Linux AppImage
+            - **${{ steps.version.outputs.base_name }}.exe** — Windows Portable EXE
+            - **${{ steps.version.outputs.base_name }}-x64.dmg** — macOS (Intel)
+            - **${{ steps.version.outputs.base_name }}-arm64.dmg** — macOS (Apple Silicon)
 
           files: |
-            PokeRogueOffline.ipa
-            PokeRogueOffline.apk
-            PokeRogueOffline.AppImage
-            PokeRogueOffline.exe
-            PokeRogueOffline-x64.dmg
-            PokeRogueOffline-arm64.dmg
+            ${{ steps.version.outputs.base_name }}.ipa
+            ${{ steps.version.outputs.base_name }}.apk
+            ${{ steps.version.outputs.base_name }}.AppImage
+            ${{ steps.version.outputs.base_name }}.exe
+            ${{ steps.version.outputs.base_name }}-x64.dmg
+            ${{ steps.version.outputs.base_name }}-arm64.dmg
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -478,7 +501,7 @@ jobs:
       - name: Get IPA size
         if: ${{ steps.gate.outputs.is_release == 'true' }}
         id: ipa_size
-        run: echo "size=$(wc -c < PokeRogueOffline.ipa)" >> $GITHUB_OUTPUT
+        run: echo "size=$(wc -c < '${{ steps.version.outputs.base_name }}.ipa')" >> $GITHUB_OUTPUT
 
       # -----------------------------------------------------------------------
       # repo.json (the AltStore source) lives permanently on the `seed`
@@ -500,6 +523,7 @@ jobs:
         if: ${{ steps.gate.outputs.is_release == 'true' }}
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
+          UPSTREAM_VERSION: ${{ steps.version.outputs.upstream_version }}
           BUILD_NUMBER: ${{ steps.build.outputs.number }}
           IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
           REPO_JSON_PATH: seed-branch/docs/repo.json

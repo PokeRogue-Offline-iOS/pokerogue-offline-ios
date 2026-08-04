@@ -63,10 +63,13 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node scripts/read-release-version.js)
+          POKEROGUE_VERSION=$(node --input-type=module -e 'import("./switch/scripts/config.mjs").then(config => process.stdout.write(config.UPSTREAM_VERSION))')
 
           echo "SILVERSHADOW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "POKEROGUE_VERSION=$POKEROGUE_VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "zip_name=SilverShadow-PokeRogue-v${VERSION}-switch.zip" >> "$GITHUB_OUTPUT"
+          echo "upstream_version=$POKEROGUE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip_name=SilverShadow-PokeRogue-v${POKEROGUE_VERSION}-${VERSION}-switch.zip" >> "$GITHUB_OUTPUT"
 
       - name: Set up pinned Node.js
         uses: actions/setup-node@v7
@@ -303,7 +306,7 @@ jobs:
       - name: Upload ready-to-copy Switch ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: SilverShadow-PokeRogue-v${{ steps.version.outputs.version }}-switch
+          name: SilverShadow-PokeRogue-v${{ steps.version.outputs.upstream_version }}-${{ steps.version.outputs.version }}-switch
           path: ${{ steps.release.outputs.zip_path }}
           archive: false
           if-no-files-found: error
@@ -312,7 +315,7 @@ jobs:
       - name: Upload Switch build diagnostics
         uses: actions/upload-artifact@v7
         with:
-          name: SilverShadow-PokeRogue-v${{ steps.version.outputs.version }}-switch-diagnostics
+          name: SilverShadow-PokeRogue-v${{ steps.version.outputs.upstream_version }}-${{ steps.version.outputs.version }}-switch-diagnostics
           path: |
             switch/release/milestone2-build.log
             switch/release/symbols/

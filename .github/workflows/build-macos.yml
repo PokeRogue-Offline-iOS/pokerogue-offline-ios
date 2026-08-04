@@ -50,6 +50,14 @@ jobs:
       - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "POKEROGUE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "PokeRogue version: $VERSION"
+
       - name: Download full unlocks save file
         run: |
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
@@ -166,10 +174,12 @@ jobs:
         id: dmg_path
         run: |
           FILE=$(find . -type f -name "*.dmg" | head -n1)
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="./PokeRogueOffline-dev-${{ matrix.arch }}.dmg"
+            OUTPUT="./${BASE}-dev-${{ matrix.arch }}.dmg"
           else
-            OUTPUT="./PokeRogueOffline-${{ matrix.arch }}.dmg"
+            OUTPUT="./${BASE}-${{ matrix.arch }}.dmg"
           fi
           mv "$FILE" "$OUTPUT"
           echo "dmg=$OUTPUT" >> $GITHUB_OUTPUT

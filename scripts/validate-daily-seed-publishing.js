@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+
+/** Verify that the publisher and packaged client agree on the Daily Run feed. */
+
+const fs = require("fs");
+const path = require("path");
+
+const root = path.join(__dirname, "..");
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
+
+function requireText(source, expected, label) {
+  if (!source.includes(expected)) {
+    throw new Error(`${label} is missing ${JSON.stringify(expected)}`);
+  }
+}
+
+const workflow = read(".github/workflows/publish-daily-seed.yml");
+requireText(workflow, "https://api.pokerogue.net/daily/seed", "publisher API source");
+requireText(workflow, "PKR-Client-Version: $client_version", "publisher client-version header");
+requireText(workflow, "for attempt in $(seq 1 8)", "publisher retry loop");
+requireText(workflow, 'source="offline-fallback"', "publisher offline fallback");
+requireText(workflow, 'publish_dir="$publish_parent/seed"', "publisher worktree path");
+requireText(workflow, "push origin HEAD:seed", "publisher seed branch push");
+
+const client = read("new-files/src/system/offline/daily-run-seed.ts");
+requireText(client, "https://raw.githubusercontent.com/silvershadowkat/pokerogue-offline/seed/docs/daily-seed.json", "client seed feed");
+requireText(client, 'published.source !== "offline-fallback"', "fallback cache protection");
+
+const patch = read("patches/all/node/daily-run-seed.js");
+requireText(patch, "getDailyRunSeed()", "title-screen Daily Run integration");
+requireText(patch, "return createOfflineDailySeed()", "title-screen network fallback");
+
+console.log("Daily Run publisher, seed-branch feed, and packaged client are linked consistently.");

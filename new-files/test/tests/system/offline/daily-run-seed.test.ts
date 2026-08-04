@@ -34,9 +34,7 @@ describe("System - Offline - daily-run-seed", () => {
 
   it("validates and caches this fork's dated seed feed", async () => {
     const storage = installStorage();
-    const fetchMock = vi.fn(
-      async () => new Response(JSON.stringify({ date: "2026-07-31", seed: "official-seed" })),
-    );
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ date: "2026-07-31", seed: "official-seed" })));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(refreshDailyRunSeed(new Date("2026-07-31T12:00:00Z"))).resolves.toBe("official-seed");
@@ -58,6 +56,37 @@ describe("System - Offline - daily-run-seed", () => {
 
     await expect(refreshDailyRunSeed(new Date("2026-07-31T12:00:00Z"))).rejects.toThrow("not 2026-07-31");
     expect(storage.has(DAILY_SEED_STORAGE_KEYS.seed)).toBe(false);
+  });
+
+  it("uses a published offline fallback without caching it as authoritative", async () => {
+    const storage = installStorage();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              date: "2026-07-31",
+              seed: "fallback-seed",
+              source: "offline-fallback",
+            }),
+          ),
+      ),
+    );
+
+    await expect(refreshDailyRunSeed(new Date("2026-07-31T12:00:00Z"))).resolves.toBe("fallback-seed");
+    expect(storage.has(DAILY_SEED_STORAGE_KEYS.seed)).toBe(false);
+    expect(storage.has(DAILY_SEED_STORAGE_KEYS.fetchedAt)).toBe(false);
+  });
+
+  it("rejects an unknown publisher source", async () => {
+    installStorage();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ date: "2026-07-31", seed: "seed", source: "unknown" }))),
+    );
+
+    await expect(refreshDailyRunSeed(new Date("2026-07-31T12:00:00Z"))).rejects.toThrow("invalid source");
   });
 
   it("creates the same deterministic fallback as upstream offline mode", () => {

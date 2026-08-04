@@ -50,6 +50,15 @@ jobs:
       - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
 
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "POKEROGUE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "PokeRogue version: $VERSION"
+
       - name: Download full unlocks save file
         shell: bash
         run: |
@@ -165,10 +174,12 @@ jobs:
         shell: bash
         run: |
           FILE=$(find -type f -name "PokeRogue*Offline*.exe" | head -n1)
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="./PokeRogueOffline-dev.exe"
+            OUTPUT="./${BASE}-dev.exe"
           else
-            OUTPUT="./PokeRogueOffline.exe"
+            OUTPUT="./${BASE}.exe"
           fi
           mv "$FILE" "$OUTPUT"
           echo "exe=$OUTPUT" >> $GITHUB_OUTPUT
