@@ -31,6 +31,7 @@ value again without relying on boot-time or scene-initialization state.
 | Always Critical Hit | On the next player damage calculation |
 | Always Move First | On the next queued attack-order comparison |
 | No Charge / Recharge Turns | On the next player charge or recharge effect |
+| Run Never Fails | On the next normally permitted Run attempt |
 | Full Heal After Every Battle | At the end of the next victorious battle |
 | Unlimited Poke Balls | On the next ball selection and throw |
 | Catch Trainer Pokemon | On the next trainer-battle ball eligibility check |

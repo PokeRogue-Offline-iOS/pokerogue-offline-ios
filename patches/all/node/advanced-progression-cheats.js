@@ -140,7 +140,7 @@ writeFile(settingsPath, settingsSource);
 const overridesPath = path.join("pokerogue-src", "src", "overrides.ts");
 let overridesSource = readFile(overridesPath);
 if (!overridesSource.includes("UNLIMITED_TM_COMPATIBILITY_OVERRIDE")) {
-  const overrideAnchor = `  /** Bypasses the remaining-boss-shield capture restriction. */
+  const overrideAnchor = `  /** Bypasses End-biome/final-boss capture locks and remaining boss shields. */
   readonly CATCH_BOSS_SHIELDS_OVERRIDE: boolean = false;`;
   const overrideReplacement = `${overrideAnchor}
   /** Multiplies positive money gains without changing prices. */

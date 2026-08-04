@@ -104,6 +104,7 @@ const sections = [
       "Offline_Always_Critical_Hit",
       "Offline_Always_Move_First",
       "Offline_No_Recharge_Turns",
+      "Offline_Run_Never_Fails",
       "Offline_Full_Heal_After_Battle",
     ],
   },

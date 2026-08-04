@@ -124,7 +124,7 @@ if (!overridesSource.includes("CATCH_BOSS_SHIELDS_OVERRIDE")) {
   readonly CATCH_TRAINER_POKEMON_OVERRIDE: boolean = false;
   /** Allows choosing one capture target in a wild double battle. */
   readonly CATCH_DOUBLE_BATTLE_OVERRIDE: boolean = false;
-  /** Bypasses the remaining-boss-shield capture restriction. */
+  /** Bypasses End-biome/final-boss capture locks and remaining boss shields. */
   readonly CATCH_BOSS_SHIELDS_OVERRIDE: boolean = false;`;
   overridesSource = replaceRequired(
     overridesSource,
@@ -133,6 +133,10 @@ if (!overridesSource.includes("CATCH_BOSS_SHIELDS_OVERRIDE")) {
     "PLAYER_SKIP_CHARGE_RECHARGE_OVERRIDE",
   );
 }
+overridesSource = overridesSource.replace(
+  "  /** Bypasses the remaining-boss-shield capture restriction. */",
+  "  /** Bypasses End-biome/final-boss capture locks and remaining boss shields. */",
+);
 writeFile(overridesPath, overridesSource);
 
 const ballUiPath = path.join("pokerogue-src", "src", "ui", "handlers", "ball-ui-handler.ts");
@@ -177,6 +181,28 @@ if (!commandSource.includes("battleType === BattleType.TRAINER && !activeOverrid
     "the trainer-battle capture restriction",
   );
 }
+if (!commandSource.includes("Allow restricted End-biome captures when the boss capture cheat is enabled")) {
+  const endBiomeAnchor = `    if (biomeId === BiomeId.END && battleType === BattleType.WILD) {
+      if (`;
+  const endBiomeReplacement = `    if (biomeId === BiomeId.END && battleType === BattleType.WILD) {
+      // Allow restricted End-biome captures when the boss capture cheat is enabled.
+      // Successful Eternatus captures use the normal VictoryPhase path, so the
+      // final wave is cleared and caught/starter data is persisted normally.
+      if (activeOverrides.CATCH_BOSS_SHIELDS_OVERRIDE && (isClassic || isEndless)) {
+        return true;
+      }
+      if (`;
+  commandSource = replaceRequired(
+    commandSource,
+    endBiomeAnchor,
+    endBiomeReplacement,
+    "the End-biome capture restriction block",
+  );
+}
+commandSource = commandSource.replace(
+  "      if (activeOverrides.CATCH_BOSS_SHIELDS_OVERRIDE) {\n        return true;\n      }",
+  "      if (activeOverrides.CATCH_BOSS_SHIELDS_OVERRIDE && (isClassic || isEndless)) {\n        return true;\n      }",
+);
 if (!commandSource.includes("const canChooseCaptureTarget")) {
   const multiAnchor = `    if (targets.length > 1) {
       this.queueShowText("battle:noPokeballMulti");
@@ -196,9 +222,24 @@ if (!commandSource.includes("&& !activeOverrides.CATCH_BOSS_SHIELDS_OVERRIDE")) 
   const bossAnchor = `        targetPokemon?.isBoss()
         && targetPokemon?.bossSegmentIndex >= 1 // TODO: Decouple this hardcoded exception for wonder guard and just check the target...
         && !targetPokemon?.hasAbility(AbilityId.WONDER_GUARD, false, true)`;
-  const bossReplacement = `${bossAnchor}
+  const bossReplacement = `        targets.length === 1
+        && ${bossAnchor.trimStart()}
         && !activeOverrides.CATCH_BOSS_SHIELDS_OVERRIDE`;
   commandSource = replaceRequired(commandSource, bossAnchor, bossReplacement, "the remaining boss-shield capture check");
+}
+if (
+  commandSource.includes("&& !activeOverrides.CATCH_BOSS_SHIELDS_OVERRIDE")
+  && !commandSource.includes("targets.length === 1\n        && targetPokemon?.isBoss()")
+) {
+  commandSource = replaceRequired(
+    commandSource,
+    `        targetPokemon?.isBoss()
+        && targetPokemon?.bossSegmentIndex >= 1 // TODO: Decouple this hardcoded exception for wonder guard and just check the target...`,
+    `        targets.length === 1
+        && targetPokemon?.isBoss()
+        && targetPokemon?.bossSegmentIndex >= 1 // TODO: Decouple this hardcoded exception for wonder guard and just check the target...`,
+    "the single-target boss-shield capture check",
+  );
 }
 if (!commandSource.includes("targets.length > 1 && canChooseCaptureTarget")) {
   const targetAnchor = `      globalScene.currentBattle.turnCommands[this.fieldIndex]!.targets = targets;
@@ -214,6 +255,63 @@ writeFile(commandPath, commandSource);
 
 const selectTargetPath = path.join("pokerogue-src", "src", "phases", "select-target-phase.ts");
 let selectTargetSource = readFile(selectTargetPath);
+if (!selectTargetSource.includes('import { activeOverrides } from "#app/overrides";')) {
+  selectTargetSource = replaceRequired(
+    selectTargetSource,
+    'import { globalScene } from "#app/global-scene";',
+    'import { globalScene } from "#app/global-scene";\nimport { activeOverrides } from "#app/overrides";',
+    "the globalScene import in select-target-phase.ts",
+  );
+}
+if (!selectTargetSource.includes('import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";')) {
+  selectTargetSource = replaceRequired(
+    selectTargetSource,
+    'import { allMoves } from "#data/data-lists";',
+    'import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";\nimport { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";\nimport { allMoves } from "#data/data-lists";',
+    "the move data import in select-target-phase.ts",
+  );
+}
+selectTargetSource = selectTargetSource.replace(
+  `import { allMoves } from "#data/data-lists";
+import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
+import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";`,
+  `import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
+import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { allMoves } from "#data/data-lists";`,
+);
+if (!selectTargetSource.includes('import { AbilityId } from "#enums/ability-id";')) {
+  selectTargetSource = replaceRequired(
+    selectTargetSource,
+    'import type { BattlerIndex } from "#enums/battler-index";',
+    'import { AbilityId } from "#enums/ability-id";\nimport type { BattlerIndex } from "#enums/battler-index";',
+    "the BattlerIndex import in select-target-phase.ts",
+  );
+}
+if (!selectTargetSource.includes('import { PokeballType } from "#enums/pokeball";')) {
+  if (selectTargetSource.includes('import { MoveId } from "#enums/move-id";')) {
+    selectTargetSource = replaceRequired(
+      selectTargetSource,
+      'import { MoveId } from "#enums/move-id";',
+      'import { MoveId } from "#enums/move-id";\nimport { PokeballType } from "#enums/pokeball";',
+      "the MoveId import in select-target-phase.ts",
+    );
+  } else {
+    selectTargetSource = replaceRequired(
+      selectTargetSource,
+      'import { Command } from "#enums/command";',
+      'import { Command } from "#enums/command";\nimport { MoveId } from "#enums/move-id";\nimport { PokeballType } from "#enums/pokeball";',
+      "the Command import in select-target-phase.ts",
+    );
+  }
+}
+if (!selectTargetSource.includes('import i18next from "i18next";')) {
+  selectTargetSource = replaceRequired(
+    selectTargetSource,
+    'import { PokemonPhase } from "#phases/pokemon-phase";',
+    'import { PokemonPhase } from "#phases/pokemon-phase";\nimport i18next from "i18next";',
+    "the PokemonPhase import in select-target-phase.ts",
+  );
+}
 if (!selectTargetSource.includes('import { MoveId } from "#enums/move-id";')) {
   selectTargetSource = replaceRequired(
     selectTargetSource,
@@ -292,6 +390,16 @@ if (!selectTargetSource.includes("const isBallCommand = turnCommand?.command ===
     );`;
   selectTargetSource = replaceRequired(selectTargetSource, endArgsAnchor, endArgsReplacement, "the target-selection optional arguments");
 }
+selectTargetSource = selectTargetSource.replace(
+  `    const explicitTargets = isBallCommand
+      ? globalScene
+          .getEnemyField(true)
+          .map(pokemon => pokemon.getBattlerIndex())
+      : undefined;`,
+  `    const explicitTargets = isBallCommand
+      ? globalScene.getEnemyField(true).map(pokemon => pokemon.getBattlerIndex())
+      : undefined;`,
+);
 if (selectTargetSource.includes("restrictingTag.selectionDeniedText(user, moveId)")) {
   selectTargetSource = replaceRequired(
     selectTargetSource,
@@ -300,6 +408,53 @@ if (selectTargetSource.includes("restrictingTag.selectionDeniedText(user, moveId
     "the target-restriction denial message MoveId",
   );
 }
+if (!selectTargetSource.includes("Double-battle capture must validate the selected boss")) {
+  const targetValidationAnchor = `        if (targets.length === 0) {
+          globalScene.currentBattle.turnCommands[this.fieldIndex] = null;`;
+  const targetValidationReplacement = `        // Double-battle capture must validate the selected boss rather than
+        // whichever enemy happened to be first before target selection.
+        if (isBallCommand && targets[0] != null && !activeOverrides.CATCH_BOSS_SHIELDS_OVERRIDE) {
+          const targetPokemon = globalScene
+            .getEnemyField(true)
+            .find(pokemon => pokemon.getBattlerIndex() === targets[0]);
+          if (
+            targetPokemon?.isBoss()
+            && targetPokemon.bossSegmentIndex >= 1
+            && !targetPokemon.hasAbility(AbilityId.WONDER_GUARD, false, true)
+          ) {
+            const cursor = turnCommand.cursor!;
+            const isFinalBoss = globalScene.gameMode.isBattleClassicFinalBoss(globalScene.currentBattle.waveIndex);
+            const isChallengeActive = globalScene.gameMode.hasAnyChallenges();
+            const isCatchableDailyBoss = isDailyFinalBoss() && (getDailyEventSeedBoss()?.catchable ?? false);
+            if (
+              isFinalBoss
+              && (cursor < PokeballType.MASTER_BALL || (cursor === PokeballType.MASTER_BALL && isChallengeActive))
+            ) {
+              globalScene.phaseManager.queueMessage(i18next.t("battle:noPokeballForceFinalBossCatchable"));
+              targets = [];
+            } else if (isCatchableDailyBoss || cursor < PokeballType.MASTER_BALL) {
+              globalScene.phaseManager.queueMessage(i18next.t("battle:noPokeballStrong"));
+              targets = [];
+            }
+          }
+        }
+
+        if (targets.length === 0) {
+          globalScene.currentBattle.turnCommands[this.fieldIndex] = null;`;
+  selectTargetSource = replaceRequired(
+    selectTargetSource,
+    targetValidationAnchor,
+    targetValidationReplacement,
+    "the target-selection completion branch",
+  );
+}
+selectTargetSource = selectTargetSource.replace(
+  `              isFinalBoss
+              && (cursor < PokeballType.MASTER_BALL
+                || (cursor === PokeballType.MASTER_BALL && isChallengeActive))`,
+  `              isFinalBoss
+              && (cursor < PokeballType.MASTER_BALL || (cursor === PokeballType.MASTER_BALL && isChallengeActive))`,
+);
 writeFile(selectTargetPath, selectTargetSource);
 
 const targetUiPath = path.join("pokerogue-src", "src", "ui", "handlers", "target-select-ui-handler.ts");
@@ -397,6 +552,19 @@ if (!captureSource.includes("const hasReservePartyMember = globalScene")) {
           pokemon.leaveField(true, true, true);
         };`;
   const removeReplacement = `        const removePokemon = () => {
+          // A weakened trainer Pokemon may have already chosen a voluntary
+          // switch this turn. The capture command runs before that queued
+          // SwitchSummonPhase, so discard every stale enemy switch for this
+          // exact field slot before the captured record is removed. Otherwise
+          // the trainer can send out the reserve twice and the second summon
+          // has no party member to load.
+          globalScene.currentBattle.turnCommands[pokemon.getBattlerIndex()] = null;
+          while (
+            globalScene.phaseManager.tryRemovePhase(
+              "SwitchSummonPhase",
+              phase => !phase.isPlayer() && phase.getFieldIndex() === this.fieldIndex,
+            )
+          ) {}
           globalScene.currentBattle.enemyFaints += 1;
           globalScene.currentBattle.enemyFaintsHistory.push({
             pokemon,
@@ -424,6 +592,31 @@ if (!captureSource.includes("const hasReservePartyMember = globalScene")) {
           );`;
   captureSource = replaceRequired(captureSource, modifierAnchor, modifierReplacement, "the captured held-item lookup");
 }
+if (!captureSource.includes("discard every stale enemy switch for this")) {
+  const staleSwitchAnchor = `        const removePokemon = () => {
+          globalScene.currentBattle.enemyFaints += 1;`;
+  const staleSwitchReplacement = `        const removePokemon = () => {
+          // A weakened trainer Pokemon may have already chosen a voluntary
+          // switch this turn. The capture command runs before that queued
+          // SwitchSummonPhase, so discard every stale enemy switch for this
+          // exact field slot before the captured record is removed. Otherwise
+          // the trainer can send out the reserve twice and the second summon
+          // has no party member to load.
+          globalScene.currentBattle.turnCommands[pokemon.getBattlerIndex()] = null;
+          while (
+            globalScene.phaseManager.tryRemovePhase(
+              "SwitchSummonPhase",
+              phase => !phase.isPlayer() && phase.getFieldIndex() === this.fieldIndex,
+            )
+          ) {}
+          globalScene.currentBattle.enemyFaints += 1;`;
+  captureSource = replaceRequired(
+    captureSource,
+    staleSwitchAnchor,
+    staleSwitchReplacement,
+    "the captured-Pokemon stale switch cleanup",
+  );
+}
 if (captureSource.includes('switchDiagnostics?.checkpoint?.("capture:queue-reserve"')) {
   const obsoleteDiagnostic = `              switchDiagnostics?.checkpoint?.("capture:queue-reserve", {
                 wave: globalScene.currentBattle?.waveIndex ?? null,
@@ -447,6 +640,20 @@ for (const marker of [
 ]) {
   if (!readFile(overridesPath).includes(marker)) {
     fail(`Missing capture-cheat override marker: ${marker}`);
+  }
+}
+
+for (const [filePath, marker] of [
+  [capturePath, "discard every stale enemy switch for this"],
+  [capturePath, "turnCommands[pokemon.getBattlerIndex()] = null"],
+  [commandPath, "targets.length === 1\n        && targetPokemon?.isBoss()"],
+  [commandPath, "isClassic && isClassicFinalBoss && missingMultipleStarters"],
+  [commandPath, "Allow restricted End-biome captures when the boss capture cheat is enabled"],
+  [commandPath, "CATCH_BOSS_SHIELDS_OVERRIDE && (isClassic || isEndless)"],
+  [selectTargetPath, "Double-battle capture must validate the selected boss"],
+]) {
+  if (!readFile(filePath).includes(marker)) {
+    fail(`Missing capture safety marker in ${filePath}: ${marker}`);
   }
 }
 

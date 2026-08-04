@@ -23,7 +23,7 @@ contiguous sections:
 | Team | 60 Starter Points, Allow Duplicate Starters, Starting Level, Unlock Starter on Select, All Starters Have Pokerus |
 | Generation / Gacha | Free Egg Gacha Pulls, Rare Eggs, Instant Hatch, Shiny Rate, Always Shiny, Form Change Items |
 | Capture | Guaranteed Capture, Unlimited Poke Balls, Catch Trainer Pokemon, Catch Pokemon in Double Battles, Catch Bosses Through Shields |
-| Battle | Infinite Player HP, Infinite Player PP, Player OHKO, Never Miss, Always Critical Hit, Always Move First, No Charge / Recharge Turns, Full Heal After Every Battle |
+| Battle | Infinite Player HP, Infinite Player PP, Player OHKO, Never Miss, Always Critical Hit, Always Move First, No Charge / Recharge Turns, Run Never Fails, Full Heal After Every Battle |
 | Evolution / TM | Ignore Evolution Requirements, Unlimited TM Compatibility |
 
 Each section has its own display-only heading row. These headings have no
@@ -79,6 +79,19 @@ The cheat does not suppress independent consecutive-use mechanics. Rage,
 Outrage-style rampage, Rollout, move queues, delayed attacks, and similar
 automatic sequences retain their normal tags and behavior.
 
+### Run Never Fails
+
+Every permitted Run attempt succeeds on its normal escape roll. The setting
+does not make Run available where the game normally rejects the command:
+
+- trainer battles and trainer-mode mystery encounters;
+- the End biome and mystery encounters that forbid fleeing;
+- Commander, trapping abilities, trapping moves, Fairy Lock, and equivalent
+  field restrictions.
+
+The setting is live on the next permitted Run attempt. Turning it off restores
+the normal speed-, boss-, and prior-attempt-based escape calculation.
+
 ## Capture cheats
 
 ### Unlimited Poke Balls
@@ -111,9 +124,13 @@ continuation, the captured enemy is then processed as a removed combatant:
    existing faint-target redirector.
 5. The field object leaves without being destroyed, allowing the existing
    Victory and reserve-switch phases to inspect it safely.
-6. A living reserve in the same trainer slot is queued with the same
+6. Any voluntary enemy switch already queued for the captured field slot is
+   canceled and the captured Pokemon's obsolete turn command is cleared. This
+   covers the damaged-before-capture trainer-AI path without touching the
+   partner slot in a double battle.
+7. A living reserve in the same trainer slot is queued with the same
    `SwitchSummonPhase` used after a normal faint.
-7. The battle ends only when no active wild opponent or non-fainted trainer
+8. The battle ends only when no active wild opponent or non-fainted trainer
    party member remains.
 
 Capturing is not a knockout, so PostFaint, PostKnockOut, and PostVictory
@@ -123,10 +140,24 @@ requested battle flow.
 
 ### Catch Bosses Through Shields
 
-This bypasses only the remaining-shield check (`bossSegmentIndex >= 1`). It
-does not make an otherwise forbidden encounter catchable, bypass final-boss
-ownership/challenge restrictions, or imply a guaranteed catch. Combine it
-with Guaranteed Capture if the throw itself must always succeed.
+This bypasses the remaining-shield check (`bossSegmentIndex >= 1`) and the
+Classic and Endless End-biome capture locks. While enabled, locked Paradox
+Pokemon can be caught without first obtaining their eggs, and Eternatus/final
+bosses can be caught without satisfying the normal completion, ownership, or
+challenge unlock requirements in either mode. Daily-specific encounter gates
+remain unchanged. Combine it with Guaranteed Capture if the throw itself must
+always succeed.
+
+A successful Eternatus capture uses the same caught-data and party-add flow as
+other captures, so it unlocks the corresponding starter data. The captured
+enemy is removed and `VictoryPhase` clears the final wave as a win rather than
+starting another boss stage. This is intentionally save-breaking-capable cheat
+behavior; no compatibility or progression repair is attempted afterward.
+
+In a double battle, shield eligibility is checked against the Pokemon selected
+for the ball rather than whichever opponent occupies the first field slot.
+Turning the setting off restores every original End-biome, final-boss,
+ownership, challenge, and shield restriction.
 
 ## Economy and progression cheats
 
@@ -261,38 +292,52 @@ restarting after its positive test.
 5. Test a charging move, Hyper Beam, Rage, an Outrage-style move, and Rollout.
    Charge/recharge should be skipped; the three consecutive-use mechanics
    should continue normally.
-6. Finish a battle with missing HP, a fainted party member, status, confusion,
+6. In an ordinary wild battle where Run is available, enable Run Never Fails
+   and confirm the first attempt succeeds. Turn it off and confirm normal odds
+   return. With it on, confirm trainer battles, the End biome, no-flee mystery
+   encounters, Commander, trapping effects, and Fairy Lock still reject Run.
+7. Finish a battle with missing HP, a fainted party member, status, confusion,
    and used PP. Confirm the entire party is restored only after victory.
-7. Set a ball count to zero, throw that ball, and confirm it remains zero. Also
+8. Set a ball count to zero, throw that ball, and confirm it remains zero. Also
    throw a ball with a positive count and confirm the count is unchanged.
-8. In a wild double battle, capture the left and right slots in separate runs.
+9. In a wild double battle, capture the left and right slots in separate runs.
    Confirm the animation/UI, remaining enemy turn, targeting, and final battle
    end. Repeat once with a failed capture.
-9. In a trainer single battle with reserves, catch the lead and confirm the
-   next Pokemon is sent out. Fill the player party first and exercise both the
-   release and decline paths.
-10. In a trainer double battle with at least one reserve per relevant trainer
+10. In a trainer single battle with reserves, catch an untouched lead and
+   confirm the next Pokemon is sent out. Repeat after damaging the lead enough
+   for trainer AI to choose a voluntary switch; confirm the caught Pokemon is
+   not withdrawn, the reserve is sent out exactly once, and the battle remains
+   responsive. Fill the player party first and exercise both the release and
+   decline paths.
+11. In a trainer double battle with at least one reserve per relevant trainer
     slot, capture each side separately. Confirm the partner remains, pending
-    moves redirect normally, the correct reserve enters, and the battle ends
-    only after all opponents are defeated or caught.
-11. Attempt a shielded boss with the shield cheat off and on. Confirm other
-    encounter/final-boss restrictions remain authoritative.
-12. Record a known money and EXP reward and verify every multiplier option,
+    moves redirect normally, any damaged target's pending voluntary switch is
+    canceled only for that slot, the correct reserve enters once, and the
+    battle ends only after all opponents are defeated or caught.
+12. Attempt a shielded boss with the shield cheat off and on. In a double
+    battle, select each side and confirm the shield check follows the selected
+    target. With the setting off, confirm the original locked Paradox and
+    Eternatus/final-boss restrictions remain. Turn it on, catch a locked
+    Paradox Pokemon without its egg, then catch Eternatus before its normal
+    unlock; confirm each unlocks as a starter and the Eternatus capture clears
+    the final battle as a victory without queuing another boss stage. Repeat
+    the restricted-capture checks in both Classic and Endless.
+13. Record a known money and EXP reward and verify every multiplier option,
     including the 100x cap/floor behavior.
-13. Outside a run, set Candy Jar Count to 250 and begin both a standard run and
+14. Outside a run, set Candy Jar Count to 250 and begin both a standard run and
     a daily run; confirm each starts at 250. In a loaded run with a different
     count, open Offline settings and confirm the row shows the saved run's
     actual value without changing it. Pick 0, 100, and 9,999 in succession and
     confirm the modifier bar and both Rare Candy and Rarer Candy update without
     restarting. Earn another Candy Jar at 9,999 and confirm it stacks to 10,000.
-14. With evolution requirements ignored, test a low-level standard evolution,
+15. With evolution requirements ignored, test a low-level standard evolution,
     an item/trade/friendship evolution, a branching species, and a multi-level
     EXP award. Confirm one formal evolution per award and no Mega/Gigantamax/
     Dynamax/Tera form change.
-15. Generate TM rewards with a deliberately incompatible party, teach one to
+16. Generate TM rewards with a deliberately incompatible party, teach one to
     that Pokemon, and confirm known/used exclusions still work. Turn the cheat
     off and confirm legitimate compatibility returns.
-16. Repeat the battle/capture tests in both player slots where possible and
+17. Repeat the battle/capture tests in both player slots where possible and
     once with existing Infinite HP, Infinite PP, Player OHKO, Guaranteed
     Capture, and reward cheats enabled together.
 
@@ -306,6 +351,7 @@ restarting after its positive test.
 | Clean `mobile` patch application (iOS + shared mobile) | Passed |
 | Clean `android` patch application | Passed |
 | Clean `switch` patch application | Passed |
+| Generated-source assertions for live Run wiring, stale trainer-switch cleanup, selected double-battle boss checks, Classic/Endless restricted captures, retained Daily gates, and final-wave victory completion | Passed |
 | Source TypeScript check for clean shared desktop/mobile output | Passed with temporary validation stubs for the Capgo dependency and unpopulated asset-submodule JSON |
 | Source TypeScript check after the Switch overlay | Passed with temporary validation JSON for the unpopulated asset submodule |
 | Production app-mode Vite build after the Switch overlay | Passed |

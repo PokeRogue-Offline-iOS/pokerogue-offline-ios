@@ -13,6 +13,8 @@
  * - No Charge / Recharge Turns reuses the normal instant-charge route and
  *   suppresses only RechargeAttr for player Pokemon. Rampage, Rage, Rollout,
  *   delayed attacks, and other consecutive-use mechanics are not changed.
+ * - Run Never Fails forces the normal escape roll to succeed without changing
+ *   trainer, final-biome, mystery-encounter, Commander, or trapping eligibility.
  */
 
 const fs = require("fs");
@@ -102,6 +104,45 @@ if (!settingsSource.includes('label: "No Charge / Recharge Turns"')) {
   );
 }
 
+if (!settingsSource.includes("Offline_Run_Never_Fails")) {
+  const keyAnchor = '  Offline_No_Recharge_Turns: "OFFLINE_NO_RECHARGE_TURNS",';
+  settingsSource = replaceRequired(
+    settingsSource,
+    keyAnchor,
+    `${keyAnchor}\n  Offline_Run_Never_Fails: "OFFLINE_RUN_NEVER_FAILS",`,
+    "the no-recharge setting key for Run Never Fails",
+  );
+}
+
+if (!settingsSource.includes('label: "Run Never Fails"')) {
+  const rowAnchor = `  {
+    key: SettingKeys.Offline_No_Recharge_Turns,
+    label: "No Charge / Recharge Turns",
+    options: [
+      { value: "0", label: "Off" },
+      { value: "1", label: "On" },
+    ],
+    default: 0,
+    type: SettingType.APP,
+  },`;
+  const runRow = `  {
+    key: SettingKeys.Offline_Run_Never_Fails,
+    label: "Run Never Fails",
+    options: [
+      { value: "0", label: "Off" },
+      { value: "1", label: "On" },
+    ],
+    default: 0,
+    type: SettingType.APP,
+  },`;
+  settingsSource = replaceRequired(
+    settingsSource,
+    rowAnchor,
+    `${rowAnchor}\n${runRow}`,
+    "the no-recharge settings row for Run Never Fails",
+  );
+}
+
 if (!settingsSource.includes("case SettingKeys.Offline_No_Recharge_Turns:")) {
   const switchAnchor = `    case SettingKeys.Offline_Player_Ohko:
       activeOverrides.PLAYER_OHKO_OVERRIDE = value === 1;
@@ -127,6 +168,21 @@ if (!settingsSource.includes("case SettingKeys.Offline_No_Recharge_Turns:")) {
     switchAnchor,
     switchReplacement,
     "the Player OHKO setting switch case",
+  );
+}
+if (!settingsSource.includes("case SettingKeys.Offline_Run_Never_Fails:")) {
+  const switchAnchor = `    case SettingKeys.Offline_No_Recharge_Turns:
+      activeOverrides.PLAYER_SKIP_CHARGE_RECHARGE_OVERRIDE = value === 1;
+      break;`;
+  const switchReplacement = `${switchAnchor}
+    case SettingKeys.Offline_Run_Never_Fails:
+      activeOverrides.RUN_SUCCESS_OVERRIDE = value === 1 ? true : null;
+      break;`;
+  settingsSource = replaceRequired(
+    settingsSource,
+    switchAnchor,
+    switchReplacement,
+    "the no-recharge setting switch case for Run Never Fails",
   );
 }
 writeFile(settingsPath, settingsSource);
@@ -299,6 +355,16 @@ for (const marker of [
 ]) {
   if (!readFile(overridesPath).includes(marker)) {
     fail(`Missing battle-cheat override marker: ${marker}`);
+  }
+}
+
+for (const marker of [
+  "Offline_Run_Never_Fails",
+  'label: "Run Never Fails"',
+  "activeOverrides.RUN_SUCCESS_OVERRIDE = value === 1 ? true : null",
+]) {
+  if (!readFile(settingsPath).includes(marker)) {
+    fail(`Missing Run Never Fails setting marker: ${marker}`);
   }
 }
 
