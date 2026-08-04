@@ -26,9 +26,9 @@ contiguous sections:
 | Battle | Infinite Player HP, Infinite Player PP, Player OHKO, Never Miss, Always Critical Hit, Always Move First, No Charge / Recharge Turns, Full Heal After Every Battle |
 | Evolution / TM | Ignore Evolution Requirements, Unlimited TM Compatibility |
 
-The first row in each section receives a compact visible section prefix. The
-existing Google Drive, backup, clear-data, and update rows remain above the
-cheat catalog.
+Each section has its own display-only heading row. These headings have no
+selectable options and navigation skips over them. The existing Google Drive,
+backup, clear-data, and update rows remain above the cheat catalog.
 
 ## Battle cheats
 
@@ -249,7 +249,8 @@ slot-identity model rather than the existing species-keyed starter save.
 Use a disposable save/export and toggle each setting off again without
 restarting after its positive test.
 
-1. Open Offline settings and confirm the eight section prefixes and ordering.
+1. Open Offline settings and confirm the eight standalone section headings,
+   ordering, and that up/down navigation skips every heading.
 2. In a normal battle, test Never Miss with a low-accuracy move, then confirm
    Protect, an immunity, and a semi-invulnerable target still work normally.
 3. Test Always Critical Hit with an ordinary damage move and a target that can
