@@ -270,11 +270,18 @@ jobs:
       - name: Write version artifact
         run: echo -n "${{ steps.pokerogue_version.outputs.version }}" > version.txt
 
-      - name: Upload IPA and version artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload IPA directly
+        uses: actions/upload-artifact@v7
         with:
-          name: PokeRogueOffline-iOS${{ inputs.dev && '-dev' || '' }}
-          path: |
-            ${{ env.IPA_NAME }}
-            version.txt
+          path: ${{ env.IPA_NAME }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload version metadata directly
+        uses: actions/upload-artifact@v7
+        with:
+          path: version.txt
+          archive: false
+          if-no-files-found: error
           retention-days: 30

@@ -166,8 +166,9 @@ jobs:
           echo "exe=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload EXE artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: PokeRogueOffline-Windows${{ inputs.dev && '-dev' || '' }}
           path: ${{ steps.exe_path.outputs.exe }}
+          archive: false
+          if-no-files-found: error
           retention-days: 30

@@ -169,8 +169,9 @@ jobs:
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload AppImage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: PokeRogueOffline-AppImage${{ inputs.dev && '-dev' || '' }}
           path: ${{ steps.appimage_path.outputs.AppImage }}
+          archive: false
+          if-no-files-found: error
           retention-days: 30
