@@ -269,9 +269,9 @@ function showIntegerPicker(
 function showFormPicker(draft: PokemonEditorDraft, back: () => void): boolean {
   const species = speciesDataRegistry.getSpecies(draft.speciesId);
   const formIndices = getSafePokemonEditorFormIndices(draft.speciesId);
-  const forms = formIndices
-    .map(index => ({ index, label: species.getName(index) }))
-    .sort((a, b) => compareLabels(a.label, b.label) || a.index - b.index);
+  // Form registry order is meaningful: the standard/default form comes first,
+  // followed by the game's own progression of alternate forms.
+  const forms = formIndices.map(index => ({ index, label: species.getName(index) }));
   const options: OptionSelectItem[] = forms.map(form => ({
     label: form.label,
     handler: () => {
@@ -342,9 +342,8 @@ function showAbilityPicker(draft: PokemonEditorDraft, back: () => void): boolean
 }
 
 function showGenderPicker(draft: PokemonEditorDraft, back: () => void): boolean {
-  const genders = getPokemonEditorGenders(draft.speciesId).sort((a, b) =>
-    compareLabels(genderLabels[a], genderLabels[b]),
-  );
+  // Preserve the game's canonical Male, Female, Genderless order.
+  const genders = getPokemonEditorGenders(draft.speciesId);
   const options: OptionSelectItem[] = genders.map(gender => ({
     label: genderLabels[gender],
     handler: () => {
@@ -359,10 +358,11 @@ function showGenderPicker(draft: PokemonEditorDraft, back: () => void): boolean 
 }
 
 function showShinyPicker(draft: PokemonEditorDraft, back: () => void): boolean {
+  // This is a rarity progression, not an alphabetical lookup list.
   const shinyChoices = [
     { label: "Off", shiny: false, variant: 0 as const },
     ...variantLabels.map((label, variant) => ({ label, shiny: true, variant: variant as 0 | 1 | 2 })),
-  ].sort((a, b) => compareLabels(a.label, b.label));
+  ];
   const options: OptionSelectItem[] = shinyChoices.map(choice => ({
     label: choice.label,
     handler: () => {
@@ -610,18 +610,17 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
     return true;
   };
   const showSorts = (): boolean => {
-    const sorts = (
-      [
-        "name-asc",
-        "name-desc",
-        "power-desc",
-        "power-asc",
-        "accuracy-desc",
-        "accuracy-asc",
-        "pp-desc",
-        "pp-asc",
-      ] satisfies PokemonEditorMoveSort[]
-    ).sort((a, b) => compareLabels(formatMoveSort(a), formatMoveSort(b)));
+    // Keep each field's high/low pair together in the most useful order.
+    const sorts = [
+      "name-asc",
+      "name-desc",
+      "power-desc",
+      "power-asc",
+      "accuracy-desc",
+      "accuracy-asc",
+      "pp-desc",
+      "pp-asc",
+    ] satisfies PokemonEditorMoveSort[];
     showOptions(
       sorts.map(sort => ({
         label: formatMoveSort(sort),

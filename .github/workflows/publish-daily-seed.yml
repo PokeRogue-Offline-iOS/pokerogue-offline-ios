@@ -38,26 +38,38 @@ jobs:
             echo "Could not read the pinned PokeRogue client version." >&2
             exit 1
           fi
-          for attempt in $(seq 1 8); do
+          # The Ubuntu runner includes matching Chrome and ChromeDriver.
+          # Fetching from a real pokerogue.net page gives the API the same
+          # first-party browser context as the official game, without using
+          # Scooom's server, another mirror, or any third-party proxy.
+          echo "Fetching the official seed from a first-party pokerogue.net browser context."
+          if candidate="$(POKEROGUE_CLIENT_VERSION="$client_version" node scripts/fetch-official-daily-seed.js)"; then
+            candidate="$(printf '%s' "$candidate" | tr -d '\r\n')"
+            if [[ -n "$candidate" && ${#candidate} -le 131072 && "$candidate" =~ ^[A-Za-z0-9+/=_-]+$ ]]; then
+              seed="$candidate"
+            fi
+          fi
+
+          # Retain one lightweight exact-client request as a fallback in case
+          # a future runner image temporarily lacks a working browser driver.
+          if [[ -z "$seed" ]]; then
+            echo "Browser fetch failed; trying the official API directly once."
             if candidate="$(curl --fail --silent --show-error \
               --connect-timeout 10 \
               --max-time 30 \
               --header "Accept: text/plain" \
+              --header "Authorization;" \
+              --header "Content-Type: application/json" \
               --header "Origin: https://pokerogue.net" \
               --header "PKR-Client-Version: $client_version" \
               --header "Referer: https://pokerogue.net/" \
-              --user-agent "SilverShadow-Daily-Seed-Publisher/2.0" \
               "$SEED_API_URL")"; then
               candidate="$(printf '%s' "$candidate" | tr -d '\r\n')"
               if [[ -n "$candidate" && ${#candidate} -le 131072 && "$candidate" =~ ^[A-Za-z0-9+/=_-]+$ ]]; then
                 seed="$candidate"
-                break
               fi
             fi
-
-            echo "Official Daily Run seed fetch failed (attempt $attempt/8)." >&2
-            sleep $((attempt * 5))
-          done
+          fi
 
           if [[ -z "$seed" ]]; then
             # Publish the same deterministic fallback used by the offline app,

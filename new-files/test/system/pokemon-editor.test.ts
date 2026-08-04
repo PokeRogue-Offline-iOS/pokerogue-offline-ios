@@ -239,12 +239,15 @@ describe("Pokemon Editor Draco Caterpie acceptance", () => {
 describe("Pokemon Editor menu integration", () => {
   const readSource = (...segments: string[]) => readFileSync(join(process.cwd(), "src", ...segments), "utf8");
 
-  it("refreshes nested option pages after the current option callback clears", () => {
+  it("renders nested option pages immediately without clearing their replacement config", () => {
     const uiSource = readSource("ui", "ui.ts");
+    const optionSource = readSource("ui", "handlers", "base-option-select-ui-handler.ts");
     const editorUiSource = readSource("system", "pokemon-editor", "pokemon-editor-ui.ts");
 
     expect(uiSource).toContain("refreshOverlayMode(mode: UiMode");
-    expect(uiSource).toContain("globalScene.time.delayedCall(0");
+    expect(uiSource).toContain("this.getHandler().show(args);\n    return Promise.resolve();");
+    expect(optionSource).toContain("const activeConfig = this.config;");
+    expect(optionSource).toContain("!option.keepOpen && this.config === activeConfig");
     const optionSelectMode = ["UiMode", "OPTION_SELECT"].join(".");
     expect(editorUiSource).toContain(`globalScene.ui.refreshOverlayMode(${optionSelectMode}`);
   });
@@ -283,5 +286,19 @@ describe("Pokemon Editor menu integration", () => {
     expect(starterUiSource).toContain("selectedEditorMoveset");
     expect(starterUiSource).toContain("editorAbilityId");
     expect(gameDataSource).toContain("Cached save-and-quit data can be absent");
+  });
+
+  it("preserves semantic ordering while sorting lookup catalogs", () => {
+    const editorUiSource = readSource("system", "pokemon-editor", "pokemon-editor-ui.ts");
+    const starterUiSource = readSource("ui", "handlers", "starter-select-ui-handler.ts");
+
+    expect(editorUiSource).toContain("This is a rarity progression, not an alphabetical lookup list.");
+    expect(editorUiSource).toContain("Preserve the game's canonical Male, Female, Genderless order.");
+    expect(editorUiSource).toContain("Keep each field's high/low pair together in the most useful order.");
+    expect(editorUiSource).toContain(".sort((a, b) => compareLabels(a.name, b.name)");
+    expect(editorUiSource).toContain("compareLabels(toTitleCase(PokemonType[a]), toTitleCase(PokemonType[b]))");
+    expect(starterUiSource).toContain(
+      'new DropDownOption("POKERUS", pokerusLabels),\n      new DropDownOption("SAVED_BUILDS", savedBuildLabels)',
+    );
   });
 });

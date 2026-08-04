@@ -42,30 +42,15 @@ copyTree(
   path.join(root, "new-files", "src", "system", "pokemon-editor"),
   path.join("pokerogue-src", "src", "system", "pokemon-editor"),
 );
-copyTree(
-  path.join(root, "new-files", "test", "system"),
-  path.join("pokerogue-src", "test", "system"),
-);
+copyTree(path.join(root, "new-files", "test", "system"), path.join("pokerogue-src", "test", "system"));
 
 // Option-select pages frequently replace another option-select page. The
-// stock mode setter intentionally ignores same-mode requests, so defer a
-// same-mode refresh until the current option handler has finished clearing.
-// This keeps nested editor pages visible and lets their explicit Back/Cancel
-// rows remain usable with keyboard, touch, or controller input.
+// stock mode setter intentionally ignores same-mode requests, so explicitly
+// show the replacement. BaseOptionSelectUiHandler is patched below to avoid
+// clearing a replacement config after the old option callback returns.
 const uiPath = path.join("pokerogue-src", "src", "ui", "ui.ts");
 let uiSource = read(uiPath);
-if (!uiSource.includes("refreshOverlayMode(mode: UiMode")) {
-  uiSource = replaceRequired(
-    uiSource,
-    `  setOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
-    return this.setModeInternal(mode, false, false, true, args);
-  }
-`,
-    `  setOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
-    return this.setModeInternal(mode, false, false, true, args);
-  }
-
-  /**
+const deferredOverlayRefresh = `  /**
    * Show an overlay even when that overlay mode is already active.
    *
    * Option handlers clear themselves after their callback returns. Deferring
@@ -84,16 +69,72 @@ if (!uiSource.includes("refreshOverlayMode(mode: UiMode")) {
       });
     });
   }
+`;
+const immediateOverlayRefresh = `  /** Show or redraw an overlay, including a replacement of the active mode. */
+  refreshOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
+    if (this.mode !== mode) {
+      return this.setOverlayMode(mode, ...args);
+    }
+    this.getHandler().show(args);
+    return Promise.resolve();
+  }
+`;
+if (uiSource.includes(deferredOverlayRefresh)) {
+  uiSource = uiSource.replace(deferredOverlayRefresh, immediateOverlayRefresh);
+}
+if (!uiSource.includes("refreshOverlayMode(mode: UiMode")) {
+  uiSource = replaceRequired(
+    uiSource,
+    `  setOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, false, false, true, args);
+  }
+`,
+    `  setOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, false, false, true, args);
+  }
+
+${immediateOverlayRefresh}
 `,
     "UI overlay refresh method",
   );
 }
 write(uiPath, uiSource);
 
+// An option callback may synchronously replace the active option page. Only
+// clear the handler when the callback did not install a new config; otherwise
+// the replacement can render as a blank window until the next cursor move.
+const optionSelectPath = path.join("pokerogue-src", "src", "ui", "handlers", "base-option-select-ui-handler.ts");
+let optionSelectSource = read(optionSelectPath);
+if (!optionSelectSource.includes("const activeConfig = this.config;")) {
+  const optionHandler = `      const option = this.config?.options[this.unskippedIndices[this.fullCursor]];
+      if (option?.handler()) {
+        if (!option.keepOpen) {
+          this.clear();
+        }
+        playSound = !option.overrideSound;
+      } else {
+        ui.playError();
+      }`;
+  const guardedOptionHandler = `      const activeConfig = this.config;
+      const option = activeConfig?.options[this.unskippedIndices[this.fullCursor]];
+      if (option?.handler()) {
+        if (!option.keepOpen && this.config === activeConfig) {
+          this.clear();
+        }
+        playSound = !option.overrideSound;
+      } else {
+        ui.playError();
+      }`;
+  const count = optionSelectSource.split(optionHandler).length - 1;
+  if (count !== 2) fail(`Expected two option handler cleanup blocks, found ${count}.`);
+  optionSelectSource = optionSelectSource.replaceAll(optionHandler, guardedOptionHandler);
+}
+write(optionSelectPath, optionSelectSource);
+
 // Persist the versioned build library and per-selected-copy editor data.
 const saveDataPath = path.join("pokerogue-src", "src", "@types", "save-data.ts");
 let saveData = read(saveDataPath);
-if (!saveData.includes('#system/pokemon-editor/pokemon-editor-types')) {
+if (!saveData.includes("#system/pokemon-editor/pokemon-editor-types")) {
   saveData = replaceRequired(
     saveData,
     'import type { PokemonData } from "#system/pokemon-data";',
@@ -515,22 +556,6 @@ if (!starterUi.includes('new DropDownOption("SAVED_BUILDS"')) {
     `      new DropDownOption("POKERUS", pokerusLabels),
       new DropDownOption("SAVED_BUILDS", savedBuildLabels),`,
     "starter Misc saved-build option",
-  );
-  starterUi = replaceRequired(
-    starterUi,
-    `      new DropDownOption("FAVORITE", favoriteLabels),
-      new DropDownOption("WIN", winLabels),
-      new DropDownOption("HIDDEN_ABILITY", hiddenAbilityLabels),
-      new DropDownOption("EGG", eggLabels),
-      new DropDownOption("POKERUS", pokerusLabels),
-      new DropDownOption("SAVED_BUILDS", savedBuildLabels),`,
-    `      new DropDownOption("EGG", eggLabels),
-      new DropDownOption("FAVORITE", favoriteLabels),
-      new DropDownOption("HIDDEN_ABILITY", hiddenAbilityLabels),
-      new DropDownOption("POKERUS", pokerusLabels),
-      new DropDownOption("WIN", winLabels),
-      new DropDownOption("SAVED_BUILDS", savedBuildLabels),`,
-    "alphabetical starter Misc filters",
   );
   starterUi = replaceRequired(
     starterUi,

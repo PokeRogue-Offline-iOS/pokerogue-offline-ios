@@ -55,12 +55,13 @@ claims use the normal game interface and animation flow for stability.
   If that feed is unavailable, the game immediately falls back to a deterministic UTC-date seed and remains playable offline.
 - The app is built from current PokéRogue source with SilverShadow patches applied during the build.
 
-The **Publish Daily Run Seed** workflow requests the seed directly from PokéRogue's official API several times during
-the first three UTC hours and publishes a dated JSON payload to this fork's own `seed` branch. It retries transient
-Cloudflare/API failures; if the official service remains unavailable, it publishes a marked, non-cacheable offline
-fallback that a later scheduled run can replace. After enabling Actions on a new fork, run that workflow once manually
-to create the branch immediately. The app reads this fork's raw `seed` branch URL and does not request another
-PokéRogue Offline repository or service.
+The **Publish Daily Run Seed** workflow requests the seed from PokéRogue's official API several times during the first
+three UTC hours and publishes a dated JSON payload to this fork's own `seed` branch. To avoid Cloudflare rejecting a
+command-line request from a GitHub runner, the workflow uses a real first-party `pokerogue.net` browser context with the
+Chrome and ChromeDriver already installed on the runner. It does not use Scooom's server or another offline seed mirror. If the
+official service remains unavailable, it publishes a marked, non-cacheable offline fallback that a later scheduled run
+can replace. After enabling Actions on a new fork, run that workflow once manually to create the branch immediately.
+The app reads this fork's raw `seed` branch URL.
 
 ### SilverShadow Android Branding
 
