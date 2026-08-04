@@ -117,7 +117,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   }
 
   private applyLockedStyling(): void {
-    const locked = !offlineBackup.isSignedIn();
+    const locked = !offlineBackup.isSupported() || !offlineBackup.isSignedIn();
     for (const key of OfflineSettingsUiHandler.LOCKABLE_KEYS) {
       this.setRowLocked(key, locked);
     }
@@ -133,13 +133,18 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   }
 
   private refreshDisplay(): void {
-    this.setRowText(SettingKeys.Offline_Google_Connect, offlineBackup.isSignedIn() ? "Connected" : "Not Connected");
+    const connectionText = !offlineBackup.isSupported()
+      ? "Unavailable in this build"
+      : offlineBackup.isSignedIn()
+        ? "Connected"
+        : "Not Connected";
+    this.setRowText(SettingKeys.Offline_Google_Connect, connectionText);
     this.applyLockedStyling();
   }
 
   /** Fetches and displays the Drive backup's embedded save time — only meaningful once connected. */
   private refreshDriveLastPlayed(): void {
-    if (!offlineBackup.isSignedIn()) {
+    if (!offlineBackup.isSupported() || !offlineBackup.isSignedIn()) {
       this.setRowText(SettingKeys.Offline_Drive_Last_Played, "—");
       return;
     }
@@ -169,7 +174,7 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
     // refresh token exists (see google-drive-backup.ts / main.cjs); it's a
     // no-op if there's nothing stored. Fire-and-forget — show() itself stays
     // synchronous, the rows just update once this resolves.
-    if (!offlineBackup.isSignedIn()) {
+    if (offlineBackup.isSupported() && !offlineBackup.isSignedIn()) {
       this.setRowText(SettingKeys.Offline_Google_Connect, "Checking connection…");
       offlineBackup
         .tryRestoreSession()
@@ -212,6 +217,10 @@ export class OfflineSettingsUiHandler extends BaseSettingsUiHandler {
   }
 
   private handleConnectPress(): void {
+    if (!offlineBackup.isSupported()) {
+      this.showText("Google Drive is not available in this build.", 0, () => this.showText("", 0), 1500);
+      return;
+    }
     if (offlineBackup.isSignedIn() || this.connectInProgress) {
       return;
     }

@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       dev:
-        description: 'Dev build (dev OAuth config/icon/app id, no Drive backup wiring)'
+        description: 'Dev build (dev icon/app id and matching Google Android OAuth client)'
         required: false
         type: boolean
         default: false
@@ -69,6 +69,18 @@ jobs:
         run: |
           bash "${{ github.workspace }}/scripts/apply-patches.sh" android
 
+      - name: Configure Google Drive OAuth
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          if [ -z "$GOOGLE_WEB_CLIENT_ID" ]; then
+            echo "::warning::GOOGLE_WEB_CLIENT_ID is not configured; the APK will build but Google Drive sign-in will report that OAuth is unavailable."
+          else
+            sed -i \
+              "s|GOOGLE_WEB_CLIENT_ID_PLACEHOLDER|${GOOGLE_WEB_CLIENT_ID}|g" \
+              pokerogue-src/src/system/offline/google-drive-backup.ts
+          fi
+
       - name: Inject SilverShadow version into banner
         run: |
           BUILD_NUM="${{ inputs.build_number || github.run_number }}"
@@ -124,7 +136,8 @@ jobs:
             @capacitor/filesystem@8.1.2 \
             @capacitor/haptics@8.0.2 \
             @capacitor/share@8.0.1 \
-            @capacitor/status-bar@8.0.2
+            @capacitor/status-bar@8.0.2 \
+            @capgo/capacitor-social-login@8.3.33
 
       - name: Install all JavaScript dependencies
         working-directory: pokerogue-src
@@ -148,6 +161,11 @@ jobs:
             cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config-dev.json capacitor.config.json
           else
             cp ${{ github.workspace }}/configs/android/capacitor/capacitor.config.json capacitor.config.json
+          fi
+          if [ -n "${{ secrets.GOOGLE_WEB_CLIENT_ID }}" ]; then
+            sed -i \
+              "s|GOOGLE_WEB_CLIENT_ID_PLACEHOLDER|${{ secrets.GOOGLE_WEB_CLIENT_ID }}|g" \
+              capacitor.config.json
           fi
 
       - name: Build PokeRogue
@@ -443,6 +461,14 @@ jobs:
         run: |
           mkdir -p ~/.android
           echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > ~/.android/debug.keystore
+
+      - name: Print Android OAuth signing SHA-1
+        run: |
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            | grep 'SHA1:'
 
       - name: Build Android APK
         working-directory: pokerogue-src/android

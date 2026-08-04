@@ -77,12 +77,22 @@ jobs:
             sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           fi
 
-      - name: Inject Google iOS Client ID
+      - name: Configure Google Drive OAuth
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+          GOOGLE_IOS_DEV_CLIENT_ID: ${{ secrets.GOOGLE_IOS_DEV_CLIENT_ID }}
         run: |
           if [ "${{ inputs.dev }}" = "true" ]; then
-            sed -i '' "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-k9ns6u546mgn6vjv1mcks32mn76u1v01.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
+            SELECTED_IOS_CLIENT_ID="$GOOGLE_IOS_DEV_CLIENT_ID"
           else
-            sed -i '' "s/IOS_CLIENT_ID_PLACEHOLDER/856587427302-ejrsdp1qu750amcjupo943593vmeje1k.apps.googleusercontent.com/g" pokerogue-src/src/system/offline/google-drive-backup.ts
+            SELECTED_IOS_CLIENT_ID="$GOOGLE_IOS_CLIENT_ID"
+          fi
+          if [ -z "$GOOGLE_WEB_CLIENT_ID" ] || [ -z "$SELECTED_IOS_CLIENT_ID" ]; then
+            echo "::warning::Google OAuth client IDs are incomplete; the IPA will build but Google Drive sign-in will report that OAuth is unavailable."
+          else
+            sed -i '' "s|GOOGLE_WEB_CLIENT_ID_PLACEHOLDER|${GOOGLE_WEB_CLIENT_ID}|g" pokerogue-src/src/system/offline/google-drive-backup.ts
+            sed -i '' "s|GOOGLE_IOS_CLIENT_ID_PLACEHOLDER|${SELECTED_IOS_CLIENT_ID}|g" pokerogue-src/src/system/offline/google-drive-backup.ts
           fi
 
       - name: Install PokeRogue dependencies
@@ -96,11 +106,26 @@ jobs:
 
       - name: Configure Capacitor
         working-directory: pokerogue-src
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+          GOOGLE_IOS_DEV_CLIENT_ID: ${{ secrets.GOOGLE_IOS_DEV_CLIENT_ID }}
         run: |
           if [ "${{ inputs.dev }}" = "true" ]; then
             cp ${{ github.workspace }}/configs/ios/capacitor/capacitor.config.dev.json capacitor.config.json
           else
             cp ${{ github.workspace }}/configs/ios/capacitor/capacitor.config.json capacitor.config.json
+          fi
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            sed -i '' "s|GOOGLE_WEB_CLIENT_ID_PLACEHOLDER|${GOOGLE_WEB_CLIENT_ID}|g" capacitor.config.json
+          fi
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            SELECTED_IOS_CLIENT_ID="$GOOGLE_IOS_DEV_CLIENT_ID"
+          else
+            SELECTED_IOS_CLIENT_ID="$GOOGLE_IOS_CLIENT_ID"
+          fi
+          if [ -n "$SELECTED_IOS_CLIENT_ID" ]; then
+            sed -i '' "s|GOOGLE_IOS_CLIENT_ID_PLACEHOLDER|${SELECTED_IOS_CLIENT_ID}|g" capacitor.config.json
           fi
           cat capacitor.config.json
 
@@ -173,10 +198,14 @@ jobs:
           else
             SCHEME="${{ secrets.GOOGLE_IOS_REVERSED_CLIENT_ID }}"
           fi
-          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/App/App/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string ${SCHEME}" ios/App/App/Info.plist
+          if [ -z "$SCHEME" ]; then
+            echo "::warning::Google iOS reversed client ID is missing; skipping the sign-in URL scheme."
+          else
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/App/App/Info.plist || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" ios/App/App/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/App/App/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string ${SCHEME}" ios/App/App/Info.plist
+          fi
 
       - name: Copy app icon
         run: |

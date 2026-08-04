@@ -33,6 +33,8 @@ import { SettingKeys } from "#system/settings";
 const BACKUP_FILE_NAME = "pkroffline-save-backup.json";
 const DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 const DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files";
+const GOOGLE_WEB_CLIENT_ID = "GOOGLE_WEB_CLIENT_ID_PLACEHOLDER";
+const GOOGLE_IOS_CLIENT_ID = "GOOGLE_IOS_CLIENT_ID_PLACEHOLDER";
 
 // Matches sessionData_<user>, sessionData1_<user> ... sessionData4_<user>.
 const SESSION_KEY_PATTERN = /^sessionData\d*_/;
@@ -42,6 +44,7 @@ declare global {
     // Injected by @capacitor/core at runtime on Android/iOS builds.
     Capacitor?: {
       isNativePlatform?: () => boolean;
+      getPlatform?: () => string;
     };
     // Injected by configs/desktop/electron/preload.cjs on the Electron build.
     pkrOffline?: {
@@ -58,6 +61,18 @@ function isCapacitor(): boolean {
 
 function isElectron(): boolean {
   return typeof window !== "undefined" && !!window.pkrOffline;
+}
+
+/** Whether this build includes a native/browser OAuth bridge. */
+export function isSupported(): boolean {
+  return isCapacitor() || isElectron();
+}
+
+function requireConfiguredClientId(value: string, label: string): string {
+  if (!value || value.includes("PLACEHOLDER")) {
+    throw new Error(`${label} is not configured for this build. See docs/GOOGLE_DRIVE_SETUP.md.`);
+  }
+  return value;
 }
 
 let cachedAccessToken: string | null = null;
@@ -117,6 +132,13 @@ export async function signOut(): Promise<void> {
  */
 export async function signIn(): Promise<string> {
   if (isCapacitor()) {
+    const webClientId = requireConfiguredClientId(GOOGLE_WEB_CLIENT_ID, "Google Web OAuth client ID");
+    const platform = window.Capacitor?.getPlatform?.();
+    const iOSClientId =
+      platform === "ios"
+        ? requireConfiguredClientId(GOOGLE_IOS_CLIENT_ID, "Google iOS OAuth client ID")
+        : GOOGLE_IOS_CLIENT_ID;
+
     // @capgo/capacitor-social-login — NOT @codetrix-studio/capacitor-google-auth.
     // The codetrix plugin is effectively unmaintained (peer dep capped at
     // Capacitor 6; this project pins Capacitor 8), so this fork is used
@@ -128,21 +150,21 @@ export async function signIn(): Promise<string> {
         // webClientId is intentionally used here even though we're on a
         // native platform — see capacitor.config.json comments; this is a
         // "Web application" type client used purely as the token audience.
-        webClientId: "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
+        webClientId,
         // REQUIRED on iOS specifically — without this, SocialLogin.login()
         // throws "No provider was initialized" on iOS even though the exact
         // same call works fine on Android with only webClientId set. Harmless
         // to include on Android too, so it's set unconditionally here rather
         // than branching on platform.
         //
-        // This value is DIFFERENT for the prod (xyz.scooom.pkr) vs dev
-        // (xyz.scooom.pkrdev) iOS builds, since Google's iOS OAuth clients are
+        // This value is different for production and development iOS builds,
+        // since Google's iOS OAuth clients are
         // bundle-ID-locked — substituted at build time via sed, sourced from
         // GOOGLE_IOS_CLIENT_ID / GOOGLE_IOS_DEV_CLIENT_ID secrets. Android
         // ignores this field entirely, so it gets the prod value there too —
         // doesn't matter functionally, just keeps one substitution convention.
-        iOSClientId: "IOS_CLIENT_ID_PLACEHOLDER",
-        iOSServerClientId: "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
+        iOSClientId,
+        iOSServerClientId: webClientId,
         mode: "online", // plain access token, not the server-auth-code/offline flow
       },
     });
@@ -167,7 +189,7 @@ export async function signIn(): Promise<string> {
     return token;
   }
 
-  throw new Error("Google sign-in is not supported in this build.");
+  throw new Error("Google sign-in is not available in this build.");
 }
 
 /** Reads the persisted "Include Current Run" toggle directly from the shared settings blob. */

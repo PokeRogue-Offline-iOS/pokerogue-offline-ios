@@ -20,7 +20,6 @@ apply_patch "update-check.js"         all
 apply_patch "update-title-labels.js"  all
 
 apply_patch "app-settings-menu.js"          all
-apply_patch "remove-google-drive.js"        all
 apply_patch "offline-settings-navigation-fix.js" all
 apply_patch "auto-hide-touch-controls.js" all
 apply_patch "silvershadow-touch-controls.js" all
@@ -38,6 +37,7 @@ apply_patch "starter-extra-settings.js"     all
 apply_patch "player-ohko.js"                all
 apply_patch "infinite-player-pp.js"         all
 apply_patch "infinite-player-hp.js"         all
+apply_patch "live-cheat-settings.js"        all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all
 
@@ -59,6 +59,10 @@ fi
 
 # --- Switch only --------------------------------------------------------------
 if [[ "$PLATFORM" == "switch" ]]; then
+
+  # Google OAuth and Drive require a browser/native sign-in bridge and remote
+  # network access. Keep those rows out of the strictly offline Switch build.
+  apply_patch "remove-google-drive.js" switch
 
   # Hand the real Phaser application the nx.js screen canvas and inject the
   # Switch Milestone 2 build label. Browser compatibility stays in the nx.js

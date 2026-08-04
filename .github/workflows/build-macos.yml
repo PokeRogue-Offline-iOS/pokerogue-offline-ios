@@ -117,9 +117,16 @@ jobs:
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
       - name: Inject Google OAuth credentials into main.cjs
+        env:
+          GOOGLE_DESKTOP_CLIENT_ID: ${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
         run: |
-          sed -i '' "s/GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}/g" pokerogue-src/main.cjs
-          sed -i '' "s/GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER/${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}/g" pokerogue-src/main.cjs
+          if [ -z "$GOOGLE_DESKTOP_CLIENT_ID" ] || [ -z "$GOOGLE_DESKTOP_CLIENT_SECRET" ]; then
+            echo "::warning::Desktop Google OAuth credentials are missing; the app will build but Drive sign-in will report that OAuth is unavailable."
+          else
+            sed -i '' "s|GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER|${GOOGLE_DESKTOP_CLIENT_ID}|g" pokerogue-src/main.cjs
+            sed -i '' "s|GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER|${GOOGLE_DESKTOP_CLIENT_SECRET}|g" pokerogue-src/main.cjs
+          fi
 
       - name: Set electron main in package.json
         working-directory: pokerogue-src

@@ -36,9 +36,11 @@ then runs repository-owned Node or git patch files against `pokerogue-src`.
 `scripts/apply-patches.sh` always applies `patches/all`, then conditionally
 applies `mobile` and `android`. Post-build mobile changes are applied to Vite
 output by `scripts/apply-post-build-patches.sh`. The shared layer contains the
-SilverShadow title and banner, offline settings, Google Drive removal, update
-screen, daily seed handling, sandbox economy settings, guaranteed capture,
-claim-all rewards, gacha calendar, community menu, and touch-control behavior.
+SilverShadow title and banner, offline settings, update screen, daily seed
+handling, sandbox economy settings, guaranteed capture, claim-all rewards,
+gacha calendar, community menu, and touch-control behavior. The Switch layer
+removes Google Drive after the shared Offline tab is built because the Switch
+runtime intentionally blocks remote network access.
 
 Switch now follows `all` then `switch`. It never executes `mobile` or
 `android`. No existing workflow or package identifier was changed.

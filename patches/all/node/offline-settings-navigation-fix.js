@@ -14,7 +14,8 @@
  *    OfflineSettingsUiHandler was missing from that whitelist, so F/R and
  *    LB/RB were discarded before reaching UI.processInput() or the handler.
  *
- * Apply after remove-google-drive.js.
+ * Works with both the full Google Drive handler and the Switch-only local
+ * handler installed later by patches/switch/node/remove-google-drive.js.
  */
 
 const fs = require("fs");
