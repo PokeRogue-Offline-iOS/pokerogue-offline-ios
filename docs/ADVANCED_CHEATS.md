@@ -1,8 +1,8 @@
 # Advanced cheat catalog and behavior
 
 This document covers the advanced cheats added by
-`advanced-battle-cheats.js`, `advanced-capture-cheats.js`, and
-`advanced-progression-cheats.js`. They are shared `patches/all` behavior, so
+`advanced-battle-cheats.js`, `advanced-capture-cheats.js`,
+`advanced-progression-cheats.js`, and `candy-jar-cheat.js`. They are shared `patches/all` behavior, so
 the same runtime code is used by Windows, Linux, macOS, iOS, Android, and
 Switch builds.
 
@@ -19,7 +19,7 @@ contiguous sections:
 | --- | --- |
 | Shop | Free Shop Items, Free Rerolls, Money Multiplier |
 | Rewards | Reward Claim Mode, Max Luck (SSS) |
-| Progress | EXP Multiplier, Pokemon Candy Multiplier, Candy Costs |
+| Progress | EXP Multiplier, Candy Jar Count, Pokemon Candy Multiplier, Candy Costs |
 | Team | 60 Starter Points, Allow Duplicate Starters, Starting Level, Unlock Starter on Select, All Starters Have Pokerus |
 | Generation / Gacha | Free Egg Gacha Pulls, Rare Eggs, Instant Hatch, Shiny Rate, Always Shiny, Form Change Items |
 | Capture | Guaranteed Capture, Unlimited Poke Balls, Catch Trainer Pokemon, Catch Pokemon in Double Battles, Catch Bosses Through Shields |
@@ -143,6 +143,32 @@ EXP is multiplied immediately before its EXP display/award phase. Participant
 shares, Pokerus, EXP Share/Balance behavior, and Pokemon-specific boosters are
 calculated through the normal pipeline.
 
+### Candy Jar Count
+
+This row is an action-backed number picker rather than a left/right cheat
+toggle. Press Action to open the game's native scrolling option menu and pick
+an exact value from 0 through 9,999. The picker uses the same UI/input path on
+keyboard, controller, touchscreen, Windows, Linux, macOS, iOS, Android, and
+Switch. Its large-list rendering is restricted to the visible window so
+moving the cursor does not rebuild thousands of off-screen labels. Up/Down
+moves by one and Left/Right jumps by 100 for practical controller and touch
+navigation.
+
+The setting has two deliberate modes:
+
+- Outside a run, it stores the exact Candy Jar count assigned when the next
+  standard or daily run initializes.
+- Inside a run, the row reads the real current Candy Jar modifier stack. A
+  confirmed choice immediately replaces that stack; choosing 0 removes it.
+
+Opening settings never overwrites a loaded run with the configured starting
+value. A loaded save keeps its serialized Candy Jar count until the player
+confirms a new value. The persistent modifier's old maximum of 99 is raised to
+JavaScript's safe-integer limit, so normal item rewards can continue stacking
+beyond the picker range. Both Rare Candy and Rarer Candy already consume the
+same Candy Jar modifier, so each receives the selected bonus without a second
+multiplier path.
+
 ### Ignore Evolution Requirements
 
 On a level-up event, `PlayerPokemon.getEvolution()` selects the first formal
@@ -252,14 +278,20 @@ restarting after its positive test.
     encounter/final-boss restrictions remain authoritative.
 12. Record a known money and EXP reward and verify every multiplier option,
     including the 100x cap/floor behavior.
-13. With evolution requirements ignored, test a low-level standard evolution,
+13. Outside a run, set Candy Jar Count to 250 and begin both a standard run and
+    a daily run; confirm each starts at 250. In a loaded run with a different
+    count, open Offline settings and confirm the row shows the saved run's
+    actual value without changing it. Pick 0, 100, and 9,999 in succession and
+    confirm the modifier bar and both Rare Candy and Rarer Candy update without
+    restarting. Earn another Candy Jar at 9,999 and confirm it stacks to 10,000.
+14. With evolution requirements ignored, test a low-level standard evolution,
     an item/trade/friendship evolution, a branching species, and a multi-level
     EXP award. Confirm one formal evolution per award and no Mega/Gigantamax/
     Dynamax/Tera form change.
-14. Generate TM rewards with a deliberately incompatible party, teach one to
+15. Generate TM rewards with a deliberately incompatible party, teach one to
     that Pokemon, and confirm known/used exclusions still work. Turn the cheat
     off and confirm legitimate compatibility returns.
-15. Repeat the battle/capture tests in both player slots where possible and
+16. Repeat the battle/capture tests in both player slots where possible and
     once with existing Infinite HP, Infinite PP, Player OHKO, Guaranteed
     Capture, and reward cheats enabled together.
 
@@ -267,16 +299,16 @@ restarting after its positive test.
 
 | Check | Result |
 | --- | --- |
-| JavaScript syntax for all four new patch scripts | Passed |
-| Idempotent direct reapplication of the four new patch scripts | Passed |
+| JavaScript syntax for all five advanced-cheat patch scripts | Passed |
+| Idempotent direct reapplication of the five advanced-cheat patch scripts | Passed |
 | Clean `all` patch application (desktop/web: Windows, Linux, macOS) | Passed |
 | Clean `mobile` patch application (iOS + shared mobile) | Passed |
 | Clean `android` patch application | Passed |
 | Clean `switch` patch application | Passed |
-| Source TypeScript check for clean shared desktop/mobile output | Passed with a temporary declaration for the Capgo dependency installed by those CI workflows |
-| Source TypeScript check after the Switch overlay | Passed |
+| Source TypeScript check for clean shared desktop/mobile output | Passed with temporary validation stubs for the Capgo dependency and unpopulated asset-submodule JSON |
+| Source TypeScript check after the Switch overlay | Passed with temporary validation JSON for the unpopulated asset submodule |
 | Production app-mode Vite build after the Switch overlay | Passed |
-| Biome check of the 15 generated files touched by the new patches | New emitted code clean; two pre-existing formatting findings remain in older patch output |
+| Biome check of generated files touched by the advanced patches | Candy Jar output clean; older Google Drive/live-settings formatting findings remain |
 
 Native APK, IPA, macOS DMG, and NRO packages were not produced. The repository
 handoff forbids building an Android APK for this task, and Apple-native packages

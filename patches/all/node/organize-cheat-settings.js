@@ -50,7 +50,12 @@ const sections = [
   },
   {
     category: "PROGRESS",
-    keys: ["Offline_Exp_Multiplier", "Offline_Starter_Candy_Multiplier", "Offline_Candy_Costs"],
+    keys: [
+      "Offline_Exp_Multiplier",
+      "Offline_Candy_Jar_Count",
+      "Offline_Starter_Candy_Multiplier",
+      "Offline_Candy_Costs",
+    ],
   },
   {
     category: "TEAM",
@@ -121,7 +126,16 @@ if (!settingsSource.includes("  category?: string;")) {
 }
 
 const categoryMarkersPresent = sections.every(section =>
-  settingsSource.includes(`    category: "${section.category}",`),
+  section.keys.every(key => {
+    const rowPattern = new RegExp(`\\n  \\{\\n    key: SettingKeys\\.${key},[\\s\\S]*?\\n  \\},`);
+    const matches = [...settingsSource.matchAll(new RegExp(rowPattern.source, "g"))];
+    const categoryLines = matches[0]?.[0].match(/\n    category: "[^"]+",/g) ?? [];
+    return (
+      matches.length === 1
+      && categoryLines.length === 1
+      && matches[0][0].includes(`    category: "${section.category}",`)
+    );
+  }),
 );
 
 if (!categoryMarkersPresent) {
@@ -148,7 +162,8 @@ if (!categoryMarkersPresent) {
         if (!row) {
           fail(`Missing extracted settings row for ${key}`);
         }
-        return row.replace("\n  },", `\n    category: "${section.category}",\n  },`);
+        const normalizedRow = row.replace(/\n    category: "[^"]+",/g, "");
+        return normalizedRow.replace("\n  },", `\n    category: "${section.category}",\n  },`);
       }),
     )
     .join("");
@@ -176,10 +191,9 @@ writeFile(baseSettingsPath, baseSettingsSource);
 
 for (const section of sections) {
   for (const key of section.keys) {
-    const rowPattern = new RegExp(
-      `key: SettingKeys\\.${key},[\\s\\S]*?category: "${section.category}",[\\s\\S]*?\\n  \\},`,
-    );
-    if (!rowPattern.test(settingsSource)) {
+    const rowPattern = new RegExp(`\\n  \\{\\n    key: SettingKeys\\.${key},[\\s\\S]*?\\n  \\},`);
+    const matches = [...settingsSource.matchAll(new RegExp(rowPattern.source, "g"))];
+    if (matches.length !== 1 || !matches[0][0].includes(`    category: "${section.category}",`)) {
       fail(`Cheat catalog order/category marker is incomplete for ${key}`);
     }
   }

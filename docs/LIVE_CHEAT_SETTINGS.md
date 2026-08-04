@@ -38,13 +38,16 @@ value again without relying on boot-time or scene-initialization state.
 | Catch Bosses Through Shields | On the next boss-shield capture check |
 | Money Multiplier | On the next positive money gain |
 | EXP Multiplier | On the next per-Pokemon EXP award |
+| Candy Jar Count | Immediately in an active run; otherwise when the next run initializes |
 | Ignore Evolution Requirements | On the next level-up evolution lookup |
 | Unlimited TM Compatibility | On the next TM generation or compatibility query |
 
 Turning a generator setting on does not rewrite already-generated state. For
 example, Always Shiny affects the next eligible Pokémon, Starting Level affects
 the next run, and All Starters Have Pokérus affects starter records created
-after the setting changes.
+after the setting changes. Candy Jar Count is the exception with explicit
+dual behavior: the native picker edits the actual modifier stack when a run is
+active and stores a new-run starting count when no run is active.
 
 ## Still restart-required
 

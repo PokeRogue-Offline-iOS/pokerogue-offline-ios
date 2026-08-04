@@ -130,6 +130,7 @@ All sandbox options:
 | **Full Heal After Every Battle** | Restores the full party's HP, PP, faint/status state, and confusion after a victory. |
 | **Money Multiplier** | Selects Default, 2x, 5x, 10x, or 100x for positive money gains without changing prices. |
 | **EXP Multiplier** | Selects Default, 2x, 4x, 8x, 16x, or 100x for each party member's EXP award. |
+| **Candy Jar Count** | Opens the native scrolling picker to set an exact 0-9,999 starting or live-run Candy Jar stack; the old 99-stack runtime cap is removed. |
 | **Ignore Evolution Requirements** | Makes the first matching formal evolution eligible on the next level-up event, one evolution per EXP award. |
 | **Unlimited TM Compatibility** | Makes the complete TM reward pool teachable to every player Pokemon. |
 
@@ -138,6 +139,7 @@ All sandbox options:
 - **Guaranteed Capture** does not bypass encounters where Poké Balls cannot normally be used, including Trainer battles and other restricted encounters.
 - **Pokémon Candy Multiplier** affects awarded species candy. It does not modify Rare Candy battle items or the separate **Candy Costs** setting.
 - **Candy Costs** applies to passive unlocks, both starter point reductions, and same-species eggs. Rebalanced costs are 25% of normal, rounded up; Free costs are zero.
+- **Candy Jar Count** affects both Rare Candy and Rarer Candy through their normal Candy Jar modifier. Outside a run it configures the next run; inside a run the row displays and edits the real current stack immediately.
 - **60 Starter Points** changes the point limit only. Combine it with **Allow Duplicate Starters** when selecting costly duplicate teams.
 - With duplicate starters enabled, species-grid customization prepares the next copy. Highlight a selected copy in the team panel to edit or remove that specific copy; adding another copy is done from the main species pool. Gender, moves, nature, ability, form, shiny variant, Tera type, and passive selection are stored per copy and survive save/continue.
 - Passive ownership is still unlocked once per species, while the enabled/disabled passive choice is stored independently on each selected duplicate.
