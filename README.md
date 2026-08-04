@@ -251,23 +251,18 @@ Export both your user data and active session before switching package versions.
 
 Do not uninstall the main app or clear its Android application storage until you have confirmed that your backup can be imported.
 
-## Google Drive and OAuth Removal
+## Google Drive Backups
 
-Google Drive backup and Google OAuth integration have been removed from this fork.
+Supported Android, iOS, Windows, Linux, and macOS builds include manual Google
+Drive backup and restore in **Settings → Offline**. Backups use only the hidden
+Drive app-data folder and can optionally include the current run. Manual local
+save import/export remains available and is recommended as a second backup.
 
-Removed functionality includes:
-
-- Google account connection
-- Google Drive backup
-- Google Drive restore
-- Include-current-run Drive setting
-- Drive last-played information
-- Google session prewarming
-- Google social-login Android plugin
-- Google OAuth client configuration
-- Google-specific Android activity-result handling
-
-Local saves and manual import and export remain available.
+OAuth values are injected from repository secrets. Builds without credentials
+still complete, but Google connection reports that it is not configured. See
+[Google Drive OAuth setup](docs/GOOGLE_DRIVE_SETUP.md) for the exact client
+types, package IDs, signing SHA-1 requirements, and secret names. The
+network-disabled Nintendo Switch build intentionally omits Drive integration.
 
 ## Build Process
 
@@ -278,13 +273,12 @@ During a build, the workflow:
 1. Downloads the selected upstream PokéRogue source.
 2. Applies standard PokéRogue Offline modifications.
 3. Applies SilverShadow branding and offline settings.
-4. Removes Google Drive and OAuth functionality.
-5. Applies sandbox gameplay options in their required order.
-6. Applies interface and quality-of-life changes.
-7. Applies mobile and Android-specific fixes.
-8. Builds the PokéRogue web application.
-9. Packages the web build as a Capacitor Android application.
-10. Signs the APK using the repository's configured signing certificate.
+4. Adds the Offline settings, live sandbox gameplay options, and Google Drive backup UI.
+5. Applies interface and quality-of-life changes.
+6. Applies mobile and Android-specific fixes, including the native Google sign-in bridge.
+7. Builds the PokéRogue web application.
+8. Packages the web build as a Capacitor Android application.
+9. Signs the APK using the repository's configured signing certificate.
 
 The main and development APKs contain the same gameplay modifications but use separate Android identities.
 

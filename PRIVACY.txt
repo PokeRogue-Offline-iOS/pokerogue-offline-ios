@@ -1,5 +1,5 @@
 PRIVACY POLICY — PokeRogue-Offline (Google Verification)
-Last updated: 2026-07-07
+Last updated: 2026-08-03
 
 PokeRogue-Offline is an unofficial, offline-capable wrapper for the game
 PokeRogue, distributed for desktop (Electron) and sideloaded mobile builds
@@ -48,8 +48,8 @@ connection with Google Sign-In / Google Drive access.
 6. CHANGES TO THIS POLICY
    Any future changes to what data is accessed or how it is used will be
    reflected in this file, versioned alongside the source code at:
-   https://github.com/PokeRogue-Offline/pokerogue-offline
+   https://github.com/silvershadowkat/pokerogue-offline
 
 7. CONTACT
-   Questions about this policy or data handling: contact "scooom" on
-   Discord.
+   Questions about this policy or data handling: open an issue at
+   https://github.com/silvershadowkat/pokerogue-offline/issues

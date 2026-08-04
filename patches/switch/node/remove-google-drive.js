@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * Removes Google Drive and Google OAuth functionality added by
- * app-settings-menu.js while retaining the Offline settings tab, Clear All
- * Data, and custom sandbox settings.
+ * Removes Google Drive and Google OAuth functionality from the network-disabled
+ * Switch build while retaining the Offline settings tab, Clear All Data, and
+ * custom sandbox settings.
  */
 
 const fs = require("fs");

@@ -1,5 +1,5 @@
 {
-  "appId": "xyz.scooom.pkrdev",
+  "appId": "com.silvershadow.pkrdev",
   "appName": "PokéRogue Offline Dev",
   "webDir": "dist",
   "ios": {
@@ -24,8 +24,8 @@
         "twitter": false
       },
       "google": {
-        "iOSClientId": "856587427302-k9ns6u546mgn6vjv1mcks32mn76u1v01.apps.googleusercontent.com",
-        "iOSServerClientId": "856587427302-iffda5uuavbg9ft4eo4f5c93fmu46kqg.apps.googleusercontent.com",
+        "iOSClientId": "GOOGLE_IOS_CLIENT_ID_PLACEHOLDER",
+        "iOSServerClientId": "GOOGLE_WEB_CLIENT_ID_PLACEHOLDER",
         "mode": "online"
       }
     }

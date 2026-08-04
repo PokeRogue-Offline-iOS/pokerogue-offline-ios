@@ -16,6 +16,17 @@ const GOOGLE_CLIENT_ID = 'GOOGLE_DESKTOP_CLIENT_ID_PLACEHOLDER';
 const GOOGLE_CLIENT_SECRET = 'GOOGLE_DESKTOP_CLIENT_SECRET_PLACEHOLDER';
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 
+function assertGoogleOAuthConfigured() {
+  if (
+    !GOOGLE_CLIENT_ID ||
+    !GOOGLE_CLIENT_SECRET ||
+    GOOGLE_CLIENT_ID.includes('PLACEHOLDER') ||
+    GOOGLE_CLIENT_SECRET.includes('PLACEHOLDER')
+  ) {
+    throw new Error('Google Drive OAuth is not configured for this build. See docs/GOOGLE_DRIVE_SETUP.md.');
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -207,6 +218,7 @@ function postTokenEndpoint(bodyParams) {
 
 /** Exchanges a stored refresh token for a fresh access token — no browser needed. */
 async function refreshAccessToken(refreshToken) {
+  assertGoogleOAuthConfigured();
   const { status, body } = await postTokenEndpoint({
     client_id: GOOGLE_CLIENT_ID,
     client_secret: GOOGLE_CLIENT_SECRET,
@@ -226,6 +238,7 @@ async function refreshAccessToken(refreshToken) {
  * forced consent, so a fresh refresh_token comes back every time this runs
  * (Google otherwise omits it on repeat authorizations for the same client). */
 async function interactiveSignIn() {
+  assertGoogleOAuthConfigured();
   const port = await getFreePort();
   const redirectUri = `http://127.0.0.1:${port}`;
   const { verifier, challenge } = makePkcePair();
