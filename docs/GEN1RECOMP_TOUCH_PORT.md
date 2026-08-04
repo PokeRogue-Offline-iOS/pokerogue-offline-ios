@@ -260,6 +260,14 @@ and `#dpad` both use the same size token and explicitly allow visible overflow;
 saved portrait/landscape position formats are unchanged. No action-button CSS,
 layout, hit region, or behavior participates in this multiplier.
 
+The default portrait layout subtracts `5%` of `--controls-size` from the
+D-pad's original left padding, clamped at the viewport edge. This small offset
+moves the stationary `.control-group-dpad`, its artwork, and its hit region
+together to restore clearance from the E button after enlargement. It does not
+use a transform, does not affect landscape, and does not modify any action
+button. Move Touch Controls still writes inline orientation-specific positions,
+which override this default without changing the stored layout format.
+
 To tune opacity during development, edit the three shared opacity tokens in the
 SilverShadow block injected into `index.css` by
 `patches/all/node/silvershadow-touch-controls.js`.

@@ -910,6 +910,7 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   /* 2.0 baseline * 1.10; expanded to 2.2 for the existing CSS calc convention. */
   --ss-dpad-scale-multiplier: 1.1;
   --ss-dpad-assembly-size: calc(2.2 * var(--controls-size));
+  --ss-dpad-portrait-left-shift: calc(var(--controls-size) * 0.05);
   --ss-control-idle-opacity: 0.3;
   --ss-control-neutral-opacity: 0.4;
   --ss-control-active-opacity: 0.58;
@@ -932,6 +933,13 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   width: var(--ss-dpad-assembly-size);
   height: var(--ss-dpad-assembly-size);
   overflow: visible;
+}
+
+/* Move the stationary group and hit region together; never offset the rocking face alone. */
+@media (orientation: portrait) {
+  #touchControls.silvershadow-touch-upgrade #control-group-dpad {
+    left: max(0px, calc(var(--controls-padding) - var(--ss-dpad-portrait-left-shift)));
+  }
 }
 
 #touchControls.silvershadow-touch-upgrade #dpad {

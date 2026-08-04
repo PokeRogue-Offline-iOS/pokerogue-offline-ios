@@ -37,6 +37,16 @@ describe("System - Touch controls - visual integration contract", () => {
     expect(styles).not.toContain("scale(1.1)");
   });
 
+  it("nudges only the stationary D-pad group left in portrait", () => {
+    expect(styles).toContain("--ss-dpad-portrait-left-shift: calc(var(--controls-size) * 0.05)");
+    expect(styles).toContain(`@media (orientation: portrait) {
+  #touchControls.silvershadow-touch-upgrade #control-group-dpad {
+    left: max(0px, calc(var(--controls-padding) - var(--ss-dpad-portrait-left-shift)));
+  }
+}`);
+    expect(styles).not.toContain("translateX(var(--ss-dpad-portrait-left-shift))");
+  });
+
   it("coalesces pointer movement into a single pending animation frame", () => {
     expect(runtime.match(/requestAnimationFrame\(/g)).toHaveLength(1);
     expect(runtime).toContain("if (this.dpadVisualFrameId !== null)");

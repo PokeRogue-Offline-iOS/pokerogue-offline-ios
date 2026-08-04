@@ -143,8 +143,10 @@ baseline for this iteration.
 7. Confirm D-pad haptic timing and strength are unchanged.
 8. Hold the D-pad with multiple action buttons and confirm existing independent
    multi-touch behavior remains unchanged.
-9. Check portrait and landscape for clipping, unintended overlap, and excessive
-   gameplay coverage.
+9. In portrait, confirm the D-pad no longer overlaps E and that the D-pad-to-E
+   clearance visually matches the accepted A-to-V spacing. In landscape,
+   confirm the prior position is unchanged. Check both orientations for
+   clipping and excessive gameplay coverage.
 10. Move the D-pad in Move Touch Controls, save, rotate, and confirm both saved
     orientations restore normally.
 11. Wait for auto-hide and wake the enlarged D-pad with the first touch.
