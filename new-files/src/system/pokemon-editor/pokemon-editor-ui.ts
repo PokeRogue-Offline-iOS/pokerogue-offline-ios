@@ -43,8 +43,10 @@ export interface PokemonEditorUiContext {
 const genderLabels = { [-1]: "Genderless", 0: "Male", 1: "Female" };
 const variantLabels = ["Standard", "Rare", "Epic"];
 
-function showOptions(options: OptionSelectItem[], initialCursor = 0, maxOptions = 10): void {
-  globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+const EDITOR_MAX_VISIBLE_OPTIONS = 7;
+
+function showOptions(options: OptionSelectItem[], initialCursor = 0, maxOptions = EDITOR_MAX_VISIBLE_OPTIONS): void {
+  globalScene.ui.refreshOverlayMode(UiMode.OPTION_SELECT, {
     options,
     maxOptions,
     initialCursor,
@@ -204,7 +206,7 @@ function showIntegerPicker(
   });
   options.push({ label: "Cancel", handler: () => (back(), true) });
   globalScene.ui.showText(`Choose ${label}.`, 0);
-  showOptions(options, current - minimum, 12);
+  showOptions(options, current - minimum);
   return true;
 }
 
@@ -256,7 +258,7 @@ function showAbilityPicker(draft: PokemonEditorDraft, back: () => void): boolean
       0,
       abilities.findIndex(ability => ability.id === draft.abilityId),
     ),
-    12,
+    EDITOR_MAX_VISIBLE_OPTIONS,
   );
   return true;
 }

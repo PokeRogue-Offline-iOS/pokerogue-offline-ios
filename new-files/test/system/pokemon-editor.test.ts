@@ -25,6 +25,8 @@ import {
 } from "#system/pokemon-editor/pokemon-editor-service";
 import { type PokemonEditorDraft, PokemonEditorMode } from "#system/pokemon-editor/pokemon-editor-types";
 import type { Starter } from "#types/save-data";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const caterpieDraft = (): PokemonEditorDraft => ({
@@ -216,5 +218,30 @@ describe("Pokemon Editor Draco Caterpie acceptance", () => {
     expect(reloaded.moveset[0].moveId).toBe(MoveId.DRACO_METEOR);
     expect(reloaded.customPokemonData.editorSourceBuildId).toBe(build.id);
     expect(library.builds[0].moves).toEqual([MoveId.DRACO_METEOR, MoveId.TACKLE]);
+  });
+});
+
+describe("Pokemon Editor menu integration", () => {
+  const readSource = (...segments: string[]) => readFileSync(join(process.cwd(), "src", ...segments), "utf8");
+
+  it("refreshes nested option pages after the current option callback clears", () => {
+    const uiSource = readSource("ui", "ui.ts");
+    const editorUiSource = readSource("system", "pokemon-editor", "pokemon-editor-ui.ts");
+
+    expect(uiSource).toContain("refreshOverlayMode(mode: UiMode");
+    expect(uiSource).toContain("globalScene.time.delayedCall(0");
+    const optionSelectMode = ["UiMode", "OPTION_SELECT"].join(".");
+    expect(editorUiSource).toContain(`globalScene.ui.refreshOverlayMode(${optionSelectMode}`);
+  });
+
+  it("caps every editor, starter-action, and party-action window at seven visible rows", () => {
+    const editorUiSource = readSource("system", "pokemon-editor", "pokemon-editor-ui.ts");
+    const starterUiSource = readSource("ui", "handlers", "starter-select-ui-handler.ts");
+    const partyUiSource = readSource("ui", "handlers", "party-ui-handler.ts");
+
+    expect(editorUiSource).toContain("const EDITOR_MAX_VISIBLE_OPTIONS = 7;");
+    expect(starterUiSource).toContain("maxOptions: 7,\n            yOffset: 47,");
+    expect(partyUiSource).toContain("const visibleActionSlots = 6;");
+    expect(partyUiSource).toContain("including its scroll indicators and persistent Cancel row");
   });
 });

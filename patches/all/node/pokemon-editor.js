@@ -47,6 +47,49 @@ copyTree(
   path.join("pokerogue-src", "test", "system"),
 );
 
+// Option-select pages frequently replace another option-select page. The
+// stock mode setter intentionally ignores same-mode requests, so defer a
+// same-mode refresh until the current option handler has finished clearing.
+// This keeps nested editor pages visible and lets their explicit Back/Cancel
+// rows remain usable with keyboard, touch, or controller input.
+const uiPath = path.join("pokerogue-src", "src", "ui", "ui.ts");
+let uiSource = read(uiPath);
+if (!uiSource.includes("refreshOverlayMode(mode: UiMode")) {
+  uiSource = replaceRequired(
+    uiSource,
+    `  setOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, false, false, true, args);
+  }
+`,
+    `  setOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, false, false, true, args);
+  }
+
+  /**
+   * Show an overlay even when that overlay mode is already active.
+   *
+   * Option handlers clear themselves after their callback returns. Deferring
+   * the replacement prevents that cleanup from hiding the new option page.
+   */
+  refreshOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
+    if (this.mode !== mode) {
+      return this.setOverlayMode(mode, ...args);
+    }
+    return new Promise(resolve => {
+      globalScene.time.delayedCall(0, () => {
+        if (this.mode === mode) {
+          this.getHandler().show(args);
+        }
+        resolve();
+      });
+    });
+  }
+`,
+    "UI overlay refresh method",
+  );
+}
+write(uiPath, uiSource);
+
 // Persist the versioned build library and per-selected-copy editor data.
 const saveDataPath = path.join("pokerogue-src", "src", "@types", "save-data.ts");
 let saveData = read(saveDataPath);
@@ -390,6 +433,24 @@ ${helperAnchor}`;
     "starter record push",
   );
 }
+
+// The starter action menu can exceed the viewport once editor actions are
+// enabled. Cap it for both grid and selected-party targets and use the
+// engine's native scrolling.
+if (!starterUi.includes("maxOptions: 7,\n            yOffset: 47,")) {
+  const starterActionMenu = `            options,
+            yOffset: 47,`;
+  const starterActionMenuCount = starterUi.split(starterActionMenu).length - 1;
+  if (starterActionMenuCount !== 1) {
+    fail(`Expected one starter action menu, found ${starterActionMenuCount}.`);
+  }
+  starterUi = starterUi.replaceAll(
+    starterActionMenu,
+    `            options,
+            maxOptions: 7,
+            yOffset: 47,`,
+  );
+}
 write(starterUiPath, starterUi);
 
 // Active-party integration. Mutation is limited to SelectModifierPhase, the
@@ -514,6 +575,37 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
 
 ${handlerAnchor}`;
   partyUi = replaceRequired(partyUi, handlerAnchor, editorHandler, "party no-callback option anchor");
+}
+
+if (!partyUi.includes("const visibleActionSlots = 6;")) {
+  partyUi = replaceRequired(
+    partyUi,
+    `    const optionEndIndex = Math.min(
+      this.optionsScrollTotal,
+      optionStartIndex + (!optionStartIndex || this.optionsScrollCursor + 8 >= this.optionsScrollTotal ? 8 : 7),
+    );
+
+    this.optionsScroll = this.optionsScrollTotal > 9;`,
+    `    // Keep the party action window to at most seven visible rows,
+    // including its scroll indicators and persistent Cancel row.
+    const visibleActionSlots = 6;
+    const optionEndIndex = Math.min(
+      this.optionsScrollTotal,
+      optionStartIndex
+        + (!optionStartIndex || this.optionsScrollCursor + visibleActionSlots - 1 >= this.optionsScrollTotal
+          ? visibleActionSlots - 1
+          : visibleActionSlots - 2),
+    );
+
+    this.optionsScroll = this.optionsScrollTotal > visibleActionSlots;`,
+    "party option window capacity",
+  );
+  partyUi = replaceRequired(
+    partyUi,
+    "        this.optionsScrollCursor = cursor ? this.optionsScrollTotal - 8 : 0;",
+    "        this.optionsScrollCursor = cursor ? this.optionsScrollTotal - 5 : 0;",
+    "party option wrap scroll position",
+  );
 }
 write(partyUiPath, partyUi);
 

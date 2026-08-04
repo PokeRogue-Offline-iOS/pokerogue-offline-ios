@@ -46,6 +46,12 @@ Full Editor also adds **Edit Pokemon**, **Manage Any Moves**, **Save Current
 Setup as Build**, **Restore Legitimate Setup**, and **Undo Last Editor
 Changes** when applicable.
 
+The species-grid and selected-team action menus show at most seven rows and
+scroll through any remaining actions. Every editor picker and saved-build list
+uses the same seven-row cap, with visible scroll arrows and controller wrapping.
+Opening one editor page from another safely replaces the current menu; Cancel,
+Back, and Done always return to the documented parent screen.
+
 When duplicate starters are enabled:
 
 - editing from a selected team icon targets only that exact copy;
@@ -63,7 +69,8 @@ Pokemon's real state; the saved build is not continuously re-applied.
 
 Party actions include **Load Saved Build** in both enabled modes and Full
 Editor actions for editing fields, managing any moves, saving a build, and
-undoing the last runtime editor change.
+undoing the last runtime editor change. Party action windows are also capped at
+seven visible rows, including their scroll indicators and Cancel row.
 
 Active-party mutation is permitted only in `SelectModifierPhase`, the normal
 between-battles reward/shop boundary. An attempt from a battle party menu is
