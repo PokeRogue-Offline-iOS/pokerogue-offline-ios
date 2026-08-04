@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { getNatureName } from "#data/nature";
+import { Color, TypeColor, TypeShadow } from "#enums/color";
 import { MoveCategory } from "#enums/move-category";
 import type { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
@@ -14,7 +15,6 @@ import { toTitleCase } from "#utils/strings";
 import {
   applySavedPokemonBuildToDraft,
   clonePokemonEditorDraft,
-  createSavedPokemonBuild,
   deleteSavedPokemonBuild,
   duplicateSavedPokemonBuild,
   getImplementedPokemonEditorMoves,
@@ -45,15 +45,47 @@ const variantLabels = ["Standard", "Rare", "Epic"];
 
 const EDITOR_MAX_VISIBLE_OPTIONS = 7;
 
-function showOptions(options: OptionSelectItem[], initialCursor = 0, maxOptions = EDITOR_MAX_VISIBLE_OPTIONS): void {
+interface EditorOptionNavigation {
+  pageStep?: number | undefined;
+  pageStepMinIndex?: number | undefined;
+  pageStepMaxIndex?: number | undefined;
+  wrapNavigation?: boolean | undefined;
+}
+
+function compareLabels(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+function showOptions(
+  options: OptionSelectItem[],
+  initialCursor = 0,
+  maxOptions = EDITOR_MAX_VISIBLE_OPTIONS,
+  navigation: EditorOptionNavigation = {},
+): void {
   globalScene.ui.refreshOverlayMode(UiMode.OPTION_SELECT, {
     options,
     maxOptions,
     initialCursor,
     measureVisibleOptionsOnly: options.length > 50,
-    pageStep: options.length > 100 ? 100 : undefined,
+    pageStep: navigation.pageStep ?? (options.length > maxOptions ? maxOptions : undefined),
+    pageStepMinIndex: navigation.pageStepMinIndex,
+    pageStepMaxIndex: navigation.pageStepMaxIndex,
+    wrapNavigation: navigation.wrapNavigation,
     supportHover: true,
   });
+}
+
+function getTypeLabelColor(type: PokemonType): { color: string; shadow: string } {
+  const typeName = PokemonType[type] as keyof typeof TypeColor;
+  return {
+    color: TypeColor[typeName] ?? Color.WHITE,
+    shadow: TypeShadow[typeName] ?? Color.GREY,
+  };
+}
+
+function colorMoveLabel(label: string, type: PokemonType): string {
+  const { color, shadow } = getTypeLabelColor(type);
+  return `[color=${color}][shadow=${shadow}]${label}[/shadow][/color]`;
 }
 
 function showConfirmation(message: string, onConfirm: () => void, onCancel: () => void): void {
@@ -130,51 +162,69 @@ function clearTooltip(): void {
 
 export function showPokemonEditor(initialDraft: PokemonEditorDraft, context: PokemonEditorUiContext): void {
   const draft = clonePokemonEditorDraft(initialDraft);
+  let mainCursor = 0;
 
-  const showMain = () => {
+  const showMain = (initialCursor = mainCursor) => {
+    mainCursor = initialCursor;
+    clearTooltip();
     const species = speciesDataRegistry.getSpecies(draft.speciesId);
     const options: OptionSelectItem[] = [
       {
         label: `Level: ${draft.level.toLocaleString()}`,
-        handler: () => showIntegerPicker("Level", 1, 10_000, draft.level, value => (draft.level = value), showMain),
+        handler: () =>
+          showIntegerPicker(
+            "Level",
+            1,
+            10_000,
+            draft.level,
+            value => (draft.level = value),
+            () => showMain(0),
+          ),
       },
       {
         label: `Form: ${species.getName(draft.formIndex)}`,
-        handler: () => showFormPicker(draft, showMain),
+        handler: () => showFormPicker(draft, () => showMain(1)),
       },
       {
         label: `Nature: ${getNatureName(draft.nature)}`,
-        handler: () => showNaturePicker(draft, showMain),
+        handler: () => showNaturePicker(draft, () => showMain(2)),
       },
       {
         label: `Ability: ${allAbilities[draft.abilityId].name}`,
-        handler: () => showAbilityPicker(draft, showMain),
+        handler: () => showAbilityPicker(draft, () => showMain(3)),
       },
       {
         label: `Gender: ${genderLabels[draft.gender]}`,
-        handler: () => showGenderPicker(draft, showMain),
+        handler: () => showGenderPicker(draft, () => showMain(4)),
       },
       {
         label: `Shiny: ${draft.shiny ? variantLabels[draft.variant] : "Off"}`,
-        handler: () => showShinyPicker(draft, showMain),
+        handler: () => showShinyPicker(draft, () => showMain(5)),
       },
-      { label: `IVs: ${draft.ivs.join("/")}`, handler: () => showIvEditor(draft, showMain) },
+      { label: `IVs: ${draft.ivs.join("/")}`, handler: () => showIvEditor(draft, () => showMain(6)) },
       {
         label: `Friendship: ${draft.friendship}`,
         handler: () =>
-          showIntegerPicker("Friendship", 0, 255, draft.friendship, value => (draft.friendship = value), showMain),
+          showIntegerPicker(
+            "Friendship",
+            0,
+            255,
+            draft.friendship,
+            value => (draft.friendship = value),
+            () => showMain(7),
+          ),
       },
       {
         label: `Pokerus: ${draft.pokerus ? "On" : "Off"}`,
         handler: () => {
           draft.pokerus = !draft.pokerus;
-          showMain();
+          showMain(8);
           return true;
         },
       },
       {
         label: `Moves: ${formatMoves(draft.moves)}`,
-        handler: () => showPokemonMoveEditor(draft, showMain, context.legitimateMoves),
+        handler: () => showPokemonMoveEditor(draft, () => showMain(9), context.legitimateMoves),
       },
       {
         label: "Apply Changes",
@@ -186,7 +236,7 @@ export function showPokemonEditor(initialDraft: PokemonEditorDraft, context: Pok
       { label: "Cancel (discard draft)", handler: () => (context.onCancel(), true) },
     ];
     globalScene.ui.showText(context.title, 0);
-    showOptions(options);
+    showOptions(options, mainCursor);
   };
 
   showMain();
@@ -199,6 +249,7 @@ function showIntegerPicker(
   current: number,
   apply: (value: number) => void,
   back: () => void,
+  pageMinimum = minimum,
 ): boolean {
   const options = Array.from({ length: maximum - minimum + 1 }, (_, index) => {
     const value = minimum + index;
@@ -206,46 +257,73 @@ function showIntegerPicker(
   });
   options.push({ label: "Cancel", handler: () => (back(), true) });
   globalScene.ui.showText(`Choose ${label}.`, 0);
-  showOptions(options, current - minimum);
+  showOptions(options, current - minimum, EDITOR_MAX_VISIBLE_OPTIONS, {
+    pageStep: 10,
+    pageStepMinIndex: pageMinimum - minimum,
+    pageStepMaxIndex: maximum - minimum,
+    wrapNavigation: false,
+  });
   return true;
 }
 
 function showFormPicker(draft: PokemonEditorDraft, back: () => void): boolean {
   const species = speciesDataRegistry.getSpecies(draft.speciesId);
   const formIndices = getSafePokemonEditorFormIndices(draft.speciesId);
-  const options: OptionSelectItem[] = formIndices.map(index => ({
-    label: species.getName(index),
+  const forms = formIndices
+    .map(index => ({ index, label: species.getName(index) }))
+    .sort((a, b) => compareLabels(a.label, b.label) || a.index - b.index);
+  const options: OptionSelectItem[] = forms.map(form => ({
+    label: form.label,
     handler: () => {
-      draft.formIndex = index;
+      draft.formIndex = form.index;
       back();
       return true;
     },
   }));
   options.push({ label: "Cancel", handler: () => (back(), true) });
-  showOptions(options, Math.max(0, formIndices.indexOf(draft.formIndex)));
+  showOptions(
+    options,
+    Math.max(
+      0,
+      forms.findIndex(form => form.index === draft.formIndex),
+    ),
+  );
   return true;
 }
 
 function showNaturePicker(draft: PokemonEditorDraft, back: () => void): boolean {
-  const options: OptionSelectItem[] = Array.from({ length: Nature.QUIRKY + 1 }, (_, nature) => ({
+  const natures = Array.from({ length: Nature.QUIRKY + 1 }, (_, nature) => ({
+    nature: nature as Nature,
     label: getNatureName(nature as Nature, true, true, true),
+  })).sort((a, b) => compareLabels(a.label, b.label));
+  const options: OptionSelectItem[] = natures.map(entry => ({
+    label: entry.label,
     handler: () => {
-      draft.nature = nature as Nature;
+      draft.nature = entry.nature;
       back();
       return true;
     },
   }));
   options.push({ label: "Cancel", handler: () => (back(), true) });
-  showOptions(options, draft.nature);
+  showOptions(
+    options,
+    Math.max(
+      0,
+      natures.findIndex(entry => entry.nature === draft.nature),
+    ),
+  );
   return true;
 }
 
 function showAbilityPicker(draft: PokemonEditorDraft, back: () => void): boolean {
-  const abilities = allAbilities.filter(ability => ability?.id && ability.name && !ability.unimplemented);
+  const abilities = allAbilities
+    .filter(ability => ability?.id && ability.name && !ability.unimplemented)
+    .sort((a, b) => compareLabels(a.name, b.name) || a.id - b.id);
   const options: OptionSelectItem[] = abilities.map(ability => ({
     label: ability.name,
     handler: () => {
       draft.abilityId = ability.id;
+      clearTooltip();
       back();
       return true;
     },
@@ -264,7 +342,9 @@ function showAbilityPicker(draft: PokemonEditorDraft, back: () => void): boolean
 }
 
 function showGenderPicker(draft: PokemonEditorDraft, back: () => void): boolean {
-  const genders = getPokemonEditorGenders(draft.speciesId);
+  const genders = getPokemonEditorGenders(draft.speciesId).sort((a, b) =>
+    compareLabels(genderLabels[a], genderLabels[b]),
+  );
   const options: OptionSelectItem[] = genders.map(gender => ({
     label: genderLabels[gender],
     handler: () => {
@@ -279,36 +359,49 @@ function showGenderPicker(draft: PokemonEditorDraft, back: () => void): boolean 
 }
 
 function showShinyPicker(draft: PokemonEditorDraft, back: () => void): boolean {
-  const options: OptionSelectItem[] = [
-    { label: "Off", handler: () => ((draft.shiny = false), (draft.variant = 0), back(), true) },
-    ...variantLabels.map((label, variant) => ({
-      label,
-      handler: () => {
-        draft.shiny = true;
-        draft.variant = variant as 0 | 1 | 2;
-        back();
-        return true;
-      },
-    })),
-    { label: "Cancel", handler: () => (back(), true) },
-  ];
-  showOptions(options, draft.shiny ? draft.variant + 1 : 0);
+  const shinyChoices = [
+    { label: "Off", shiny: false, variant: 0 as const },
+    ...variantLabels.map((label, variant) => ({ label, shiny: true, variant: variant as 0 | 1 | 2 })),
+  ].sort((a, b) => compareLabels(a.label, b.label));
+  const options: OptionSelectItem[] = shinyChoices.map(choice => ({
+    label: choice.label,
+    handler: () => {
+      draft.shiny = choice.shiny;
+      draft.variant = choice.variant;
+      back();
+      return true;
+    },
+  }));
+  options.push({ label: "Cancel", handler: () => (back(), true) });
+  showOptions(
+    options,
+    Math.max(
+      0,
+      shinyChoices.findIndex(
+        choice => choice.shiny === draft.shiny && (!choice.shiny || choice.variant === draft.variant),
+      ),
+    ),
+  );
   return true;
 }
 
 function showIvEditor(draft: PokemonEditorDraft, back: () => void): boolean {
   const names = ["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"];
+  let ivCursor = 0;
   const show = () => {
     const options: OptionSelectItem[] = names.map((name, index) => ({
       label: `${name}: ${draft.ivs[index]}`,
-      handler: () => showIntegerPicker(name, 0, 31, draft.ivs[index], value => (draft.ivs[index] = value), show),
+      handler: () => {
+        ivCursor = index;
+        return showIntegerPicker(name, 0, 31, draft.ivs[index], value => (draft.ivs[index] = value), show, 1);
+      },
     }));
     options.push(
-      { label: "Set All to 31", handler: () => (draft.ivs.fill(31), show(), true) },
-      { label: "Set All to 0", handler: () => (draft.ivs.fill(0), show(), true) },
+      { label: "Set All to 31", handler: () => ((ivCursor = 6), draft.ivs.fill(31), show(), true) },
+      { label: "Set All to 0", handler: () => ((ivCursor = 7), draft.ivs.fill(0), show(), true) },
       { label: "Done", handler: () => (back(), true) },
     );
-    showOptions(options);
+    showOptions(options, ivCursor);
   };
   show();
   return true;
@@ -317,10 +410,9 @@ function showIvEditor(draft: PokemonEditorDraft, back: () => void): boolean {
 interface MoveBrowserState {
   search: string;
   initial: string;
-  type?: number | undefined;
+  type?: PokemonType | undefined;
   category: PokemonEditorMoveCategoryFilter;
   sort: PokemonEditorMoveSort;
-  page: number;
 }
 
 export function showPokemonMoveEditor(
@@ -328,19 +420,30 @@ export function showPokemonMoveEditor(
   back: () => void,
   legitimateMoves?: StarterMoveset,
 ): boolean {
+  let moveCursor = 0;
   const show = () => {
     const options: OptionSelectItem[] = draft.moves.map((moveId, index) => ({
-      label: `${index + 1}. ${allMoves[moveId].name}`,
-      handler: () => showMoveSlotActions(draft, index, show),
+      label: colorMoveLabel(`${index + 1}. ${allMoves[moveId].name}`, allMoves[moveId].type),
+      handler: () => {
+        moveCursor = index;
+        return showMoveSlotActions(draft, index, show);
+      },
       onHover: () => moveTooltip(moveId),
     }));
     if (draft.moves.length < 4) {
-      options.push({ label: "+ Add Move", handler: () => showMoveBrowser(draft, draft.moves.length, show) });
+      options.push({
+        label: "+ Add Move",
+        handler: () => {
+          moveCursor = draft.moves.length;
+          return showMoveBrowser(draft, draft.moves.length, show);
+        },
+      });
     }
     if (legitimateMoves && legitimateMoves.length > 0) {
       options.push({
         label: "Restore Legitimate Moves",
         handler: () => {
+          moveCursor = options.length - 1;
           draft.moves = legitimateMoves.slice(0, 4) as StarterMoveset;
           show();
           return true;
@@ -349,7 +452,7 @@ export function showPokemonMoveEditor(
     }
     options.push({ label: "Done", handler: () => (clearTooltip(), back(), true), onHover: clearTooltip });
     globalScene.ui.showText("Manage any implemented moves (1–4, no duplicates).", 0);
-    showOptions(options);
+    showOptions(options, Math.min(moveCursor, options.length - 1));
   };
   show();
   return true;
@@ -395,8 +498,11 @@ function showMoveSlotActions(draft: PokemonEditorDraft, index: number, back: () 
 }
 
 function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => void): boolean {
-  const state: MoveBrowserState = { search: "", initial: "", category: "all", sort: "name-asc", page: 0 };
-  const showFilters = () => {
+  const state: MoveBrowserState = { search: "", initial: "", category: "all", sort: "name-asc" };
+  let filterCursor = 0;
+  const showFilters = (initialCursor = filterCursor) => {
+    filterCursor = initialCursor;
+    clearTooltip();
     const count = getImplementedPokemonEditorMoves({
       ...state,
       excluded: draft.moves.filter((_, index) => index !== slot),
@@ -410,10 +516,9 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
             state.search,
             value => {
               state.search = value.trim();
-              state.page = 0;
-              showFilters();
+              showFilters(1);
             },
-            showFilters,
+            () => showFilters(1),
           );
           return true;
         },
@@ -431,26 +536,24 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
             type: undefined,
             category: "all",
             sort: "name-asc",
-            page: 0,
           });
-          showFilters();
+          showFilters(6);
           return true;
         },
       },
       { label: "Cancel", handler: () => (clearTooltip(), back(), true) },
     ];
-    showOptions(options);
+    showOptions(options, filterCursor);
   };
   const showResults = (): boolean => {
     const moves = getImplementedPokemonEditorMoves({
       ...state,
       excluded: draft.moves.filter((_, index) => index !== slot),
     });
-    const pageSize = 8;
-    const pageCount = Math.max(1, Math.ceil(moves.length / pageSize));
-    state.page = Math.min(state.page, pageCount - 1);
-    const options: OptionSelectItem[] = moves.slice(state.page * pageSize, (state.page + 1) * pageSize).map(move => ({
-      label: `${move.name} · ${toTitleCase(PokemonType[move.type])} · ${toTitleCase(MoveCategory[move.category])} · Pwr ${move.powerLabel} · Acc ${move.accuracyLabel} · PP ${move.pp}`,
+    const options: OptionSelectItem[] = moves.map(move => ({
+      // Keep the virtualized result window narrow. The highlighted move's
+      // complete registry details remain visible in the left tooltip.
+      label: colorMoveLabel(move.name, move.type),
       handler: () => {
         draft.moves[slot] = move.id;
         clearTooltip();
@@ -459,17 +562,12 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
       },
       onHover: () => moveTooltip(move.id),
     }));
-    if (state.page > 0) {
-      options.push({ label: "← Previous Page", handler: () => (state.page--, showResults(), true) });
-    }
-    if (state.page + 1 < pageCount) {
-      options.push({ label: "Next Page →", handler: () => (state.page++, showResults(), true) });
-    }
     options.push({
-      label: `Filters (${state.page + 1}/${pageCount})`,
-      handler: () => (clearTooltip(), showFilters(), true),
+      label: `Back to Filters (${moves.length} matches)`,
+      handler: () => (clearTooltip(), showFilters(0), true),
       onHover: clearTooltip,
     });
+    globalScene.ui.showText(`${moves.length} matching moves. Up/Down: one move. Left/Right: one page.`, 0);
     showOptions(options);
     return true;
   };
@@ -478,21 +576,26 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
     showOptions(
       initials.map(initial => ({
         label: initial || "Any",
-        handler: () => ((state.initial = initial), (state.page = 0), showFilters(), true),
+        handler: () => ((state.initial = initial), showFilters(2), true),
       })),
       Math.max(0, initials.indexOf(state.initial)),
     );
     return true;
   };
   const showTypes = (): boolean => {
-    const types = [...new Set(getImplementedPokemonEditorMoves().map(move => move.type))].sort((a, b) => a - b);
-    showOptions([
-      { label: "Any", handler: () => ((state.type = undefined), (state.page = 0), showFilters(), true) },
-      ...types.map(type => ({
-        label: toTitleCase(PokemonType[type]),
-        handler: () => ((state.type = type), (state.page = 0), showFilters(), true),
-      })),
-    ]);
+    const types = [...new Set(getImplementedPokemonEditorMoves().map(move => move.type))].sort((a, b) =>
+      compareLabels(toTitleCase(PokemonType[a]), toTitleCase(PokemonType[b])),
+    );
+    showOptions(
+      [
+        { label: "Any", handler: () => ((state.type = undefined), showFilters(3), true) },
+        ...types.map(type => ({
+          label: colorMoveLabel(toTitleCase(PokemonType[type]), type),
+          handler: () => ((state.type = type), showFilters(3), true),
+        })),
+      ],
+      state.type === undefined ? 0 : Math.max(0, types.indexOf(state.type) + 1),
+    );
     return true;
   };
   const showCategories = (): boolean => {
@@ -500,26 +603,29 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
     showOptions(
       categories.map(category => ({
         label: toTitleCase(category),
-        handler: () => ((state.category = category), (state.page = 0), showFilters(), true),
+        handler: () => ((state.category = category), showFilters(4), true),
       })),
+      categories.indexOf(state.category),
     );
     return true;
   };
   const showSorts = (): boolean => {
-    const sorts: PokemonEditorMoveSort[] = [
-      "name-asc",
-      "name-desc",
-      "power-desc",
-      "power-asc",
-      "accuracy-desc",
-      "accuracy-asc",
-      "pp-desc",
-      "pp-asc",
-    ];
+    const sorts = (
+      [
+        "name-asc",
+        "name-desc",
+        "power-desc",
+        "power-asc",
+        "accuracy-desc",
+        "accuracy-asc",
+        "pp-desc",
+        "pp-asc",
+      ] satisfies PokemonEditorMoveSort[]
+    ).sort((a, b) => compareLabels(formatMoveSort(a), formatMoveSort(b)));
     showOptions(
       sorts.map(sort => ({
         label: formatMoveSort(sort),
-        handler: () => ((state.sort = sort), (state.page = 0), showFilters(), true),
+        handler: () => ((state.sort = sort), showFilters(5), true),
       })),
       sorts.indexOf(state.sort),
     );
@@ -552,29 +658,23 @@ export interface PokemonBuildLibraryUiContext {
 }
 
 export function showPokemonBuildLibrary(library: PokemonBuildLibrary, context: PokemonBuildLibraryUiContext): void {
+  let listCursor = 0;
   const showList = () => {
+    clearTooltip();
     const builds = getSavedPokemonBuildsForSpecies(library, context.draft.speciesId);
-    const options: OptionSelectItem[] = builds.map(build => ({
+    const options: OptionSelectItem[] = builds.map((build, index) => ({
       label: `${build.name}${build.formIndex === context.draft.formIndex ? "" : ` (${speciesDataRegistry.getSpecies(build.speciesId).getName(build.formIndex)})`}`,
-      handler: () => showBuild(build),
-      onHover: () => globalScene.ui.showTooltip(build.name, formatBuild(build), true),
+      handler: () => {
+        listCursor = index;
+        return showBuild(build);
+      },
     }));
-    if (context.allowManagement) {
-      options.push({
-        label: "Save Current Setup as New Build",
-        handler: () => {
-          const build = createSavedPokemonBuild(library, context.draft);
-          void context.onSave();
-          showBuild(build);
-          return true;
-        },
-      });
-    }
     options.push({ label: "Cancel", handler: () => (clearTooltip(), context.onCancel(), true), onHover: clearTooltip });
     globalScene.ui.showText(builds.length > 0 ? "Choose a saved build." : "No saved builds for this species yet.", 0);
-    showOptions(options);
+    showOptions(options, Math.min(listCursor, options.length - 1));
   };
   const showBuild = (build: SavedPokemonBuild): boolean => {
+    clearTooltip();
     const options: OptionSelectItem[] = [
       {
         label: "Apply Build",

@@ -542,7 +542,12 @@ export function getSavedPokemonBuildsForSpecies(
         library.preferredBySpeciesForm[getPokemonBuildSpeciesFormKey(a.speciesId, a.formIndex)] === a.id;
       const bPreferred =
         library.preferredBySpeciesForm[getPokemonBuildSpeciesFormKey(b.speciesId, b.formIndex)] === b.id;
-      return Number(bPreferred) - Number(aPreferred) || b.updatedAt - a.updatedAt;
+      return (
+        Number(bPreferred) - Number(aPreferred)
+        || a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+        || a.formIndex - b.formIndex
+        || b.updatedAt - a.updatedAt
+      );
     });
 }
 

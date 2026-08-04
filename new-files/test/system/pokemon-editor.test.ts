@@ -17,6 +17,7 @@ import {
   deleteSavedPokemonBuild,
   duplicateSavedPokemonBuild,
   getImplementedPokemonEditorMoves,
+  getSavedPokemonBuildsForSpecies,
   normalizePokemonBuildLibrary,
   normalizePokemonEditorMoves,
   resolveStarterForPokemonEditor,
@@ -119,6 +120,20 @@ describe("Pokemon Editor build library", () => {
     applied.ivs[0] = 0;
     expect(build.moves![0]).toBe(MoveId.DRACO_METEOR);
     expect(build.ivs![0]).toBe(31);
+  });
+
+  it("sorts saved builds alphabetically after the preferred build", () => {
+    const library = createEmptyPokemonBuildLibrary();
+    createSavedPokemonBuild(library, caterpieDraft(), "Zulu", 300);
+    const preferred = createSavedPokemonBuild(library, caterpieDraft(), "Middle", 200);
+    createSavedPokemonBuild(library, caterpieDraft(), "alpha", 100);
+    setPreferredSavedPokemonBuild(library, preferred.id);
+
+    expect(getSavedPokemonBuildsForSpecies(library, SpeciesId.CATERPIE).map(build => build.name)).toEqual([
+      "Middle",
+      "alpha",
+      "Zulu",
+    ]);
   });
 });
 
@@ -243,5 +258,30 @@ describe("Pokemon Editor menu integration", () => {
     expect(starterUiSource).toContain("maxOptions: 7,\n            yOffset: 47,");
     expect(partyUiSource).toContain("const visibleActionSlots = 6;");
     expect(partyUiSource).toContain("including its scroll indicators and persistent Cancel row");
+  });
+
+  it("uses bounded ten-step number navigation and page-sized word navigation", () => {
+    const optionSource = readSource("ui", "handlers", "base-option-select-ui-handler.ts");
+    const editorUiSource = readSource("system", "pokemon-editor", "pokemon-editor-ui.ts");
+
+    expect(optionSource).toContain("const pageStepTarget");
+    expect(optionSource).toContain("this.config?.wrapNavigation !== false");
+    expect(editorUiSource).toContain("pageStep: 10");
+    expect(editorUiSource).toContain("pageStepMaxIndex: maximum - minimum");
+    expect(editorUiSource).toContain("options.length > maxOptions ? maxOptions : undefined");
+  });
+
+  it("keeps editor lists readable and exposes saved-build filtering", () => {
+    const editorUiSource = readSource("system", "pokemon-editor", "pokemon-editor-ui.ts");
+    const starterUiSource = readSource("ui", "handlers", "starter-select-ui-handler.ts");
+    const gameDataSource = readSource("system", "game-data.ts");
+
+    expect(editorUiSource).toContain(".sort((a, b) => compareLabels(a.name, b.name)");
+    expect(editorUiSource).toContain("label: colorMoveLabel(move.name, move.type)");
+    expect(editorUiSource).not.toContain("Save Current Setup as New Build");
+    expect(starterUiSource).toContain('new DropDownOption("SAVED_BUILDS"');
+    expect(starterUiSource).toContain("selectedEditorMoveset");
+    expect(starterUiSource).toContain("editorAbilityId");
+    expect(gameDataSource).toContain("Cached save-and-quit data can be absent");
   });
 });

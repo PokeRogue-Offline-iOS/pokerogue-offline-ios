@@ -142,9 +142,9 @@ let gameData = read(gameDataPath);
 if (!gameData.includes('from "#system/pokemon-editor/pokemon-editor-service"')) {
   gameData = replaceRequired(
     gameData,
-    'import { RUN_HISTORY_LIMIT } from "#ui/run-history-ui-handler";',
-    'import { createEmptyPokemonBuildLibrary, normalizePokemonBuildLibrary } from "#system/pokemon-editor/pokemon-editor-service";\nimport type { PokemonBuildLibrary } from "#system/pokemon-editor/pokemon-editor-types";\nimport { RUN_HISTORY_LIMIT } from "#ui/run-history-ui-handler";',
-    "run history import",
+    'import { PokemonData } from "#system/pokemon-data";',
+    'import { PokemonData } from "#system/pokemon-data";\nimport {\n  createEmptyPokemonBuildLibrary,\n  normalizePokemonBuildLibrary,\n} from "#system/pokemon-editor/pokemon-editor-service";\nimport type { PokemonBuildLibrary } from "#system/pokemon-editor/pokemon-editor-types";',
+    "PokemonData import",
   );
 }
 if (!gameData.includes('pokemonBuildLibrary: "$pe"')) {
@@ -179,6 +179,51 @@ if (!gameData.includes("public pokemonBuildLibrary: PokemonBuildLibrary")) {
     "    this.starterData = systemData.starterData;",
     "    this.starterData = systemData.starterData;\n    const normalizedBuilds = normalizePokemonBuildLibrary(systemData.pokemonBuildLibrary);\n    this.pokemonBuildLibrary = normalizedBuilds.library;\n    normalizedBuilds.warnings.forEach(warning => console.warn(`[Pokemon Editor] ${warning}`));",
     "parsed system starterData",
+  );
+}
+if (!gameData.includes("Cached save-and-quit data can be absent")) {
+  gameData = replaceRequired(
+    gameData,
+    `    const sessionData = useCachedSession
+      ? this.parseSessionData(
+          decrypt(localStorage.getItem(getSessionDataLocalStorageKey(globalScene.sessionSlotId))!, bypassLogin),
+        ) // TODO: is this bang correct?
+      : this.getSessionSaveData();`,
+    `    // Cached save-and-quit data can be absent when a very short first
+    // battle reaches the shop before the background save finishes. Fall back
+    // to the live snapshot instead of leaving the Loading screen rejected.
+    let sessionData: SessionSaveData | undefined;
+    if (useCachedSession) {
+      const cachedSession = localStorage.getItem(getSessionDataLocalStorageKey(globalScene.sessionSlotId));
+      if (cachedSession) {
+        try {
+          sessionData = this.parseSessionData(decrypt(cachedSession, bypassLogin));
+        } catch (error) {
+          console.warn("Cached session was unavailable during save-and-quit; using the live session.", error);
+        }
+      }
+    }
+    sessionData ??= this.getSessionSaveData();`,
+    "save-and-quit cached session read",
+  );
+  gameData = replaceRequired(
+    gameData,
+    `    const systemData = useCachedSystem
+      ? GameData.parseSystemData(decrypt(localStorage.getItem(\`data_\${loggedInUser?.username}\`)!, bypassLogin))
+      : this.getSystemSaveData(); // TODO: is this bang correct?`,
+    `    let systemData: SystemSaveData | undefined;
+    if (useCachedSystem) {
+      const cachedSystem = localStorage.getItem(\`data_\${loggedInUser?.username}\`);
+      if (cachedSystem) {
+        try {
+          systemData = GameData.parseSystemData(decrypt(cachedSystem, bypassLogin));
+        } catch (error) {
+          console.warn("Cached system data was unavailable during save-and-quit; using the live system.", error);
+        }
+      }
+    }
+    systemData ??= this.getSystemSaveData();`,
+    "save-and-quit cached system read",
   );
 }
 write(gameDataPath, gameData);
@@ -238,7 +283,7 @@ if (!selectPhase.includes("resolveStarterForPokemonEditor")) {
   selectPhase = replaceRequired(
     selectPhase,
     'import type { Starter } from "#types/save-data";',
-    'import type { Starter } from "#types/save-data";\nimport { resolveStarterForPokemonEditor } from "#system/pokemon-editor/pokemon-editor-service";\nimport { PokemonEditorMode } from "#system/pokemon-editor/pokemon-editor-types";',
+    'import { resolveStarterForPokemonEditor } from "#system/pokemon-editor/pokemon-editor-service";\nimport type { PokemonEditorMode } from "#system/pokemon-editor/pokemon-editor-types";\nimport type { Starter } from "#types/save-data";',
     "SelectStarterPhase Starter import",
   );
   selectPhase = replaceRequired(
@@ -269,9 +314,9 @@ let starterUi = read(starterUiPath);
 if (!starterUi.includes("preparedPokemonEditorStarters")) {
   starterUi = replaceRequired(
     starterUi,
-    'import { SettingKeyboard } from "#system/settings-keyboard";',
-    'import { SettingKeyboard } from "#system/settings-keyboard";\nimport { applyPokemonEditorDraftToStarter, createPokemonEditorDraftFromStarter, resolveStarterForPokemonEditor, restoreLegitimateStarterSetup, undoLastStarterEditorChange } from "#system/pokemon-editor/pokemon-editor-service";\nimport { createSavedPokemonBuild } from "#system/pokemon-editor/pokemon-editor-service";\nimport { PokemonEditorMode } from "#system/pokemon-editor/pokemon-editor-types";\nimport { showPokemonBuildLibrary, showPokemonEditor, showPokemonMoveEditor } from "#system/pokemon-editor/pokemon-editor-ui";',
-    "starter settings keyboard import",
+    'import { RibbonData } from "#system/ribbons/ribbon-data";',
+    'import {\n  applyPokemonEditorDraftToStarter,\n  createPokemonEditorDraftFromStarter,\n  createSavedPokemonBuild,\n  resolveStarterForPokemonEditor,\n  restoreLegitimateStarterSetup,\n  undoLastStarterEditorChange,\n} from "#system/pokemon-editor/pokemon-editor-service";\nimport { PokemonEditorMode } from "#system/pokemon-editor/pokemon-editor-types";\nimport {\n  showPokemonBuildLibrary,\n  showPokemonEditor,\n  showPokemonMoveEditor,\n} from "#system/pokemon-editor/pokemon-editor-ui";\nimport { RibbonData } from "#system/ribbons/ribbon-data";',
+    "starter RibbonData import",
   );
   starterUi = replaceRequired(
     starterUi,
@@ -316,12 +361,18 @@ if (!starterUi.includes("preparedPokemonEditorStarters")) {
                   label: "Edit Pokemon",
                   handler: () => {
                     const target = getEditorTarget();
-                    showPokemonEditor(createPokemonEditorDraftFromStarter(target, globalScene.gameMode.getStartingLevel()), {
-                      title: editableStarterIndex >= 0 ? \`Edit selected \${this.lastSpecies.name} copy\` : \`Prepare next \${this.lastSpecies.name}\`,
-                      legitimateMoves: target.editorData?.legitimateSetup.moveset ?? target.moveset,
-                      onApply: applyDraft,
-                      onCancel: returnToStarterSelect,
-                    });
+                    showPokemonEditor(
+                      createPokemonEditorDraftFromStarter(target, globalScene.gameMode.getStartingLevel()),
+                      {
+                        title:
+                          editableStarterIndex >= 0
+                            ? \`Edit selected \${this.lastSpecies.name} copy\`
+                            : \`Prepare next \${this.lastSpecies.name}\`,
+                        legitimateMoves: target.editorData?.legitimateSetup.moveset ?? target.moveset,
+                        onApply: applyDraft,
+                        onCancel: returnToStarterSelect,
+                      },
+                    );
                     return true;
                   },
                 },
@@ -330,7 +381,11 @@ if (!starterUi.includes("preparedPokemonEditorStarters")) {
                   handler: () => {
                     const target = getEditorTarget();
                     const draft = createPokemonEditorDraftFromStarter(target, globalScene.gameMode.getStartingLevel());
-                    showPokemonMoveEditor(draft, () => applyDraft(draft), target.editorData?.legitimateSetup.moveset ?? target.moveset);
+                    showPokemonMoveEditor(
+                      draft,
+                      () => applyDraft(draft),
+                      target.editorData?.legitimateSetup.moveset ?? target.moveset,
+                    );
                     return true;
                   },
                 },
@@ -354,7 +409,9 @@ if (!starterUi.includes("preparedPokemonEditorStarters")) {
                     label: "Restore Legitimate Setup",
                     handler: () => {
                       restoreLegitimateStarterSetup(getEditorTarget());
-                      if (editableStarterIndex >= 0) this.updatePartyIcon(this.lastSpecies, editableStarterIndex);
+                      if (editableStarterIndex >= 0) {
+                        this.updatePartyIcon(this.lastSpecies, editableStarterIndex);
+                      }
                       returnToStarterSelect();
                       return true;
                     },
@@ -363,7 +420,9 @@ if (!starterUi.includes("preparedPokemonEditorStarters")) {
                     label: "Undo Last Editor Changes",
                     handler: () => {
                       undoLastStarterEditorChange(getEditorTarget());
-                      if (editableStarterIndex >= 0) this.updatePartyIcon(this.lastSpecies, editableStarterIndex);
+                      if (editableStarterIndex >= 0) {
+                        this.updatePartyIcon(this.lastSpecies, editableStarterIndex);
+                      }
                       returnToStarterSelect();
                       return true;
                     },
@@ -434,6 +493,152 @@ ${helperAnchor}`;
   );
 }
 
+// Expose saved-build ownership alongside the starter screen's existing Misc
+// filters so a player can quickly narrow the grid to every species with builds.
+if (!starterUi.includes('new DropDownOption("SAVED_BUILDS"')) {
+  starterUi = replaceRequired(
+    starterUi,
+    `    const pokerusLabels = [
+      new DropDownLabel(i18next.t("filterBar:pokerus"), undefined, DropDownState.OFF),`,
+    `    const savedBuildLabels = [
+      new DropDownLabel("Saved Builds", undefined, DropDownState.OFF),
+      new DropDownLabel("Has Saved Builds", undefined, DropDownState.ON),
+      new DropDownLabel("No Saved Builds", undefined, DropDownState.EXCLUDE),
+    ];
+    const pokerusLabels = [
+      new DropDownLabel(i18next.t("filterBar:pokerus"), undefined, DropDownState.OFF),`,
+    "starter Misc saved-build labels",
+  );
+  starterUi = replaceRequired(
+    starterUi,
+    `      new DropDownOption("POKERUS", pokerusLabels),`,
+    `      new DropDownOption("POKERUS", pokerusLabels),
+      new DropDownOption("SAVED_BUILDS", savedBuildLabels),`,
+    "starter Misc saved-build option",
+  );
+  starterUi = replaceRequired(
+    starterUi,
+    `      new DropDownOption("FAVORITE", favoriteLabels),
+      new DropDownOption("WIN", winLabels),
+      new DropDownOption("HIDDEN_ABILITY", hiddenAbilityLabels),
+      new DropDownOption("EGG", eggLabels),
+      new DropDownOption("POKERUS", pokerusLabels),
+      new DropDownOption("SAVED_BUILDS", savedBuildLabels),`,
+    `      new DropDownOption("EGG", eggLabels),
+      new DropDownOption("FAVORITE", favoriteLabels),
+      new DropDownOption("HIDDEN_ABILITY", hiddenAbilityLabels),
+      new DropDownOption("POKERUS", pokerusLabels),
+      new DropDownOption("WIN", winLabels),
+      new DropDownOption("SAVED_BUILDS", savedBuildLabels),`,
+    "alphabetical starter Misc filters",
+  );
+  starterUi = replaceRequired(
+    starterUi,
+    `      // Pokerus Filter
+      const fitsPokerus = this.filterBar.getVals(DropDownColumn.MISC).some(misc => {`,
+    `      // Saved Pokemon Build Filter
+      const hasSavedBuild = globalScene.gameData.pokemonBuildLibrary.builds.some(
+        build => build.speciesId === container.species.speciesId,
+      );
+      const fitsSavedBuilds = this.filterBar.getVals(DropDownColumn.MISC).some(misc => {
+        if (misc.val === "SAVED_BUILDS" && misc.state === DropDownState.ON) {
+          return hasSavedBuild;
+        }
+        if (misc.val === "SAVED_BUILDS" && misc.state === DropDownState.EXCLUDE) {
+          return !hasSavedBuild;
+        }
+        if (misc.val === "SAVED_BUILDS" && misc.state === DropDownState.OFF) {
+          return true;
+        }
+        return false;
+      });
+
+      // Pokerus Filter
+      const fitsPokerus = this.filterBar.getVals(DropDownColumn.MISC).some(misc => {`,
+    "starter saved-build filter evaluation",
+  );
+  starterUi = replaceRequired(
+    starterUi,
+    `        && fitsEgg
+        && fitsPokerus`,
+    `        && fitsEgg
+        && fitsPokerus
+        && fitsSavedBuilds`,
+    "starter saved-build filter condition",
+  );
+}
+
+// Custom starter moves are valid editor state, but the stock starter details
+// filter removes anything outside the legitimate level/egg pool. Preserve the
+// editor set for display while retaining the stock filter for normal moves.
+if (!starterUi.includes("selectedEditorMoveset")) {
+  starterUi = replaceRequired(
+    starterUi,
+    `        const selectedStarterIndex = starterIndexOverride ?? this.getSelectedStarterIndex(species);
+        const selectedStarterMoveset =
+          selectedStarterIndex >= 0 ? this.starters[selectedStarterIndex].moveset : undefined;`,
+    `        const selectedStarterIndex = starterIndexOverride ?? this.getSelectedStarterIndex(species);
+        const selectedStarter = selectedStarterIndex >= 0 ? this.starters[selectedStarterIndex] : undefined;
+        const selectedEditorMoveset =
+          selectedStarter?.editorData?.customMoveset
+          ?? this.preparedPokemonEditorStarters.get(species.speciesId)?.editorData?.customMoveset;
+        const selectedStarterMoveset = selectedEditorMoveset ?? selectedStarter?.moveset;`,
+    "selected starter editor moves",
+  );
+  starterUi = replaceRequired(
+    starterUi,
+    `        this.starterMoveset = (moveData || (this.speciesStarterMoves.slice(0, 4) as StarterMoveset)).filter(m =>
+          availableStarterMoves.find(sm => sm === m),
+        ) as StarterMoveset;
+        // Consolidate move data if it contains an incompatible move
+        if (this.starterMoveset.length < 4 && this.starterMoveset.length < availableStarterMoves.length) {`,
+    `        this.starterMoveset = selectedEditorMoveset
+          ? (selectedEditorMoveset.slice(0, 4) as StarterMoveset)
+          : ((moveData || (this.speciesStarterMoves.slice(0, 4) as StarterMoveset)).filter(m =>
+              availableStarterMoves.find(sm => sm === m),
+            ) as StarterMoveset);
+        // Consolidate only legitimate move data. Editor moves intentionally
+        // remain outside the unlocked level/egg pool.
+        if (
+          !selectedEditorMoveset
+          && this.starterMoveset.length < 4
+          && this.starterMoveset.length < availableStarterMoves.length
+        ) {`,
+    "selected starter move filtering",
+  );
+}
+if (!starterUi.includes("editorAbilityId")) {
+  starterUi = replaceRequired(
+    starterUi,
+    `      if (dexEntry.caughtAttr) {
+        let ability: Ability;
+        if (this.lastSpecies.forms?.length > 1) {
+          ability = allAbilities[this.lastSpecies.forms[formIndex ?? 0].getAbility(abilityIndex!)];
+        } else {
+          ability = allAbilities[this.lastSpecies.getAbility(abilityIndex!)]; // TODO: is this bang correct?
+        }
+
+        const isHidden = abilityIndex === (this.lastSpecies.ability2 ? 2 : 1);`,
+    `      if (dexEntry.caughtAttr) {
+        const editorStarterIndex = starterIndexOverride ?? this.getSelectedStarterIndex(species);
+        const editorStarter = editorStarterIndex >= 0 ? this.starters[editorStarterIndex] : undefined;
+        const editorAbilityId =
+          editorStarter?.editorData?.abilityId
+          ?? this.preparedPokemonEditorStarters.get(species.speciesId)?.editorData?.abilityId;
+        let ability: Ability;
+        if (editorAbilityId !== undefined) {
+          ability = allAbilities[editorAbilityId];
+        } else if (this.lastSpecies.forms?.length > 1) {
+          ability = allAbilities[this.lastSpecies.forms[formIndex ?? 0].getAbility(abilityIndex!)];
+        } else {
+          ability = allAbilities[this.lastSpecies.getAbility(abilityIndex!)]; // TODO: is this bang correct?
+        }
+
+        const isHidden = editorAbilityId === undefined && abilityIndex === (this.lastSpecies.ability2 ? 2 : 1);`,
+    "selected starter editor ability display",
+  );
+}
+
 // The starter action menu can exceed the viewport once editor actions are
 // enabled. Cap it for both grid and selected-party targets and use the
 // engine's native scrolling.
@@ -461,16 +666,16 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
   if (!partyUi.includes('import { activeOverrides } from "#app/overrides";')) {
     partyUi = replaceRequired(
       partyUi,
-      'import { globalScene } from "#app/global-scene";',
-      'import { globalScene } from "#app/global-scene";\nimport { activeOverrides } from "#app/overrides";',
-      "party globalScene import",
+      'import { getPokemonNameWithAffix } from "#app/messages";',
+      'import { getPokemonNameWithAffix } from "#app/messages";\nimport { activeOverrides } from "#app/overrides";',
+      "party messages import",
     );
   }
   partyUi = replaceRequired(
     partyUi,
-    'import type { PokemonMove } from "#moves/pokemon-move";',
-    'import type { PokemonMove } from "#moves/pokemon-move";\nimport { applyPokemonEditorDraftToPokemon, createPokemonEditorDraftFromPokemon, undoLastPokemonEditorChange } from "#system/pokemon-editor/pokemon-editor-service";\nimport { createSavedPokemonBuild } from "#system/pokemon-editor/pokemon-editor-service";\nimport { PokemonEditorMode } from "#system/pokemon-editor/pokemon-editor-types";\nimport { showPokemonBuildLibrary, showPokemonEditor, showPokemonMoveEditor } from "#system/pokemon-editor/pokemon-editor-ui";',
-    "party PokemonMove import",
+    'import { getVariantTint } from "#sprites/variant";',
+    'import { getVariantTint } from "#sprites/variant";\nimport {\n  applyPokemonEditorDraftToPokemon,\n  createPokemonEditorDraftFromPokemon,\n  createSavedPokemonBuild,\n  undoLastPokemonEditorChange,\n} from "#system/pokemon-editor/pokemon-editor-service";\nimport { PokemonEditorMode } from "#system/pokemon-editor/pokemon-editor-types";\nimport {\n  showPokemonBuildLibrary,\n  showPokemonEditor,\n  showPokemonMoveEditor,\n} from "#system/pokemon-editor/pokemon-editor-ui";',
+    "party variant import",
   );
   partyUi = replaceRequired(
     partyUi,
@@ -565,8 +770,14 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
           break;
         case PartyOption.UNDO_EDITOR_CHANGES:
           void undoLastPokemonEditorChange(pokemon).then(async changed => {
-            if (changed) await globalScene.gameData.saveAll(true, false);
-            this.showText(changed ? "Undid the last editor changes." : "There are no editor changes to undo.", null, returnToParty);
+            if (changed) {
+              await globalScene.gameData.saveAll(true, false);
+            }
+            this.showText(
+              changed ? "Undid the last editor changes." : "There are no editor changes to undo.",
+              null,
+              returnToParty,
+            );
           });
           break;
       }

@@ -52,6 +52,14 @@ uses the same seven-row cap, with visible scroll arrows and controller wrapping.
 Opening one editor page from another safely replaces the current menu; Cancel,
 Back, and Done always return to the documented parent screen.
 
+Editor choice lists such as abilities, natures, forms, genders, move types,
+sort modes, and saved builds are alphabetical. Up/Down advances one row;
+Left/Right advances one visible page without the old 100-row jump. Numeric
+pickers advance by one with Up/Down and by 10 with Left/Right, clamp at their
+valid bounds, and never wrap. IV page jumps stop at 1; **Set All to 0** remains
+the explicit zero-IV shortcut. Returning from a picker or toggling a field
+keeps the cursor on the field that was just changed.
+
 When duplicate starters are enabled:
 
 - editing from a selected team icon targets only that exact copy;
@@ -64,6 +72,9 @@ When duplicate starters are enabled:
 At run construction, custom starter fields are applied once. Evolution, move
 learning, form changes, and normal game mechanics then continue from the
 Pokemon's real state; the saved build is not continuously re-applied.
+The starter detail panel displays the selected/prepared copy's editor ability
+and unrestricted moves instead of filtering that preview back to its unlocked
+level/egg move pool.
 
 ## Active party safety
 
@@ -96,10 +107,16 @@ Available controls:
 - optional full-name substring search and controller-only A–Z initials;
 - name A–Z/Z–A, power high/low, accuracy high/low, and PP high/low sorting;
 - combined filters and sorting, matching-result count, clear filters, and
-  eight-result pages;
-- move-row summaries with name, type, category, power, accuracy, and PP;
+  complete virtualized browsing without requiring search text;
+- a narrow, type-colored virtualized move-name list that remains readable
+  beside the detail panel;
 - highlighted details with name, type, category, power, accuracy, PP,
   priority, targeting, and full registry description.
+
+Move names and move-type filter rows use the game's standard type palette
+(Fire red, Water blue, Steel blue-gray, and so on), with white as the safe
+fallback for a typeless/unknown record. Left/Right moves through the complete
+virtualized results by one visible page; text search is still optional.
 
 Status power is shown as `—`; never-miss accuracy is `Always`; variable-power,
 fixed-damage, and one-hit-KO moves are labeled `Variable`, `Fixed`, and `OHKO`.
@@ -129,6 +146,13 @@ supported. Full Editor can:
 - mark one preferred build per species/form (preferred builds sort first);
 - explicitly update an existing build from the current setup after
   confirmation.
+
+The starter screen's **Misc** filter includes **Saved Builds**, with has/does
+not have states, so the grid can be narrowed to every species that owns a
+build. Build creation appears only as the species/party action; the Load list
+no longer repeats a second create-build row. Build rows are alphabetical after
+the preferred build and open their details/actions without leaving a stale
+tooltip over the selection window.
 
 Applying a build warns that it may contain moves the species cannot normally
 learn. Apply copies all data; later Pokemon edits never silently mutate the
@@ -203,6 +227,10 @@ Use a disposable export and cover at least these cases:
 8. Exercise mouse/touch, keyboard, and controller navigation. On Switch, save
    and apply a default-named build without invoking text input.
 
+Save and Quit retains the normal cached checkpoint behavior. If a one-turn
+battle reaches the shop before its background cache exists, it now falls back
+to a live session/system snapshot instead of leaving the game on Loading.
+
 ## Automated coverage
 
 `test/system/pokemon-editor.test.ts` covers unrestricted species/move pairing,
@@ -215,7 +243,7 @@ Implementation validation:
 
 | Check | Result |
 | --- | --- |
-| Pokemon editor Vitest suite | Passed: 8/8 |
+| Pokemon editor Vitest suite | Passed: 13/13 |
 | Automated Draco Caterpie build → session Pokemon serialization → Off-mode reload | Passed |
 | JavaScript syntax and idempotent direct editor-patch reapplication | Passed |
 | Clean shared `all` patch application | Passed |
