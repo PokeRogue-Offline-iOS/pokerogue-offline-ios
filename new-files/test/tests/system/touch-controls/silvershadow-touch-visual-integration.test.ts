@@ -22,6 +22,21 @@ describe("System - Touch controls - visual integration contract", () => {
     expect(styles).toContain("Stable 96% visual geometry wrapper");
   });
 
+  it("scales the complete stable D-pad assembly and hit region by exactly 1.10", () => {
+    expect(styles).toContain("--ss-dpad-scale-multiplier: 1.1");
+    expect(styles).toContain("--ss-dpad-assembly-size: calc(2.2 * var(--controls-size))");
+    expect(styles).toContain(`#touchControls.silvershadow-touch-upgrade .control-group-dpad {
+  width: var(--ss-dpad-assembly-size);
+  height: var(--ss-dpad-assembly-size);
+  overflow: visible;
+}`);
+    expect(styles).toMatch(/#touchControls\.silvershadow-touch-upgrade #dpad \{[^}]*overflow: visible;/s);
+    expect(styles.match(/width: var\(--ss-dpad-assembly-size\);/g)).toHaveLength(2);
+    expect(styles.match(/height: var\(--ss-dpad-assembly-size\);/g)).toHaveLength(2);
+    expect(styles.match(/--ss-dpad-scale-multiplier:/g)).toHaveLength(1);
+    expect(styles).not.toContain("scale(1.1)");
+  });
+
   it("coalesces pointer movement into a single pending animation frame", () => {
     expect(runtime.match(/requestAnimationFrame\(/g)).toHaveLength(1);
     expect(runtime).toContain("if (this.dpadVisualFrameId !== null)");

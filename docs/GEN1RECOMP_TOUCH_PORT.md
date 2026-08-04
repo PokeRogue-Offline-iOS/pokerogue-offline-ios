@@ -242,12 +242,23 @@ remain as fallback artwork. The primary SVG D-pad uses 30% idle, 40% captured
 but digitally neutral, and 58% active opacity. Action buttons use the same 30%
 idle and 58% active philosophy.
 
-The D-pad pointer region keeps the existing full `2 * --controls-size` square.
-Visible art grows from 84% through 88% to 96% of that square, while the resolver
-deliberately continues using its former 84% reference width. The resolver's 16%
-dead zone and all input thresholds therefore remain unchanged. Action buttons gain 15%
-invisible hit slop on each edge through a pseudo-element; their visible size is
-unchanged.
+Before the proportional size follow-up, the D-pad pointer region used a full
+`2 * --controls-size` square. Visible art had grown from 84% through 88% to 96%
+of that square, while the resolver deliberately retained its 84% reference
+ratio. Action buttons independently retain their existing 15% invisible hit
+slop; their visible size is unchanged.
+
+The size-only follow-up applies one documented `1.10` multiplier to the complete
+D-pad assembly. `--ss-dpad-assembly-size` expands the previous
+`2 * --controls-size` parent and stable hit region to
+`2.2 * --controls-size`. The 96% geometry/fallback artwork therefore grows from
+`1.92` to `2.112 * --controls-size`, while the 84% digital reference grows from
+`1.68` to `1.848 * --controls-size`. Every dimension increases by exactly 10%,
+so the dead-zone ratio, cardinal sectors, normalized distance-to-edge rocking,
+and lighting progression are unchanged. The draggable `.control-group-dpad`
+and `#dpad` both use the same size token and explicitly allow visible overflow;
+saved portrait/landscape position formats are unchanged. No action-button CSS,
+layout, hit region, or behavior participates in this multiplier.
 
 To tune opacity during development, edit the three shared opacity tokens in the
 SilverShadow block injected into `index.css` by

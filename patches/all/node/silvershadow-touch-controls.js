@@ -907,6 +907,9 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
 }
 
 #touchControls.silvershadow-touch-upgrade {
+  /* 2.0 baseline * 1.10; expanded to 2.2 for the existing CSS calc convention. */
+  --ss-dpad-scale-multiplier: 1.1;
+  --ss-dpad-assembly-size: calc(2.2 * var(--controls-size));
   --ss-control-idle-opacity: 0.3;
   --ss-control-neutral-opacity: 0.4;
   --ss-control-active-opacity: 0.58;
@@ -925,13 +928,20 @@ if (!cssSource.includes("silvershadow-touch-upgrade")) {
   --dpad-release-duration: 115ms;
 }
 
+#touchControls.silvershadow-touch-upgrade .control-group-dpad {
+  width: var(--ss-dpad-assembly-size);
+  height: var(--ss-dpad-assembly-size);
+  overflow: visible;
+}
+
 #touchControls.silvershadow-touch-upgrade #dpad {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(2 * var(--controls-size));
-  height: calc(2 * var(--controls-size));
+  width: var(--ss-dpad-assembly-size);
+  height: var(--ss-dpad-assembly-size);
+  overflow: visible;
   opacity: 1;
   touch-action: none;
   user-select: none;

@@ -126,6 +126,34 @@ Do not accept any change to the four open-chevron proportions or to the smooth
 lighting/fading behavior while sliding; those are the hardware-approved visual
 baseline for this iteration.
 
+## Proportional D-pad size checklist
+
+1. Compare the prior and current D-pad: the complete assembly should be exactly
+   10% larger (`2.0` to `2.2 * --controls-size`).
+2. Confirm socket, pivoting face, outline, bevel, centre cap, chevrons, lighting,
+   shadows, highlights, shading, and fallback art retain their proportions.
+3. Touch around the newly enlarged outer area and confirm the full visible
+   D-pad is interactive.
+4. Confirm neutral-centre and direction-activation distances feel normalized
+   exactly as before.
+5. Slowly circle through all sectors and confirm continuous cardinal sliding,
+   rocking, primary/secondary lighting, and chevron alignment remain unchanged.
+6. Hold at the edge and confirm rocking remains centred, shadows and highlights
+   are not clipped, and no geometry jitter appears.
+7. Confirm D-pad haptic timing and strength are unchanged.
+8. Hold the D-pad with multiple action buttons and confirm existing independent
+   multi-touch behavior remains unchanged.
+9. Check portrait and landscape for clipping, unintended overlap, and excessive
+   gameplay coverage.
+10. Move the D-pad in Move Touch Controls, save, rotate, and confirm both saved
+    orientations restore normally.
+11. Wait for auto-hide and wake the enlarged D-pad with the first touch.
+12. Rapidly circle and tap multiple buttons while watching for a performance
+    regression.
+
+This checklist is D-pad-only. Do not accept visual, layout, mapping, hitbox, or
+behavior changes to any action/context button in this pass.
+
 ## Haptic Android checklist
 
 Set `Vibrations` to Auto before starting:
