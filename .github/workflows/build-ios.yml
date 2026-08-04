@@ -215,10 +215,14 @@ jobs:
       - name: Copy app icon
         run: |
           if [ "${{ inputs.dev }}" = "true" ]; then
-            cp docs/appIcon-dev.png pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+            ICON_SOURCE="docs/appIcon-dev.png"
           else
-            cp docs/appIcon.png pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+            ICON_SOURCE="docs/appIcon.png"
           fi
+          ICON_DESTINATION="pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          sips --resampleHeightWidth 1024 1024 "$ICON_SOURCE" --out "$ICON_DESTINATION"
+          test "$(sips -g pixelWidth "$ICON_DESTINATION" | awk '/pixelWidth/ { print $2 }')" = "1024"
+          test "$(sips -g pixelHeight "$ICON_DESTINATION" | awk '/pixelHeight/ { print $2 }')" = "1024"
 
       - name: Build Xcode project (unsigned)
         run: |
