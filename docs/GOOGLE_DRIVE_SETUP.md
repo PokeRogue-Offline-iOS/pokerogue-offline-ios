@@ -79,15 +79,16 @@ Create one **iOS** OAuth client for each current bundle ID:
 
 | Build | Bundle ID | Client-ID secret | Reversed-client-ID secret |
 | --- | --- | --- | --- |
-| Main | `xyz.scooom.pkr` | `GOOGLE_IOS_CLIENT_ID` | `GOOGLE_IOS_REVERSED_CLIENT_ID` |
-| Development | `xyz.scooom.pkrdev` | `GOOGLE_IOS_DEV_CLIENT_ID` | `GOOGLE_IOS_DEV_REVERSED_CLIENT_ID` |
+| Main | `com.silvershadow.pkr` | `GOOGLE_IOS_CLIENT_ID` | `GOOGLE_IOS_REVERSED_CLIENT_ID` |
+| Development | `com.silvershadow.pkrdev` | `GOOGLE_IOS_DEV_CLIENT_ID` | `GOOGLE_IOS_DEV_REVERSED_CLIENT_ID` |
 
 The workflow injects the iOS client ID into the Capacitor configuration and
 registers the corresponding reversed client ID as the app's URL scheme. Keep
 `GOOGLE_WEB_CLIENT_ID` configured as the optional server client/token audience.
 
-If the iOS bundle IDs are changed in a separately reviewed identity migration,
-new matching iOS OAuth clients are required.
+The Google iOS clients, Apple App IDs, and provisioning profiles must use
+these exact bundle IDs. Changing either ID requires a new matching OAuth
+client and signing configuration.
 
 ## 5. Optional desktop client
 

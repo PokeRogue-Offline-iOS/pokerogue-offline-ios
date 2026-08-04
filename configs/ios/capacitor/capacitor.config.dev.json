@@ -1,5 +1,5 @@
 {
-  "appId": "xyz.scooom.pkrdev",
+  "appId": "com.silvershadow.pkrdev",
   "appName": "PokéRogue Offline Dev",
   "webDir": "dist",
   "ios": {
