@@ -21,6 +21,9 @@ requireText(workflow, "scripts/fetch-official-daily-seed.js", "first-party brows
 requireText(workflow, 'source="offline-fallback"', "publisher offline fallback");
 requireText(workflow, 'publish_dir="$publish_parent/seed"', "publisher worktree path");
 requireText(workflow, "push origin HEAD:seed", "publisher seed branch push");
+if (workflow.includes('git -C "$publish_dir" rm -rf .')) {
+  throw new Error("first seed-branch publication must not git-rm an already empty orphan worktree");
+}
 if (/ssh\.scooom\.xyz|pokerogue-offline\.github\.io/i.test(workflow)) {
   throw new Error("publisher must not depend on Scooom or another offline seed mirror");
 }

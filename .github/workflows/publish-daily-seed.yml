@@ -107,8 +107,10 @@ jobs:
             git worktree add --force -B seed "$publish_dir" origin/seed
           else
             git worktree add --detach "$publish_dir"
+            # `git switch --orphan` clears the index and worktree itself.
+            # A subsequent `git rm .` fails with exit 128 because nothing is
+            # tracked yet, which previously broke the first publication.
             git -C "$publish_dir" switch --orphan seed
-            git -C "$publish_dir" rm -rf .
           fi
 
           mkdir -p "$publish_dir/docs"
