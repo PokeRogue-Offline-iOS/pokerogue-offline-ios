@@ -79,15 +79,24 @@ level/egg move pool.
 ## Active party safety
 
 Party actions include **Load Saved Build** in both enabled modes and Full
-Editor actions for editing fields, managing any moves, saving a build, and
-undoing the last runtime editor change. Party action windows are also capped at
-seven visible rows, including their scroll indicators and Cancel row.
+Editor actions for editing fields, quick-editing legitimate moves, managing any
+moves, saving a build, and undoing the last runtime editor change. Party action
+windows are also capped at seven visible rows, including their scroll
+indicators and Cancel row.
+
+**Quick Edit Moves** uses the game's Move Relearner pool rather than the
+unrestricted registry. It combines the Pokemon's current moves with the same
+level, relearner, pre-evolution, permitted unlocked egg, and previously used TM
+moves returned by `getLearnableLevelMoves()`. Its browser supports the same
+controller-only filters, sorting, details, and pagination, but cannot select a
+move outside that legitimate pool.
 
 Active-party mutation is permitted only in `SelectModifierPhase`, the normal
 between-battles reward/shop boundary. An attempt from a battle party menu is
 rejected with:
 
-> Pokémon cannot be edited during battle. Finish the current battle first.
+> Editing is unavailable during battle.
+> Finish the battle first.
 
 After a successful apply or undo, the current system and session are saved
 locally.
@@ -95,15 +104,21 @@ locally.
 ## Unrestricted move browser
 
 The move browser is generated dynamically from the game's initialized move
-registry. There is no manual name chart. **Browse All Matching Moves** works
-with no text input and is the primary discovery path. Name search is only an
-optional shortcut.
+registry. There is no manual name chart. Its discovery screen starts with
+**Browse All Moves**, **Browse by Type**, **Browse by Category**, **Browse by
+Effect**, and **Search by Name**. Browse All works with no text input and is the
+primary discovery path; name search is only an optional shortcut.
 
 Available controls:
 
 - every implemented type filter, including Steel, Fire, Water, Dragon, Fairy,
   and all other registry types;
 - Physical, Special, Status, or all categories;
+- registry-derived effect filters for Direct Damage, Healing, HP Drain,
+  Recoil, Priority, Multi-Hit, High Critical-Hit Rate, Always Hits, Fixed
+  Damage, One-Hit KO, Inflicts Status, Raises User Stats, Lowers Target Stats,
+  Protection, Weather, Terrain, Entry Hazards, Switching or Pivoting,
+  Trapping, Charge Move, and Recharge Move;
 - optional full-name substring search and controller-only A–Z initials;
 - name A–Z/Z–A, power high/low, accuracy high/low, and PP high/low sorting;
 - combined filters and sorting, matching-result count, clear filters, and
@@ -124,14 +139,21 @@ The cached normalized metadata excludes `NONE`, placeholder records,
 unimplemented `(N)` moves, malformed entries, and zero-PP records. Partial
 implemented moves remain available.
 
+Effect membership is cached with that metadata and derived from category,
+priority, accuracy, charging subclasses, and registered move attributes. Moves
+with multiple matching attributes appear in multiple effect groups. The
+browser does not parse localized descriptions or guess from move names;
+bespoke effects without a reliable registry class/attribute are intentionally
+left out of that effect group rather than mislabeled.
+
 Controller-only Steel discovery example:
 
 1. Open **Manage Any Moves** and choose a slot or **Add Move**.
 2. Set **Type** to Steel.
 3. Optionally set **Category** to Physical or Special.
 4. Set **Sort** to Power High–Low.
-5. Open **Browse All Matching Moves**, page through every match, and compare
-   row values and highlighted full details.
+5. Open **Browse All Moves**, page through every match, and compare each
+   highlighted move's full details.
 6. Choose the move. No move name or external lookup is required.
 
 ## Saved builds
@@ -222,9 +244,12 @@ Use a disposable export and cover at least these cases:
    is retained. Repeat with a fainted Pokemon and confirm HP remains zero.
 6. Save and quit, reload, evolve or learn a move, and confirm the resulting
    state persists without the old build being re-applied.
-7. Attempt an edit from an active battle party menu and confirm the exact
-   rejection message and zero mutation.
-8. Exercise mouse/touch, keyboard, and controller navigation. On Switch, save
+7. Between battles, use **Quick Edit Moves** and confirm its results contain
+   current and Move Relearner-eligible moves but exclude an unrestricted move
+   the species has never learned.
+8. Attempt an edit from an active battle party menu and confirm the wrapped
+   rejection message stays inside its box and causes zero mutation.
+9. Exercise mouse/touch, keyboard, and controller navigation. On Switch, save
    and apply a default-named build without invoking text input.
 
 Save and Quit retains the normal cached checkpoint behavior. If a one-turn
@@ -237,13 +262,14 @@ to a live session/system snapshot instead of leaving the game on Loading.
 move uniqueness, CRUD and duplicate-name behavior, stable preferred
 references, deep-copy isolation, explicit update, normalization of corrupt/old
 data, Off-mode legitimate starter restoration, and registry discovery/filter/
-sort behavior including the controller-first Steel workflow.
+sort behavior including the controller-first Steel workflow, registry-derived
+effect groups, and restricted legitimate move pools.
 
 Implementation validation:
 
 | Check | Result |
 | --- | --- |
-| Pokemon editor Vitest suite | Passed: 13/13 |
+| Pokemon editor Vitest suite | Passed: 16/16 |
 | Automated Draco Caterpie build → session Pokemon serialization → Off-mode reload | Passed |
 | JavaScript syntax and idempotent direct editor-patch reapplication | Passed |
 | Clean shared `all` patch application | Passed |

@@ -705,7 +705,7 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
   partyUi = replaceRequired(
     partyUi,
     "  RENAME,\n  SELECT,",
-    "  RENAME,\n  LOAD_SAVED_BUILD,\n  EDIT_POKEMON,\n  EDIT_ANY_MOVES,\n  SAVE_POKEMON_BUILD,\n  UNDO_EDITOR_CHANGES,\n  SELECT,",
+    "  RENAME,\n  LOAD_SAVED_BUILD,\n  EDIT_POKEMON,\n  QUICK_EDIT_MOVES,\n  EDIT_ANY_MOVES,\n  SAVE_POKEMON_BUILD,\n  UNDO_EDITOR_CHANGES,\n  SELECT,",
     "party option editor insertion",
   );
   partyUi = replaceRequired(
@@ -719,6 +719,7 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
     if (pokemonEditorMode === PokemonEditorMode.FULL_EDITOR) {
       this.options.push(
         PartyOption.EDIT_POKEMON,
+        PartyOption.QUICK_EDIT_MOVES,
         PartyOption.EDIT_ANY_MOVES,
         PartyOption.SAVE_POKEMON_BUILD,
         PartyOption.UNDO_EDITOR_CHANGES,
@@ -732,6 +733,7 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
   const editorHandler = `    const pokemonEditorOptions = [
       PartyOption.LOAD_SAVED_BUILD,
       PartyOption.EDIT_POKEMON,
+      PartyOption.QUICK_EDIT_MOVES,
       PartyOption.EDIT_ANY_MOVES,
       PartyOption.SAVE_POKEMON_BUILD,
       PartyOption.UNDO_EDITOR_CHANGES,
@@ -748,7 +750,7 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
       }
       if (!globalScene.phaseManager.getCurrentPhase().is("SelectModifierPhase")) {
         this.showText(
-          "Pokémon cannot be edited during battle. Finish the current battle first.",
+          "Editing is unavailable during battle.\\nFinish the battle first.",
           null,
           () => ui.setMode(UiMode.PARTY),
           undefined,
@@ -785,6 +787,12 @@ if (!partyUi.includes("LOAD_SAVED_BUILD")) {
             onCancel: returnToParty,
           });
           break;
+        case PartyOption.QUICK_EDIT_MOVES: {
+          const relearnableMoves = pokemon.getLearnableLevelMoves().map(([, moveId]) => moveId);
+          const legitimateMoves = [...new Set([...pokemon.moveset.map(move => move.moveId), ...relearnableMoves])];
+          showPokemonMoveEditor(draft, () => void applyDraft(draft), undefined, legitimateMoves);
+          break;
+        }
         case PartyOption.EDIT_ANY_MOVES:
           showPokemonMoveEditor(draft, () => void applyDraft(draft));
           break;

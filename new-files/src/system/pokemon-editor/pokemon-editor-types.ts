@@ -95,6 +95,28 @@ export interface PokemonBuildLibrary {
 }
 
 export type PokemonEditorMoveCategoryFilter = "all" | "physical" | "special" | "status";
+export type PokemonEditorMoveEffectFilter =
+  | "direct-damage"
+  | "healing"
+  | "hp-drain"
+  | "recoil"
+  | "priority"
+  | "multi-hit"
+  | "high-critical-hit-rate"
+  | "always-hits"
+  | "fixed-damage"
+  | "one-hit-ko"
+  | "inflicts-status"
+  | "raises-user-stats"
+  | "lowers-target-stats"
+  | "protection"
+  | "weather"
+  | "terrain"
+  | "entry-hazards"
+  | "switching-or-pivoting"
+  | "trapping"
+  | "charge-move"
+  | "recharge-move";
 export type PokemonEditorMoveSort =
   | "name-asc"
   | "name-desc"

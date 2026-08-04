@@ -29,6 +29,7 @@ import type {
   PokemonBuildLibrary,
   PokemonEditorDraft,
   PokemonEditorMoveCategoryFilter,
+  PokemonEditorMoveEffectFilter,
   PokemonEditorMoveSort,
   SavedPokemonBuild,
 } from "./pokemon-editor-types";
@@ -412,13 +413,41 @@ interface MoveBrowserState {
   initial: string;
   type?: PokemonType | undefined;
   category: PokemonEditorMoveCategoryFilter;
+  effect?: PokemonEditorMoveEffectFilter | undefined;
   sort: PokemonEditorMoveSort;
 }
+
+const moveEffectLabels: Record<PokemonEditorMoveEffectFilter, string> = {
+  "direct-damage": "Direct Damage",
+  healing: "Healing",
+  "hp-drain": "HP Drain",
+  recoil: "Recoil",
+  priority: "Priority",
+  "multi-hit": "Multi-Hit",
+  "high-critical-hit-rate": "High Critical-Hit Rate",
+  "always-hits": "Always Hits",
+  "fixed-damage": "Fixed Damage",
+  "one-hit-ko": "One-Hit KO",
+  "inflicts-status": "Inflicts Status",
+  "raises-user-stats": "Raises User Stats",
+  "lowers-target-stats": "Lowers Target Stats",
+  protection: "Protection",
+  weather: "Weather",
+  terrain: "Terrain",
+  "entry-hazards": "Entry Hazards",
+  "switching-or-pivoting": "Switching or Pivoting",
+  trapping: "Trapping",
+  "charge-move": "Charge Move",
+  "recharge-move": "Recharge Move",
+};
+
+const moveEffectOrder = Object.keys(moveEffectLabels) as PokemonEditorMoveEffectFilter[];
 
 export function showPokemonMoveEditor(
   draft: PokemonEditorDraft,
   back: () => void,
   legitimateMoves?: StarterMoveset,
+  availableMoves?: readonly MoveId[],
 ): boolean {
   let moveCursor = 0;
   const show = () => {
@@ -426,7 +455,7 @@ export function showPokemonMoveEditor(
       label: colorMoveLabel(`${index + 1}. ${allMoves[moveId].name}`, allMoves[moveId].type),
       handler: () => {
         moveCursor = index;
-        return showMoveSlotActions(draft, index, show);
+        return showMoveSlotActions(draft, index, show, availableMoves);
       },
       onHover: () => moveTooltip(moveId),
     }));
@@ -435,7 +464,7 @@ export function showPokemonMoveEditor(
         label: "+ Add Move",
         handler: () => {
           moveCursor = draft.moves.length;
-          return showMoveBrowser(draft, draft.moves.length, show);
+          return showMoveBrowser(draft, draft.moves.length, show, availableMoves);
         },
       });
     }
@@ -451,16 +480,26 @@ export function showPokemonMoveEditor(
       });
     }
     options.push({ label: "Done", handler: () => (clearTooltip(), back(), true), onHover: clearTooltip });
-    globalScene.ui.showText("Manage any implemented moves (1–4, no duplicates).", 0);
+    globalScene.ui.showText(
+      availableMoves
+        ? "Quick edit: current and Move Relearner moves only."
+        : "Manage any implemented moves (1–4, no duplicates).",
+      0,
+    );
     showOptions(options, Math.min(moveCursor, options.length - 1));
   };
   show();
   return true;
 }
 
-function showMoveSlotActions(draft: PokemonEditorDraft, index: number, back: () => void): boolean {
+function showMoveSlotActions(
+  draft: PokemonEditorDraft,
+  index: number,
+  back: () => void,
+  availableMoves?: readonly MoveId[],
+): boolean {
   const options: OptionSelectItem[] = [
-    { label: "Replace", handler: () => showMoveBrowser(draft, index, back) },
+    { label: "Replace", handler: () => showMoveBrowser(draft, index, back, availableMoves) },
     {
       label: "Move Up",
       handler: () => {
@@ -497,7 +536,12 @@ function showMoveSlotActions(draft: PokemonEditorDraft, index: number, back: () 
   return true;
 }
 
-function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => void): boolean {
+function showMoveBrowser(
+  draft: PokemonEditorDraft,
+  slot: number,
+  back: () => void,
+  availableMoves?: readonly MoveId[],
+): boolean {
   const state: MoveBrowserState = { search: "", initial: "", category: "all", sort: "name-asc" };
   let filterCursor = 0;
   const showFilters = (initialCursor = filterCursor) => {
@@ -505,27 +549,35 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
     clearTooltip();
     const count = getImplementedPokemonEditorMoves({
       ...state,
+      included: availableMoves,
       excluded: draft.moves.filter((_, index) => index !== slot),
     }).length;
     const options: OptionSelectItem[] = [
-      { label: `Browse All Matching Moves (${count})`, handler: showResults },
+      { label: `Browse All Moves (${count} matching)`, handler: showResults },
       {
-        label: `Name Search: ${state.search || "Any"}`,
+        label: `Browse by Type: ${state.type === undefined ? "Any" : toTitleCase(PokemonType[state.type])}`,
+        handler: showTypes,
+      },
+      { label: `Browse by Category: ${toTitleCase(state.category)}`, handler: showCategories },
+      {
+        label: `Browse by Effect: ${state.effect === undefined ? "Any" : moveEffectLabels[state.effect]}`,
+        handler: showEffects,
+      },
+      {
+        label: `Search by Name: ${state.search || "Any"}`,
         handler: () => {
           showTextInput(
             state.search,
             value => {
               state.search = value.trim();
-              showFilters(1);
+              showFilters(4);
             },
-            () => showFilters(1),
+            () => showFilters(4),
           );
           return true;
         },
       },
-      { label: `First Letter: ${state.initial || "Any"}`, handler: showInitials },
-      { label: `Type: ${state.type === undefined ? "Any" : toTitleCase(PokemonType[state.type])}`, handler: showTypes },
-      { label: `Category: ${toTitleCase(state.category)}`, handler: showCategories },
+      { label: `Browse by First Letter: ${state.initial || "Any"}`, handler: showInitials },
       { label: `Sort: ${formatMoveSort(state.sort)}`, handler: showSorts },
       {
         label: "Clear Filters",
@@ -535,9 +587,10 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
             initial: "",
             type: undefined,
             category: "all",
+            effect: undefined,
             sort: "name-asc",
           });
-          showFilters(6);
+          showFilters(7);
           return true;
         },
       },
@@ -548,6 +601,7 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
   const showResults = (): boolean => {
     const moves = getImplementedPokemonEditorMoves({
       ...state,
+      included: availableMoves,
       excluded: draft.moves.filter((_, index) => index !== slot),
     });
     const options: OptionSelectItem[] = moves.map(move => ({
@@ -576,22 +630,22 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
     showOptions(
       initials.map(initial => ({
         label: initial || "Any",
-        handler: () => ((state.initial = initial), showFilters(2), true),
+        handler: () => ((state.initial = initial), showFilters(5), true),
       })),
       Math.max(0, initials.indexOf(state.initial)),
     );
     return true;
   };
   const showTypes = (): boolean => {
-    const types = [...new Set(getImplementedPokemonEditorMoves().map(move => move.type))].sort((a, b) =>
-      compareLabels(toTitleCase(PokemonType[a]), toTitleCase(PokemonType[b])),
-    );
+    const types = [
+      ...new Set(getImplementedPokemonEditorMoves({ included: availableMoves }).map(move => move.type)),
+    ].sort((a, b) => compareLabels(toTitleCase(PokemonType[a]), toTitleCase(PokemonType[b])));
     showOptions(
       [
-        { label: "Any", handler: () => ((state.type = undefined), showFilters(3), true) },
+        { label: "Any", handler: () => ((state.type = undefined), showFilters(1), true) },
         ...types.map(type => ({
           label: colorMoveLabel(toTitleCase(PokemonType[type]), type),
-          handler: () => ((state.type = type), showFilters(3), true),
+          handler: () => ((state.type = type), showFilters(1), true),
         })),
       ],
       state.type === undefined ? 0 : Math.max(0, types.indexOf(state.type) + 1),
@@ -603,9 +657,22 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
     showOptions(
       categories.map(category => ({
         label: toTitleCase(category),
-        handler: () => ((state.category = category), showFilters(4), true),
+        handler: () => ((state.category = category), showFilters(2), true),
       })),
       categories.indexOf(state.category),
+    );
+    return true;
+  };
+  const showEffects = (): boolean => {
+    showOptions(
+      [
+        { label: "Any", handler: () => ((state.effect = undefined), showFilters(3), true) },
+        ...moveEffectOrder.map(effect => ({
+          label: moveEffectLabels[effect],
+          handler: () => ((state.effect = effect), showFilters(3), true),
+        })),
+      ],
+      state.effect === undefined ? 0 : moveEffectOrder.indexOf(state.effect) + 1,
     );
     return true;
   };
@@ -624,7 +691,7 @@ function showMoveBrowser(draft: PokemonEditorDraft, slot: number, back: () => vo
     showOptions(
       sorts.map(sort => ({
         label: formatMoveSort(sort),
-        handler: () => ((state.sort = sort), showFilters(5), true),
+        handler: () => ((state.sort = sort), showFilters(6), true),
       })),
       sorts.indexOf(state.sort),
     );

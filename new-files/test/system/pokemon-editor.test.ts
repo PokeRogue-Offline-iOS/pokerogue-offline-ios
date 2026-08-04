@@ -183,6 +183,60 @@ describe("Pokemon Editor registry move discovery", () => {
       accuracyDescending[0].accuracy === -1 || accuracyDescending[0].accuracy >= accuracyDescending.at(-1)!.accuracy,
     ).toBe(true);
   });
+
+  it("derives effect groups from registry metadata and combines them with other filters", () => {
+    const expectedEffects = new Map([
+      [MoveId.TACKLE, "direct-damage"],
+      [MoveId.RECOVER, "healing"],
+      [MoveId.DRAIN_PUNCH, "hp-drain"],
+      [MoveId.DOUBLE_EDGE, "recoil"],
+      [MoveId.QUICK_ATTACK, "priority"],
+      [MoveId.DOUBLE_SLAP, "multi-hit"],
+      [MoveId.SLASH, "high-critical-hit-rate"],
+      [MoveId.SWIFT, "always-hits"],
+      [MoveId.SEISMIC_TOSS, "fixed-damage"],
+      [MoveId.FISSURE, "one-hit-ko"],
+      [MoveId.THUNDER_WAVE, "inflicts-status"],
+      [MoveId.SWORDS_DANCE, "raises-user-stats"],
+      [MoveId.GROWL, "lowers-target-stats"],
+      [MoveId.PROTECT, "protection"],
+      [MoveId.RAIN_DANCE, "weather"],
+      [MoveId.ELECTRIC_TERRAIN, "terrain"],
+      [MoveId.SPIKES, "entry-hazards"],
+      [MoveId.U_TURN, "switching-or-pivoting"],
+      [MoveId.WRAP, "trapping"],
+      [MoveId.SOLAR_BEAM, "charge-move"],
+      [MoveId.HYPER_BEAM, "recharge-move"],
+    ] as const);
+
+    for (const [moveId, effect] of expectedEffects) {
+      expect(getImplementedPokemonEditorMoves({ included: [moveId], effect })).toHaveLength(1);
+    }
+
+    const physicalPriority = getImplementedPokemonEditorMoves({
+      category: "physical",
+      effect: "priority",
+      sort: "power-desc",
+    });
+    expect(physicalPriority.length).toBeGreaterThan(0);
+    expect(physicalPriority.every(move => move.category === MoveCategory.PHYSICAL && move.priority > 0)).toBe(true);
+
+    const fireStatusEffects = getImplementedPokemonEditorMoves({
+      type: PokemonType.FIRE,
+      effect: "inflicts-status",
+      sort: "name-asc",
+    });
+    expect(fireStatusEffects.length).toBeGreaterThan(0);
+    expect(
+      fireStatusEffects.every(move => move.type === PokemonType.FIRE && move.effects.includes("inflicts-status")),
+    ).toBe(true);
+  });
+
+  it("can restrict the browser to a legitimate Move Relearner pool", () => {
+    const allowed = [MoveId.TACKLE, MoveId.GROWL, MoveId.DRACO_METEOR];
+    const restricted = getImplementedPokemonEditorMoves({ included: allowed, category: "status" });
+    expect(restricted.map(move => move.id)).toEqual([MoveId.GROWL]);
+  });
 });
 
 describe("Pokemon Editor Draco Caterpie acceptance", () => {
@@ -261,6 +315,9 @@ describe("Pokemon Editor menu integration", () => {
     expect(starterUiSource).toContain("maxOptions: 7,\n            yOffset: 47,");
     expect(partyUiSource).toContain("const visibleActionSlots = 6;");
     expect(partyUiSource).toContain("including its scroll indicators and persistent Cancel row");
+    expect(partyUiSource).toContain("PartyOption.QUICK_EDIT_MOVES");
+    expect(partyUiSource).toContain("pokemon.getLearnableLevelMoves()");
+    expect(partyUiSource).toContain('"Editing is unavailable during battle.\\nFinish the battle first."');
   });
 
   it("uses bounded ten-step number navigation and page-sized word navigation", () => {
@@ -281,6 +338,8 @@ describe("Pokemon Editor menu integration", () => {
 
     expect(editorUiSource).toContain(".sort((a, b) => compareLabels(a.name, b.name)");
     expect(editorUiSource).toContain("label: colorMoveLabel(move.name, move.type)");
+    expect(editorUiSource).toContain("Browse All Moves (${count} matching)");
+    expect(editorUiSource).toContain("Browse by Effect:");
     expect(editorUiSource).not.toContain("Save Current Setup as New Build");
     expect(starterUiSource).toContain('new DropDownOption("SAVED_BUILDS"');
     expect(starterUiSource).toContain("selectedEditorMoveset");

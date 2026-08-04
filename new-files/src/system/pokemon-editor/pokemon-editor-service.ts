@@ -20,6 +20,7 @@ import {
   type PokemonEditorDraft,
   PokemonEditorMode,
   type PokemonEditorMoveCategoryFilter,
+  type PokemonEditorMoveEffectFilter,
   type PokemonEditorMoveSort,
   type SavedPokemonBuild,
   type SelectedStarterEditorData,
@@ -35,7 +36,9 @@ export interface ImplementedMoveQuery {
   initial?: string | undefined;
   type?: number | undefined;
   category?: PokemonEditorMoveCategoryFilter | undefined;
+  effect?: PokemonEditorMoveEffectFilter | undefined;
   sort?: PokemonEditorMoveSort | undefined;
+  included?: readonly MoveId[] | undefined;
   excluded?: readonly MoveId[] | undefined;
 }
 
@@ -54,6 +57,7 @@ export interface PokemonEditorMoveMetadata {
   priority: number;
   target: number;
   effect: string;
+  effects: readonly PokemonEditorMoveEffectFilter[];
 }
 
 type EditorStarter = Starter & { editorData?: SelectedStarterEditorData | undefined };
@@ -167,6 +171,50 @@ export function normalizePokemonEditorMoves(value: unknown): StarterMoveset | nu
 
 let implementedMoveMetadataCache: readonly PokemonEditorMoveMetadata[] | undefined;
 
+function getMoveEffectFilters(move: (typeof allMoves)[number]): PokemonEditorMoveEffectFilter[] {
+  const effects: PokemonEditorMoveEffectFilter[] = [];
+  const add = (effect: PokemonEditorMoveEffectFilter, applies: boolean) => {
+    if (applies) {
+      effects.push(effect);
+    }
+  };
+  const statChanges = move.getAttrs("StatStageChangeAttr");
+
+  // These classifications come from registry fields, move subclasses, and
+  // attributes. A move can intentionally appear in more than one group.
+  add("direct-damage", move.category !== MoveCategory.STATUS);
+  add("healing", move.hasAttr("HealAttr"));
+  add("hp-drain", move.hasAttr("HitHealAttr"));
+  add("recoil", move.hasAttr("RecoilAttr"));
+  add("priority", move.priority > 0);
+  add("multi-hit", move.hasAttr("MultiHitAttr"));
+  add("high-critical-hit-rate", move.hasAttr("HighCritAttr") || move.hasAttr("CritOnlyAttr"));
+  add("always-hits", move.accuracy === -1);
+  add("fixed-damage", move.hasAttr("FixedDamageAttr"));
+  add("one-hit-ko", move.hasAttr("OneHitKOAttr"));
+  add("inflicts-status", move.hasAttr("StatusEffectAttr") || move.hasAttr("StatusIfBoostedAttr"));
+  add(
+    "raises-user-stats",
+    statChanges.some(attr => attr.selfTarget && attr.stages > 0)
+      || move.hasAttr("AcupressureStatStageChangeAttr")
+      || move.hasAttr("OrderUpStatBoostAttr")
+      || move.hasAttr("PostVictoryStatStageChangeAttr"),
+  );
+  add(
+    "lowers-target-stats",
+    statChanges.some(attr => !attr.selfTarget && attr.stages < 0),
+  );
+  add("protection", move.hasAttr("ProtectAttr"));
+  add("weather", move.hasAttr("WeatherChangeAttr") || move.hasAttr("ClearWeatherAttr"));
+  add("terrain", move.hasAttr("TerrainChangeAttr") || move.hasAttr("ClearTerrainAttr"));
+  add("entry-hazards", move.hasAttr("AddArenaTrapTagAttr") || move.hasAttr("AddArenaTrapTagHitAttr"));
+  add("switching-or-pivoting", move.hasAttr("ForceSwitchOutAttr") || move.hasAttr("PartingShotAttr"));
+  add("trapping", move.hasAttr("TrapAttr") || move.hasAttr("JawLockAttr"));
+  add("charge-move", move.isChargingMove());
+  add("recharge-move", move.hasAttr("RechargeAttr"));
+  return effects;
+}
+
 function getImplementedMoveMetadataCache(): readonly PokemonEditorMoveMetadata[] {
   implementedMoveMetadataCache ??= allMoves
     .filter(move => isImplementedPokemonEditorMove(move?.id))
@@ -197,6 +245,7 @@ function getImplementedMoveMetadataCache(): readonly PokemonEditorMoveMetadata[]
         priority: move.priority,
         target: move.moveTarget,
         effect: move.effect,
+        effects: getMoveEffectFilters(move),
       };
     });
   return implementedMoveMetadataCache;
@@ -205,9 +254,13 @@ function getImplementedMoveMetadataCache(): readonly PokemonEditorMoveMetadata[]
 export function getImplementedPokemonEditorMoves(query: ImplementedMoveQuery = {}) {
   const search = query.search?.trim().toLocaleLowerCase() ?? "";
   const initial = query.initial?.trim().toLocaleUpperCase() ?? "";
+  const included = query.included ? new Set(query.included) : undefined;
   const excluded = new Set(query.excluded ?? []);
   const category = query.category ?? "all";
   const result = getImplementedMoveMetadataCache().filter(move => {
+    if (included && !included.has(move.id)) {
+      return false;
+    }
     if (excluded.has(move.id)) {
       return false;
     }
@@ -218,6 +271,9 @@ export function getImplementedPokemonEditorMoves(query: ImplementedMoveQuery = {
       return false;
     }
     if (query.type !== undefined && move.type !== query.type) {
+      return false;
+    }
+    if (query.effect !== undefined && !move.effects.includes(query.effect)) {
       return false;
     }
     return (
