@@ -869,7 +869,14 @@ function attachPhaserGame(game: any): void {
 }
 
 function readInputSnapshot(): unknown {
-  return (globalThis as any).__SILVERSHADOW_INPUT_SNAPSHOT__ ?? "input-unavailable";
+  const global = globalThis as any;
+  const input = global.__SILVERSHADOW_INPUT_SNAPSHOT__;
+  const analog = global.__SILVERSHADOW_ANALOG_SNAPSHOT__;
+  if (!input && !analog) return "input-unavailable";
+  return {
+    ...(input && typeof input === "object" ? input : { lifecycle: input ?? "unavailable" }),
+    analog: analog ?? "not-used",
+  };
 }
 
 export function readGraphicsSnapshot(): unknown {

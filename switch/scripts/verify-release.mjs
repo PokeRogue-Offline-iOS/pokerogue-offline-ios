@@ -120,6 +120,7 @@ for (const file of manifest.requiredFiles) {
 
 const entryPath = safeGamePath(manifest.compiledEntryPoint);
 const entry = await readFile(entryPath, "utf8");
+const runtimeEntry = await readFile(path.join(switchRoot, "romfs", "main.js"), "utf8");
 if (
   entry.length < 1_000_000 ||
   !entry.includes("__SILVERSHADOW_WEB_BOOTSTRAP_STARTED__") ||
@@ -145,9 +146,21 @@ for (const marker of [
   "startup-progress",
   "Preparing game...",
   "Building game world...",
+  "run-seed:reserved",
+  "new-run-selection",
+  "audio/bgm/menu.mp3",
 ]) {
   if (!entry.includes(marker)) {
     throw new Error(`Compiled Switch entry is missing required stabilization marker: ${marker}`);
+  }
+}
+for (const marker of [
+  "left-and-right-sticks-to-dpad",
+  "Analog navigation edge",
+  "__SILVERSHADOW_ANALOG_SNAPSHOT__",
+]) {
+  if (!runtimeEntry.includes(marker)) {
+    throw new Error(`Compiled nx.js runtime entry is missing required controller marker: ${marker}`);
   }
 }
 if (!/rerollCostText[^;]{0,160}Number\.isFinite\([^)]*\.rerollCost\)/.test(entry)) {

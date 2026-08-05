@@ -22,6 +22,7 @@ const attemptCapturePhasePath = path.join("pokerogue-src", "src", "phases", "att
 const encounterPhasePath = path.join("pokerogue-src", "src", "phases", "encounter-phase.ts");
 const partyHealPhasePath = path.join("pokerogue-src", "src", "phases", "party-heal-phase.ts");
 const selectModifierPhasePath = path.join("pokerogue-src", "src", "phases", "select-modifier-phase.ts");
+const selectStarterPhasePath = path.join("pokerogue-src", "src", "phases", "select-starter-phase.ts");
 const switchBiomePhasePath = path.join("pokerogue-src", "src", "phases", "switch-biome-phase.ts");
 const modifierSelectUiPath = path.join("pokerogue-src", "src", "ui", "handlers", "modifier-select-ui-handler.ts");
 const titlePath = path.join("pokerogue-src", "src", "ui", "handlers", "title-ui-handler.ts");
@@ -401,6 +402,13 @@ if (!ui.includes(uiUpdateGuardReplacement)) {
 write(uiPath, ui);
 
 let loadingScene = read(loadingScenePath);
+const loadingCachedUrlImportAnchor = `import { hasAllLocalizedSprites, localPing } from "#utils/common";`;
+const loadingCachedUrlImportReplacement = `${loadingCachedUrlImportAnchor}
+import { getCachedUrl } from "#utils/fetch-utils";`;
+if (!loadingScene.includes(loadingCachedUrlImportReplacement)) {
+  if (!loadingScene.includes(loadingCachedUrlImportAnchor)) fail("Could not find LoadingScene cached URL import anchor");
+  loadingScene = loadingScene.replace(loadingCachedUrlImportAnchor, loadingCachedUrlImportReplacement);
+}
 const loadingProgressApiAnchor = `  readonly LOAD_EVENTS = Phaser.Loader.Events;
 
   constructor() {
@@ -465,6 +473,23 @@ if (!loadingScene.includes(loadingPreloadReplacement)) {
     fail("Could not find the LoadingScene preload diagnostic anchor");
   }
   loadingScene = loadingScene.replace(loadingPreloadAnchor, loadingPreloadReplacement);
+}
+
+const loadingMenuBgmAnchor = `    this.loadLoadingScreen();
+
+    initializeGame();`;
+const loadingMenuBgmReplacement = `    // Decode the starter-select BGM while the truthful startup indicator is
+    // still visible. On nx.js this 91-second track blocks the JS thread for
+    // several seconds; loading it on Starter Select made a short first D-pad
+    // tap disappear while Phaser could not poll the controller.
+    this.load.audio("menu", getCachedUrl("audio/bgm/menu.mp3"));
+
+    this.loadLoadingScreen();
+
+    initializeGame();`;
+if (!loadingScene.includes(loadingMenuBgmReplacement)) {
+  if (!loadingScene.includes(loadingMenuBgmAnchor)) fail("Could not find LoadingScene menu BGM preload anchor");
+  loadingScene = loadingScene.replace(loadingMenuBgmAnchor, loadingMenuBgmReplacement);
 }
 
 const loadingCreateAnchor = `  async create() {
@@ -579,6 +604,83 @@ if (!loadingScene.includes(loadingLaunchReplacement)) {
 write(loadingScenePath, loadingScene);
 
 let battleScene = read(battleScenePath);
+const freshRunSeedMethodAnchor = `  setSeed(seed: string): void {
+    this.seed = seed;`;
+const freshRunSeedMethodReplacement = `  /** Create a fresh non-daily run seed that survives deterministic Math.random startup. */
+  refreshFreshRunSeed(reason: string): string {
+    if (activeOverrides.SEED_OVERRIDE) {
+      this.setSeed(activeOverrides.SEED_OVERRIDE);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("run-seed:reserved", {
+        reason,
+        source: "override",
+        seed: this.seed,
+      }, true);
+      return this.seed;
+    }
+
+    const global = globalThis as any;
+    const storageKey = "silvershadowSwitchRunSeedNonce";
+    let persistedNonce = 0;
+    let persisted = false;
+    try {
+      persistedNonce = Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0;
+      persistedNonce = (persistedNonce + 1) % 2176782336; // 36^6
+      localStorage.setItem(storageKey, String(persistedNonce));
+      persisted = true;
+    } catch {
+      persistedNonce = ((Number(global.__SILVERSHADOW_RUN_SEED_NONCE__) || 0) + 1) % 2176782336;
+      global.__SILVERSHADOW_RUN_SEED_NONCE__ = persistedNonce;
+    }
+
+    const entropy = new Uint32Array(4);
+    let entropySource = "crypto";
+    try {
+      if (!global.crypto?.getRandomValues) throw new Error("crypto.getRandomValues unavailable");
+      global.crypto.getRandomValues(entropy);
+    } catch {
+      entropySource = "clock+math";
+      const now = Date.now();
+      entropy[0] = now >>> 0;
+      entropy[1] = Math.floor(now / 0x100000000) >>> 0;
+      entropy[2] = Math.floor(performance.now() * 1000) >>> 0;
+      entropy[3] = Math.floor(Math.random() * 0x100000000) >>> 0;
+    }
+
+    // Timestamp and the crash-safe monotonic nonce are placed first so even a
+    // runtime with identical Math.random state cannot replay a cold-start run.
+    const seed = [
+      Date.now().toString(36),
+      persistedNonce.toString(36).padStart(6, "0"),
+      ...Array.from(entropy, value => value.toString(36).padStart(7, "0")),
+    ].join("").slice(0, 24);
+    this.setSeed(seed);
+    global.__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("run-seed:reserved", {
+      reason,
+      source: persisted ? \`persisted-nonce+\${entropySource}\` : \`process-nonce+\${entropySource}\`,
+      nonce: persistedNonce,
+      seed,
+    }, true);
+    return seed;
+  }
+
+  setSeed(seed: string): void {
+    this.seed = seed;`;
+if (!battleScene.includes(freshRunSeedMethodReplacement)) {
+  if (!battleScene.includes(freshRunSeedMethodAnchor)) fail("Could not find BattleScene seed method anchor");
+  battleScene = battleScene.replace(freshRunSeedMethodAnchor, freshRunSeedMethodReplacement);
+}
+
+const resetRunSeedAnchor = `    this.setSeed(activeOverrides.SEED_OVERRIDE || randomString(24));
+    console.log("Seed:", this.seed);`;
+const resetRunSeedReplacement = `    this.refreshFreshRunSeed("scene-reset");
+    console.log("Seed:", this.seed);`;
+if (!battleScene.includes(resetRunSeedReplacement)) {
+  if (!battleScene.includes(resetRunSeedAnchor)) fail("Could not find BattleScene reset seed anchor");
+  battleScene = battleScene.replace(resetRunSeedAnchor, resetRunSeedReplacement);
+}
+if (battleScene.includes("  randomString,\n")) {
+  battleScene = battleScene.replace("  randomString,\n", "");
+}
 const battlePreloadAnchor = `  public async preload(): Promise<void> {
     /**`;
 const battlePreloadReplacement = `  public async preload(): Promise<void> {
@@ -1034,6 +1136,25 @@ if (!battleScene.includes(resetEndReplacement)) {
   battleScene = battleScene.replace(resetEndAnchor, resetEndReplacement);
 }
 write(battleScenePath, battleScene);
+
+let selectStarterPhase = read(selectStarterPhasePath);
+const freshStarterSeedAnchor = `  start() {
+    super.start();
+
+    audioManager.playBgm("menu");`;
+const freshStarterSeedReplacement = `  start() {
+    super.start();
+
+    // A new Classic/Challenge selection is a new run even when it overwrites
+    // a crashed session. Never inherit the previous session's deterministic
+    // encounter/reward sequence.
+    globalScene.refreshFreshRunSeed("new-run-selection");
+    audioManager.playBgm("menu");`;
+if (!selectStarterPhase.includes(freshStarterSeedReplacement)) {
+  if (!selectStarterPhase.includes(freshStarterSeedAnchor)) fail("Could not find SelectStarterPhase seed anchor");
+  selectStarterPhase = selectStarterPhase.replace(freshStarterSeedAnchor, freshStarterSeedReplacement);
+}
+write(selectStarterPhasePath, selectStarterPhase);
 
 let phase = read(phasePath);
 const phaseEndAnchor = `  public end(): void {

@@ -206,6 +206,7 @@ const manifest = {
     "phaser-webgl1-to-nxjs-webgl2",
     "default-framebuffer-scale",
     "nintendo-gamepad-identity",
+    "dual-analog-dpad-navigation",
     "plus-menu-intercept",
     "nxjs-video-capability",
     "nxjs-screen-canvas",

@@ -18,6 +18,7 @@ const liveSettingsPatch = readFileSync(
   "utf8",
 );
 const logger = readFileSync(new URL("../src/logger.ts", import.meta.url), "utf8");
+const domShim = readFileSync(new URL("../src/dom-shim.ts", import.meta.url), "utf8");
 
 test("the Switch runtime keeps a bounded freeze flight recorder and dual watchdogs", () => {
   assert.match(diagnostics, /const FLIGHT_RECORDER_INTERVAL_MS = 10_000;/);
@@ -54,6 +55,15 @@ test("command buttons are edge-triggered while only directions repeat across a U
   assert.match(diagnostics, /input: readInputSnapshot\(\)/);
 });
 
+test("both analog sticks share the hardened D-pad lifecycle with hysteresis", () => {
+  assert.match(domShim, /left-and-right-sticks-to-dpad/);
+  assert.match(domShim, /previous\[index\] \? value > 0\.35 : value >= 0\.55/);
+  assert.match(domShim, /Math\.max\(-leftY, -rightY\)/);
+  assert.match(domShim, /index >= 12 && index <= 15/);
+  assert.match(domShim, /__SILVERSHADOW_ANALOG_SNAPSHOT__/);
+  assert.match(diagnostics, /analog: analog \?\? "not-used"/);
+});
+
 test("live settings cannot retain reload and inactive reroll UI is not refreshed uninitialized", () => {
   assert.match(liveSettingsPatch, /finalRow\.includes\("requireReload"\)/);
   assert.match(liveSettingsPatch, /Number\.isFinite\(handler\.rerollCost\)/);
@@ -75,6 +85,14 @@ test("startup progress reserves completion for a rendered ready frame", () => {
   assert.match(gamePatch, /Phaser\.Core\.Events\.POST_RENDER/);
   assert.match(gamePatch, /this\.scene\.launch\("battle"\)/);
   assert.match(gamePatch, /percent >= this\.switchLastLoggedPercent \+ 10/);
+});
+
+test("starter selection is responsive and every new run receives fresh Switch entropy", () => {
+  assert.match(gamePatch, /this\.load\.audio\("menu", getCachedUrl\("audio\/bgm\/menu\.mp3"\)\)/);
+  assert.match(gamePatch, /refreshFreshRunSeed\(reason: string\)/);
+  assert.match(gamePatch, /silvershadowSwitchRunSeedNonce/);
+  assert.match(gamePatch, /run-seed:reserved/);
+  assert.match(gamePatch, /refreshFreshRunSeed\("new-run-selection"\)/);
 });
 
 test("nx.js canvas textures bypass the temporary OffscreenCanvas upload path", () => {
