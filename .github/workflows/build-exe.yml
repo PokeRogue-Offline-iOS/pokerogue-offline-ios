@@ -34,6 +34,13 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Read shared SilverShadow version
+        shell: bash
+        run: |
+          VERSION=$(node scripts/read-release-version.js)
+          echo "SILVERSHADOW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SilverShadow version: $VERSION"
+
       - name: Install pnpm
         run: npm install -g pnpm
 
@@ -42,6 +49,15 @@ jobs:
 
       - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "POKEROGUE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "PokeRogue version: $VERSION"
 
       - name: Download full unlocks save file
         shell: bash
@@ -53,14 +69,19 @@ jobs:
         shell: bash
         run: bash scripts/apply-patches.sh exe
 
-      - name: Inject build number into banner
+      - name: Inject shared version and build number into banner
         shell: bash
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i "s/SILVERSHADOW_VERSION_PLACEHOLDER/${SILVERSHADOW_VERSION}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           if [ "${{ inputs.dev }}" = "true" ]; then
             sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           else
             sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
+          if grep -q "PLACEHOLDER" pokerogue-src/src/ui/handlers/title-ui-handler.ts; then
+            echo "::error::An unresolved banner placeholder remains."
+            exit 1
           fi
 
       - name: Install PokeRogue dependencies
@@ -83,10 +104,15 @@ jobs:
       - name: Convert app icon to ICO
         shell: pwsh
         run: |
-          magick ${{ github.workspace }}\docs\appIcon.png `
+          $iconSource = if ('${{ inputs.dev }}' -eq 'true') {
+            '${{ github.workspace }}/configs/android/icon-dev.png'
+          } else {
+            '${{ github.workspace }}/configs/android/icon-main.png'
+          }
+          magick $iconSource `
             -define icon:auto-resize=256,128,64,48,32,16 `
-            ${{ github.workspace }}\docs\appIcon.ico
-          Write-Host "ICO created at ${{ github.workspace }}\docs\appIcon.ico"
+            ${{ github.workspace }}/appIcon.ico
+          Write-Host "ICO created from $iconSource"
 
       - name: Build PokeRogue
         working-directory: pokerogue-src
@@ -104,7 +130,7 @@ jobs:
           cp configs/desktop/electron/main.cjs pokerogue-src/main.cjs
           cp configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
           cp configs/desktop/electron/electron-builder.windows.json pokerogue-src/electron-builder.json
-          cp docs/appIcon.ico pokerogue-src/appIcon.ico
+          cp appIcon.ico pokerogue-src/appIcon.ico
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
       - name: Inject Google OAuth credentials into main.cjs
@@ -129,38 +155,31 @@ jobs:
             if (!pkg.description) pkg.description = 'PokeRogue Offline';
             if (!pkg.author) pkg.author = 'Scooom';
             pkg.main = 'main.cjs';
+            pkg.version = process.env.SILVERSHADOW_VERSION;
             require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           "
-          
-          
-      - name: Get 3 Num Version
-        id: old_ver
-        working-directory: pokerogue-src
-        shell: bash
-        run: |
-          sed -i -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1-\2"/' package.json
-          VERSION=$(jq -r '.version | sub("(?<v>[0-9]+\\.[0-9]+\\.[0-9]+)\\-(?<h>[0-9]+)"; .v + .h)' package.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected Version: '$VERSION'"
 
       - name: Generate Windows EXE
         working-directory: pokerogue-src
+        shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ''
           WIN_CSC_LINK: ''
-        run: pnpm electron-builder --win portable --config electron-builder.json --config.extraMetadata.version=${{ steps.old_ver.outputs.version }}
+        run: pnpm electron-builder --win portable --config electron-builder.json --config.extraMetadata.version=$SILVERSHADOW_VERSION --config.buildVersion=${{ inputs.build_number || github.run_number }}
 
       - name: Rename and save EXE
         id: exe_path
         shell: bash
         run: |
           FILE=$(find -type f -name "PokeRogue*Offline*.exe" | head -n1)
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="./PokeRogueOffline-dev.exe"
+            OUTPUT="./${BASE}-dev.exe"
           else
-            OUTPUT="./PokeRogueOffline.exe"
+            OUTPUT="./${BASE}.exe"
           fi
           mv "$FILE" "$OUTPUT"
           echo "exe=$OUTPUT" >> $GITHUB_OUTPUT

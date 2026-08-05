@@ -1,0 +1,310 @@
+# Full Pokemon Editor
+
+The Full Pokemon Editor is an offline-only, controller/touch-friendly editor
+for selected starters and the active player party. It also provides a
+versioned saved-build library. The implementation deliberately keeps unlocks,
+legitimate starter moves, and normal battle/evolution rules authoritative.
+
+## Enable the feature
+
+Open **Settings → Offline → Team → Pokemon Editor**. The setting updates live.
+
+| Mode | Available behavior |
+| --- | --- |
+| Off | Hides editor/build actions. Existing party Pokemon and saved builds are not rewritten or deleted. A selected starter with an editor draft starts from its preserved legitimate setup. |
+| Use Saved Builds | Loads saved builds on the starter screen or between battles. Build creation and management stay read-only. |
+| Full Editor | Adds field editing, unrestricted moves, build creation/management, restore, and undo actions. |
+
+Changing the setting never scans or sanitizes an existing run. A Pokemon that
+already exists in a session keeps its actual serialized level, moves, nature,
+ability override, form, gender, shiny state, IVs, friendship, and Pokerus.
+
+## Editable fields
+
+The editor supports:
+
+- safe permanent/starter-selectable form;
+- level 1–10,000;
+- nature;
+- any implemented ability, including partial implementations;
+- a species-valid gender choice;
+- shiny off or standard/rare/epic shiny variant;
+- all six IVs from 0–31, including max-all and zero-all shortcuts;
+- friendship from 0–255;
+- Pokerus;
+- one to four unique editor-safe moves in an explicit order.
+
+Edits are made in a draft. **Apply Changes** commits the draft; Cancel discards
+it. Active-party apply recalculates stats and EXP, preserves fainted state, and
+otherwise preserves current HP percentage against the new maximum.
+
+## Starter screen and duplicate copies
+
+Open a species' normal action menu. The existing **Manage Moves** action still
+edits only legitimate level/egg moves. Editor modes add **Load Saved Build**;
+Full Editor also adds **Edit Pokemon**, **Manage Any Moves**, **Save Current
+Setup as Build**, **Restore Legitimate Setup**, and **Undo Last Editor
+Changes** when applicable.
+
+The species-grid and selected-team action menus show at most seven rows and
+scroll through any remaining actions. Every editor picker and saved-build list
+uses the same seven-row cap, with visible scroll arrows and controller wrapping.
+Opening one editor page from another safely replaces the current menu; Cancel,
+Back, and Done always return to the documented parent screen.
+
+Editor choice lists such as abilities, natures, forms, genders, move types,
+sort modes, and saved builds are alphabetical. Up/Down advances one row;
+Left/Right advances one visible page without the old 100-row jump. Numeric
+pickers advance by one with Up/Down and by 10 with Left/Right, clamp at their
+valid bounds, and never wrap. IV page jumps stop at 1; **Set All to 0** remains
+the explicit zero-IV shortcut. Returning from a picker or toggling a field
+keeps the cursor on the field that was just changed.
+
+Form rows use the registry's distinct form labels (for example, Urshifu's
+Single Strike Style and Rapid Strike Style) rather than repeating the species
+name. Returning between picker pages resets the visible-row cursor before
+restoring the saved selection, preventing an invalid empty scroll window.
+
+When duplicate starters are enabled:
+
+- editing from a selected team icon targets only that exact copy;
+- editing from the species grid prepares the next copy;
+- every added copy receives a deep copy, so later edits do not cross-mutate;
+- removing a copy removes only its transient edited setup;
+- legitimate starter unlock data and the normal starter moveset are never
+  overwritten by unrestricted moves.
+
+At run construction, custom starter fields are applied once. Evolution, move
+learning, form changes, and normal game mechanics then continue from the
+Pokemon's real state; the saved build is not continuously re-applied.
+The starter detail panel displays the selected/prepared copy's editor ability
+and unrestricted moves instead of filtering that preview back to its unlocked
+level/egg move pool.
+
+## Active party safety
+
+Party actions include **Load Saved Build** in both enabled modes and Full
+Editor actions for editing fields, quick-editing legitimate moves, managing any
+moves, saving a build, and undoing the last runtime editor change. Party action
+windows are also capped at seven visible rows, including their scroll
+indicators and Cancel row.
+
+**Quick Edit Moves** uses the game's Move Relearner pool rather than the
+unrestricted registry. It combines the Pokemon's current moves with the same
+level, relearner, pre-evolution, permitted unlocked egg, and previously used TM
+moves returned by `getLearnableLevelMoves()`. Its browser supports the same
+controller-only filters, sorting, details, and pagination, but cannot select a
+move outside that legitimate pool.
+
+Active-party mutation is permitted only in `SelectModifierPhase`, the normal
+between-battles reward/shop boundary. An attempt from a battle party menu is
+rejected with:
+
+> Editing is unavailable during battle.
+> Finish the battle first.
+
+After a successful apply or undo, the current system and session are saved
+locally.
+
+## Unrestricted move browser
+
+The move browser is generated dynamically from the game's initialized move
+registry. There is no manual name chart. Its discovery screen starts with
+**Browse All Moves**, **Browse by Type**, **Browse by Category**, **Browse by
+Effect**, and **Search by Name**. Browse All works with no text input and is the
+primary discovery path; name search is only an optional shortcut.
+
+Available controls:
+
+- every implemented type filter, including Steel, Fire, Water, Dragon, Fairy,
+  and all other registry types;
+- Physical, Special, Status, or all categories;
+- registry-derived effect filters for Direct Damage, Healing, HP Drain,
+  Recoil, Priority, Multi-Hit, High Critical-Hit Rate, Always Hits, Fixed
+  Damage, One-Hit KO, Inflicts Status, Raises User Stats, Lowers Target Stats,
+  Protection, Weather, Terrain, Entry Hazards, Switching or Pivoting,
+  Trapping, Charge Move, and Recharge Move;
+- optional full-name substring search and controller-only A–Z initials;
+- name A–Z/Z–A, power high/low, accuracy high/low, and PP high/low sorting;
+- combined filters and sorting, matching-result count, clear filters, and
+  complete virtualized browsing without requiring search text;
+- a narrow, type-colored virtualized move-name list that remains readable
+  beside the detail panel;
+- highlighted details with name, type, category, power, accuracy, PP,
+  priority, targeting, and full registry description.
+
+Move names and move-type filter rows use the game's standard type palette
+(Fire red, Water blue, Steel blue-gray, and so on), with white as the safe
+fallback for a typeless/unknown record. Left/Right moves through the complete
+virtualized results by one visible page; text search is still optional.
+
+Status power is shown as `—`; never-miss accuracy is `Always`; variable-power,
+fixed-damage, and one-hit-KO moves are labeled `Variable`, `Fixed`, and `OHKO`.
+The cached normalized metadata excludes `NONE`, placeholder records,
+unimplemented `(N)` moves, malformed entries, and zero-PP records. Partial
+implemented moves remain available.
+
+Effect membership is cached with that metadata and derived from category,
+priority, accuracy, charging subclasses, and registered move attributes. Moves
+with multiple matching attributes appear in multiple effect groups. The
+browser does not parse localized descriptions or guess from move names;
+bespoke effects without a reliable registry class/attribute are intentionally
+left out of that effect group rather than mislabeled.
+
+Controller-only Steel discovery example:
+
+1. Open **Manage Any Moves** and choose a slot or **Add Move**.
+2. Set **Type** to Steel.
+3. Optionally set **Category** to Physical or Special.
+4. Set **Sort** to Power High–Low.
+5. Open **Browse All Moves**, page through every match, and compare each
+   highlighted move's full details.
+6. Choose the move. No move name or external lookup is required.
+
+## Saved builds
+
+Each build has a stable ID independent of its editable name. Duplicate names,
+multiple builds for the same species/form, and duplicate starter copies are
+supported. Full Editor can:
+
+- create with a safe default `Species Build N` name (important on Switch,
+  where a software keyboard may be unavailable);
+- view, rename, duplicate, and delete;
+- mark one preferred build per species/form (preferred builds sort first);
+- explicitly update an existing build from the current setup after
+  confirmation.
+
+The starter screen's **Misc** filter includes **Saved Builds**, with has/does
+not have states, so the grid can be narrowed to every species that owns a
+build. Build creation appears only as the species/party action; the Load list
+no longer repeats a second create-build row. Build rows are alphabetical after
+the preferred build and open their details/actions without leaving a stale
+tooltip over the selection window.
+
+Applying a build warns that it may contain moves the species cannot normally
+learn. Apply copies all data; later Pokemon edits never silently mutate the
+saved build. Source build IDs are retained only to support explicit update
+workflows.
+
+The build library is stored in `SystemSaveData.pokemonBuildLibrary`, included
+in normal local export/import and compressed-save key conversion. Old saves
+initialize an empty library. Load normalization repairs safe field ranges,
+deduplicates moves, regenerates duplicate IDs, removes dangling preferred
+references, and skips only unusable records such as a build with no valid
+moves. One consolidated warning is logged per distinct repair reason.
+
+The version-1 shape is:
+
+- library: `schemaVersion`, `builds[]`, and `preferredBySpeciesForm` (a
+  species/form key to stable build-ID map);
+- build identity: immutable `id`, mutable `name`, `schemaVersion`,
+  `speciesId`, `formIndex`, `createdAt`, `updatedAt`, and optional
+  `lastUsedAt`;
+- optional override fields: `level`, `nature`, `abilityId`, `gender`, `shiny`,
+  `variant`, six `ivs`, `friendship`, `pokerus`, and ordered `moves`.
+
+The editor adds a separate optional `editorData` object only to a transient
+selected `Starter`: custom level, ability, friendship, moves, source build ID,
+and a legitimate-setup snapshot. It does not add editor moves to
+`StarterDataEntry` and therefore cannot falsely unlock an egg/TM/level move.
+Active-run values use the existing `PokemonData` session schema; only the
+optional source build ID is added to serialized `CustomPokemonData`.
+
+Normal **Clear Data** behavior removes the system save and therefore its build
+library. Turning the editor Off is not a reset. Deleting a build removes only
+that library record and any preferred reference; it does not rewrite Pokemon
+already created from it.
+
+## Precedence and normal mechanics
+
+An explicit editor/build value wins for that Pokemon. When a build field is
+absent, the current Pokemon/starter draft is the fallback; global cheats and
+normal generation remain authoritative outside explicit fields. Normal move
+learning, evolution, challenge rules, save loading, and battle processing are
+not patched with continuous enforcement hooks.
+
+Current intentional limits:
+
+- species replacement is not exposed; builds apply to the same species;
+- held items use PokéRogue's modifier system and remain in normal item
+  management, not the Pokemon editor;
+- battle-only, unobtainable, and non-starter-selectable forms are excluded;
+- native Switch text entry may be unavailable, so filtering, browsing, default
+  build names, and all required actions work without a keyboard.
+
+## Manual acceptance scenarios
+
+Use a disposable export and cover at least these cases:
+
+1. Set Full Editor, prepare Caterpie from the species grid, give it Draco
+   Meteor plus Tackle, add two Caterpie copies, edit only the second copy, and
+   confirm each begins the run independently.
+2. Repeat the Steel discovery workflow above using only a controller.
+3. Save two same-name builds for one form, mark one preferred, duplicate it,
+   rename/delete/update only through explicit actions, export/import, and
+   confirm stable independent records.
+4. Toggle Off before starting with an edited selected starter; confirm its
+   preserved legitimate setup is used and the build library remains intact.
+5. Edit an active non-fainted Pokemon between battles and confirm HP percentage
+   is retained. Repeat with a fainted Pokemon and confirm HP remains zero.
+6. Save and quit, reload, evolve or learn a move, and confirm the resulting
+   state persists without the old build being re-applied.
+7. Between battles, use **Quick Edit Moves** and confirm its results contain
+   current and Move Relearner-eligible moves but exclude an unrestricted move
+   the species has never learned.
+8. Attempt an edit from an active battle party menu and confirm the wrapped
+   rejection message stays inside its box and causes zero mutation.
+9. Exercise mouse/touch, keyboard, and controller navigation. On Switch, save
+   and apply a default-named build without invoking text input.
+
+Save and Quit retains the normal cached checkpoint behavior. If a one-turn
+battle reaches the shop before its background cache exists, it now falls back
+to a live session/system snapshot instead of leaving the game on Loading.
+
+## Automated coverage
+
+`test/system/pokemon-editor.test.ts` covers unrestricted species/move pairing,
+move uniqueness, CRUD and duplicate-name behavior, stable preferred
+references, deep-copy isolation, explicit update, normalization of corrupt/old
+data, Off-mode legitimate starter restoration, and registry discovery/filter/
+sort behavior including the controller-first Steel workflow, registry-derived
+effect groups, and restricted legitimate move pools.
+
+Implementation validation:
+
+| Check | Result |
+| --- | --- |
+| Pokemon editor Vitest suite | Passed: 16/16 |
+| Automated Draco Caterpie build → session Pokemon serialization → Off-mode reload | Passed |
+| JavaScript syntax and idempotent direct editor-patch reapplication | Passed |
+| Clean shared `all` patch application | Passed |
+| Clean `mobile` patch application | Passed |
+| Clean `android` patch application | Passed |
+| Clean `switch` patch application | Passed |
+| Generated-source TypeScript check after the Switch overlay | Passed |
+| Biome error-level check for editor source and tests | Passed |
+| Production app-mode Vite build after the Switch overlay | Passed |
+| Repository `git diff --check` | Passed |
+
+The clean shared TypeScript check uses the same temporary validation-only
+Capgo declaration and empty asset-submodule masterlist shape described by the
+existing advanced-cheat handoff. Neither stub is part of this change. The
+Switch overlay removes Google Drive and passes without the Capgo declaration.
+
+Native Android APK, Apple packages, and a Switch NRO are not built as part of
+this feature validation. Source patches and shared web output cover those
+platform layers; real-device navigation remains a manual boundary.
+
+## Files changed
+
+- `patches/all/node/pokemon-editor.js`: idempotent generated-source installer
+  and integration anchors;
+- `new-files/src/system/pokemon-editor/`: types, validation/build service, and
+  native option-menu UI;
+- `new-files/test/system/pokemon-editor.test.ts`: focused unit/persistence
+  coverage;
+- `scripts/apply-patches.sh` and
+  `patches/all/node/organize-cheat-settings.js`: shared patch order and Team
+  settings placement;
+- `docs/POKEMON_EDITOR.md`, `docs/ADVANCED_CHEATS.md`, and `README.md`:
+  behavior, access, migration, validation, and repository documentation.

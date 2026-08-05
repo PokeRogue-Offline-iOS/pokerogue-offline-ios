@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const diagnostics = readFileSync(new URL("../src/diagnostics.ts", import.meta.url), "utf8");
+const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
+const nxjsConfig = readFileSync(new URL("../nxjs.ini", import.meta.url), "utf8");
+const gamePatch = readFileSync(
+  new URL("../../patches/switch/node/nxjs-bootstrap.js", import.meta.url),
+  "utf8",
+);
+
+test("the Switch runtime keeps a bounded freeze flight recorder and dual watchdogs", () => {
+  assert.match(diagnostics, /const FLIGHT_RECORDER_INTERVAL_MS = 10_000;/);
+  assert.match(diagnostics, /const FRAME_WATCHDOG_INTERVAL_MS = 2_000;/);
+  assert.match(diagnostics, /Event loop watchdog resumed after a stall/);
+  assert.match(diagnostics, /Phaser frame watchdog detected a stall/);
+  assert.match(diagnostics, /Freeze flight recorder/);
+  assert.match(diagnostics, /frameWindow = createFrameWindow\(\);/);
+});
+
+test("pressure-aware GC is exposed and restricted to measured or safe boundaries", () => {
+  assert.match(nxjsConfig, /\[v8\][\s\S]*flags\s*=\s*--expose-gc/);
+  assert.match(diagnostics, /const MAINTENANCE_COOLDOWN_MS = 15_000;/);
+  assert.match(diagnostics, /memoryPressureReasons\(before\)/);
+  assert.match(diagnostics, /requestMemoryMaintenance\("loader-complete"/);
+  assert.match(diagnostics, /maintenance: requestMemoryMaintenance/);
+  assert.match(gamePatch, /maintenance\?\.\("biome-assets-cleared"[\s\S]*true\);/);
+});
+
+test("Plus remains routed to game input while diagnostics only observe the request", () => {
+  assert.match(main, /addEventListener\("beforeunload", event => \{/);
+  assert.match(main, /event\.preventDefault\(\);/);
+  assert.match(main, /captureMemorySnapshot\("plus-button-exit-request"\);/);
+  assert.doesNotMatch(main, /Switch\.exit\(\)/);
+});

@@ -7,6 +7,7 @@ const styles = readFileSync("index.css", "utf8");
 const uiInputs = readFileSync("src/ui-inputs.ts", "utf8");
 const settings = readFileSync("src/system/settings/settings.ts", "utf8");
 const gameData = readFileSync("src/system/game-data.ts", "utf8");
+const moveControls = readFileSync("src/ui/settings/move-touch-controls-handler.ts", "utf8");
 
 describe("System - Touch controls - visual integration contract", () => {
   it("keeps geometry stationary and never measures transformed artwork", () => {
@@ -168,6 +169,34 @@ describe("System - Touch controls - visual integration contract", () => {
     expect(gameData).toContain("this.loadSettings()");
     expect(gameData).toContain("public saveSetting(setting: string, valueIndex: number)");
     expect(runtime).toContain("isEnabled: () => globalScene.enableVibration");
+  });
+
+  it("offers Fade, Always Appear, and Disabled without changing the default", () => {
+    expect(settings).toContain('value: "Auto",\n    label: "Fade"');
+    expect(settings).toContain('value: "Always",\n    label: "Always Appear"');
+    expect(settings).toContain('touchControls.classList.toggle("always-visible", visibilityMode === "Always")');
+    expect(runtime).toContain('touchControls.classList.contains("always-visible")');
+    expect(gameData).toContain("Migrate the former Auto/Disabled indexes");
+  });
+
+  it("resizes the five existing groups and persists scales per orientation", () => {
+    expect(moveControls).toContain('TOUCH_CONTROL_SCALES_LANDSCAPE = "touchControlScalesLandscape"');
+    expect(moveControls).toContain('TOUCH_CONTROL_SCALES_PORTRAIT = "touchControlScalesPortrait"');
+    expect(moveControls).toContain("MIN_CONTROL_SCALE = 0.6");
+    expect(moveControls).toContain("MAX_CONTROL_SCALE = 1.8");
+    expect(moveControls).toContain("this.createResizeHandles(this.getControlGroupElements())");
+    expect(moveControls).toContain('controlGroup.style.setProperty("--ss-control-scale"');
+    expect(styles).toContain("transform: scale(var(--ss-control-scale, 1))");
+    expect(styles).toContain(".ss-touch-resize-handle");
+    for (const id of [
+      "control-group-dpad",
+      "control-group-action",
+      "control-group-cancel",
+      "control-group-extra-1",
+      "control-group-extra-2",
+    ]) {
+      expect(markup).toContain(`id="${id}"`);
+    }
   });
 
   it("retains active indication with reduced motion", () => {

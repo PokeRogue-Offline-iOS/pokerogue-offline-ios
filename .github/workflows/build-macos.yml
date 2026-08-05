@@ -38,11 +38,25 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Read shared SilverShadow version
+        run: |
+          VERSION=$(node scripts/read-release-version.js)
+          echo "SILVERSHADOW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SilverShadow version: $VERSION"
+
       - name: Install pnpm
         run: npm install -g pnpm
 
       - name: Clone PokeRogue fork
         run: git clone --recurse-submodules --depth 1 --branch ${{ inputs.branch || 'main' }} https://github.com/pagefaultgames/pokerogue.git pokerogue-src
+
+      - name: Get PokeRogue version
+        id: pokerogue_version
+        run: |
+          VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "POKEROGUE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "PokeRogue version: $VERSION"
 
       - name: Download full unlocks save file
         run: |
@@ -52,13 +66,18 @@ jobs:
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh macos
 
-      - name: Inject build number into banner
+      - name: Inject shared version and build number into banner
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i '' "s/SILVERSHADOW_VERSION_PLACEHOLDER/${SILVERSHADOW_VERSION}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           if [ "${{ inputs.dev }}" = "true" ]; then
             sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           else
             sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
+          if grep -q "PLACEHOLDER" pokerogue-src/src/ui/handlers/title-ui-handler.ts; then
+            echo "::error::An unresolved banner placeholder remains."
+            exit 1
           fi
 
       - name: Install PokeRogue dependencies
@@ -92,7 +111,11 @@ jobs:
         run: |
           ICONSET="${{ github.workspace }}/appIcon.iconset"
           mkdir -p "$ICONSET"
-          SRC="${{ github.workspace }}/docs/appIcon.png"
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            SRC="${{ github.workspace }}/configs/android/icon-dev.png"
+          else
+            SRC="${{ github.workspace }}/configs/android/icon-main.png"
+          fi
 
           sips -z 16 16     "$SRC" --out "$ICONSET/icon_16x16.png"
           sips -z 32 32     "$SRC" --out "$ICONSET/icon_16x16@2x.png"
@@ -105,15 +128,15 @@ jobs:
           sips -z 512 512   "$SRC" --out "$ICONSET/icon_512x512.png"
           sips -z 1024 1024 "$SRC" --out "$ICONSET/icon_512x512@2x.png"
 
-          iconutil -c icns "$ICONSET" -o "${{ github.workspace }}/docs/appIcon.icns"
-          echo "ICNS created at ${{ github.workspace }}/docs/appIcon.icns"
+          iconutil -c icns "$ICONSET" -o "${{ github.workspace }}/appIcon.icns"
+          echo "ICNS created from $SRC"
 
       - name: Copy Electron config files into place
         run: |
           cp ${{ github.workspace }}/configs/desktop/electron/main.cjs pokerogue-src/main.cjs
           cp ${{ github.workspace }}/configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
           cp ${{ github.workspace }}/configs/desktop/electron/electron-builder.macos.json pokerogue-src/electron-builder.json
-          cp ${{ github.workspace }}/docs/appIcon.icns pokerogue-src/appIcon.icns
+          cp ${{ github.workspace }}/appIcon.icns pokerogue-src/appIcon.icns
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
       - name: Inject Google OAuth credentials into main.cjs
@@ -136,34 +159,27 @@ jobs:
             if (!pkg.description) pkg.description = 'PokeRogue Offline';
             if (!pkg.author) pkg.author = 'Scooom';
             pkg.main = 'main.cjs';
+            pkg.version = process.env.SILVERSHADOW_VERSION;
             require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           "
-
-      - name: Get 3 Num Version
-        id: old_ver
-        working-directory: pokerogue-src
-        shell: bash
-        run: |
-          sed -i '' -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1-\2"/' package.json
-          VERSION=$(jq -r '.version | sub("(?<v>[0-9]+\\.[0-9]+\\.[0-9]+)\\-(?<h>[0-9]+)"; .v + .h)' package.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected Version: '$VERSION'"
 
       - name: Generate macOS DMG
         working-directory: pokerogue-src
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm electron-builder --mac dmg --${{ matrix.arch }} --config electron-builder.json --config.extraMetadata.version=${{ steps.old_ver.outputs.version }}
+        run: pnpm electron-builder --mac dmg --${{ matrix.arch }} --config electron-builder.json --config.extraMetadata.version=$SILVERSHADOW_VERSION --config.buildVersion=${{ inputs.build_number || github.run_number }}
 
       - name: Rename and save DMG
         id: dmg_path
         run: |
           FILE=$(find . -type f -name "*.dmg" | head -n1)
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="./PokeRogueOffline-dev-${{ matrix.arch }}.dmg"
+            OUTPUT="./${BASE}-dev-${{ matrix.arch }}.dmg"
           else
-            OUTPUT="./PokeRogueOffline-${{ matrix.arch }}.dmg"
+            OUTPUT="./${BASE}-${{ matrix.arch }}.dmg"
           fi
           mv "$FILE" "$OUTPUT"
           echo "dmg=$OUTPUT" >> $GITHUB_OUTPUT

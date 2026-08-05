@@ -95,7 +95,7 @@ following:
 | Only the bottom-left of the logical game is visible | Scale default-framebuffer viewport/scissor calls from 1920x1080 to 1280x720 while preserving offscreen targets | `6e9118f` |
 | Text is fragmented because nx.js reports zero ascent/descent metrics | Return width-only fallback metrics so Phaser uses its pixel scan | `fd3ad56` |
 | A/B use Xbox semantics | Present the controller identity that selects PokéRogue's Pro Controller profile | `fd3ad56` |
-| Plus immediately exits instead of reaching the game menu | Cancel the nx.js default exit request so the game can receive Plus; still unstable in one later hardware case | `fd3ad56` |
+| Plus immediately exits instead of reaching the game menu | Cancel the nx.js default exit request so the game can receive Plus | `fd3ad56` |
 | `Invalid BitmapText key: item-count` stalls reward/session loading | Add the XML DOM subset Phaser needs to parse the bitmap-font metadata | `77ba54b` |
 
 The branch also adds reproducible pinned builds, exact caches, offline asset
@@ -105,19 +105,25 @@ iteration workflow.
 
 ## Known Alpha bugs
 
-### Native crash after Plus
+### Native crash with inconclusive trigger
 
-Plus worked in earlier screens, but pressing it during a later rival battle
-produced a Switch software crash. The final JavaScript log line was:
+An earlier crash happened after Plus was pressed during a later rival battle.
+The final JavaScript log line was:
 
 ```text
 2026-07-29T21:57:08.121Z [INFO] Intercepted Plus-button exit request for game input
 ```
 
-There was no JavaScript exception or rejection after that line. The current
-evidence cannot distinguish an nx.js Plus/exit conflict from native memory
-pressure after an expensive in-process reload. Plus must be considered unsafe
-until memory snapshots and native-boundary diagnostics are added.
+There was no JavaScript exception or rejection after that line. A follow-up
+August 2 capture also ended after the Plus interception, but the game had
+already appeared frozen to the player. Its final snapshot still had about
+640 MiB of native memory free, used 220.75 MiB of the 512 MiB V8 heap, retained
+one native context and no detached contexts, and reported a healthy WebGL
+context. The Atmosphere report was an instruction abort in `hbloader`, not an
+in-app JavaScript out-of-memory error. These captures therefore prove neither
+Plus nor memory exhaustion as the cause. Plus remains mapped to the in-game
+input and is not disabled or repurposed; further diagnosis needs a reproduction
+whose log continues through the first visible freeze.
 
 ### Battle animations use missing textures
 
@@ -147,6 +153,29 @@ The next build caps the nx.js/Skia GPU resource cache at 256 MiB instead of the
 Phaser has populated its cache, and destroys a non-fading previous BGM before
 the replacement starts decoding. These are evidence-driven mitigations, not
 yet hardware verification of long-session stability.
+
+The August 5 diagnostic build also enables nx.js's supported `--expose-gc`
+configuration and adds pressure-aware maintenance. A full collection can run
+after a completed loader batch or critical phase when V8/external/native
+measurements cross conservative thresholds. Clearing an old biome requests one
+collection after its textures and animations have been detached. A 15-second
+cooldown prevents collection loops; nothing collects once per frame. Every
+maintenance entry records its reason, duration, before/after memory and the
+amount actually reclaimed, so hardware results can show whether it helped.
+
+Freeze diagnosis is now split into three signals:
+
+- a compact flight-recorder sample every 10 seconds with the active phase,
+  checkpoint, frame gaps, audio-cache size, memory and WebGL health;
+- a two-second frame watchdog that reports when the JS event loop remains alive
+  but Phaser stops stepping and rendering for four seconds; and
+- an event-loop delay report emitted on recovery when JavaScript itself was
+  blocked for four seconds or longer.
+
+If the process aborts without recovering, the flight recorder narrows the
+unknown interval to at most ten seconds. A native watchdog cannot safely write
+from outside nx.js's JavaScript runtime, so a hard native abort can still end
+without a final JavaScript entry.
 
 ### Slow black-screen startup and reload
 
@@ -208,15 +237,19 @@ Recommended order:
 
 1. Re-run the August 2 route through the first rival battle and continue across
    multiple biome/BGM transitions. Confirm each loader batch reports released
-   response bodies, non-fading BGM destruction precedes the next load, and the
-   post-collection native/external baseline does not trend upward each wave.
+   response bodies, non-fading BGM destruction precedes the next load, and each
+   `Switch memory maintenance` entry reports whether GC ran and reclaimed
+   external/native memory.
 2. Stress normal rewards and moderate rerolls separately; confirm the reroll
    guard can recover after pressure drops and does not block the first reroll
    at the former 2250 MiB threshold.
 3. Add Phaser loader-error logging and wait for required animation texture
    keys before playback.
-4. Reproduce the rival-battle Plus failure without first enabling all cheats
-   to separate input handling from memory pressure.
+4. Reproduce the long-session freeze while preserving logs from before the
+   first visible stall through the native failure. Preserve the final `Freeze
+   flight recorder`, frame-watchdog, event-loop-watchdog and maintenance lines,
+   and record any input only as timeline context rather than assuming it was the
+   trigger.
 5. Add an early loading indicator without touching the WebGL-owned fatal
    screen.
 6. Replace keyboard/Xbox prompt artwork with Switch-specific prompts.

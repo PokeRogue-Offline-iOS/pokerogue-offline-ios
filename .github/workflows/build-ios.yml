@@ -38,6 +38,14 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Read shared SilverShadow version
+        id: silver_version
+        run: |
+          VERSION=$(node scripts/read-release-version.js)
+          echo "SILVERSHADOW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "SilverShadow version: $VERSION"
+
       - name: Install pnpm
         run: npm install -g pnpm
 
@@ -67,14 +75,19 @@ jobs:
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh mobile
 
-      - name: Inject build number into banner
+      - name: Inject shared version and build number into banner
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i '' "s/SILVERSHADOW_VERSION_PLACEHOLDER/${SILVERSHADOW_VERSION}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           if [ "${{ inputs.dev }}" = "true" ]; then
             sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
             sed -i '' "s/Unofficial Offline Client (Scooom)/Unofficial Offline Client (Scooom) Dev/" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           else
             sed -i '' "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
+          if grep -q "PLACEHOLDER" pokerogue-src/src/ui/handlers/title-ui-handler.ts; then
+            echo "::error::An unresolved banner placeholder remains."
+            exit 1
           fi
 
       - name: Configure Google Drive OAuth
@@ -154,8 +167,8 @@ jobs:
         working-directory: pokerogue-src
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.pokerogue_version.outputs.version }}.${BUILD_NUM}" ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.pokerogue_version.outputs.version }}.${BUILD_NUM}" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $SILVERSHADOW_VERSION" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" ios/App/App/Info.plist
 
       - name: Configure iOS app settings
         working-directory: pokerogue-src
@@ -215,9 +228,9 @@ jobs:
       - name: Copy app icon
         run: |
           if [ "${{ inputs.dev }}" = "true" ]; then
-            ICON_SOURCE="docs/appIcon-dev.png"
+            ICON_SOURCE="configs/android/icon-dev.png"
           else
-            ICON_SOURCE="docs/appIcon.png"
+            ICON_SOURCE="configs/android/icon-main.png"
           fi
           ICON_DESTINATION="pokerogue-src/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
           sips --resampleHeightWidth 1024 1024 "$ICON_SOURCE" --out "$ICON_DESTINATION"
@@ -239,10 +252,13 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r "build/App.app" Payload/
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          POKEROGUE_VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            IPA_NAME="PokeRogueOffline-dev.ipa"
+            IPA_NAME="${BASE}-dev.ipa"
           else
-            IPA_NAME="PokeRogueOffline.ipa"
+            IPA_NAME="${BASE}.ipa"
           fi
           zip -r "$IPA_NAME" Payload
           rm -rf Payload
@@ -254,7 +270,7 @@ jobs:
 
 #      - name: Update AltStore source
 #        env:
-#          APP_VERSION: ${{ steps.pokerogue_version.outputs.version }}
+#          APP_VERSION: ${{ steps.silver_version.outputs.version }}
 #          BUILD_NUMBER: ${{ github.run_number }}
 #          IPA_SIZE: ${{ steps.ipa_size.outputs.size }}
 #        run: node scripts/update-altstore-source.js
@@ -264,11 +280,14 @@ jobs:
 #          git config user.name "github-actions[bot]"
 #          git config user.email "github-actions[bot]@users.noreply.github.com"
 #          git add docs/repo.json
-#          git commit -m "Update AltStore source for v${{ steps.pokerogue_version.outputs.version }}"
+#          git commit -m "Update AltStore source for v${{ steps.silver_version.outputs.version }}"
 #          git push
 
       - name: Write version artifact
-        run: echo -n "${{ steps.pokerogue_version.outputs.version }}" > version.txt
+        run: echo -n "${{ steps.silver_version.outputs.version }}" > version.txt
+
+      - name: Write upstream version artifact
+        run: echo -n "${{ steps.pokerogue_version.outputs.version }}" > upstream-version.txt
 
       - name: Upload IPA directly
         uses: actions/upload-artifact@v7
@@ -282,6 +301,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           path: version.txt
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload upstream version metadata directly
+        uses: actions/upload-artifact@v7
+        with:
+          path: upstream-version.txt
           archive: false
           if-no-files-found: error
           retention-days: 30

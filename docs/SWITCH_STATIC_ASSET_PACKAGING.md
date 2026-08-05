@@ -3,7 +3,7 @@
 ## Status
 
 The indexed asset-pack layout and ranged-read compatibility fix have launched
-on the tested Nintendo Switch OLED. The public 1.0.3 package remains Alpha and
+on the tested Nintendo Switch OLED. The public 2.0.0 package remains Alpha and
 needs broader long-session and hardware-configuration testing.
 
 ## Measured input
@@ -28,7 +28,7 @@ The largest logical groups were:
 | `switch-entry.js` | 1 | 8,850,425 |
 | `fonts/` | 7 | 7,235,742 |
 
-The complete old SD-card application layout had 34,116 files. The 1.0.3
+The complete old SD-card application layout had 34,116 files. The 2.0.0
 layout has 15 files and 734,931,641 bytes, including the required license and
 third-party-notice files. It removes filesystem-entry overhead and copy
 latency rather than compressing already-compressed media.

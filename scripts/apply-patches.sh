@@ -23,6 +23,7 @@ apply_patch "app-settings-menu.js"          all
 apply_patch "offline-settings-navigation-fix.js" all
 apply_patch "auto-hide-touch-controls.js" all
 apply_patch "silvershadow-touch-controls.js" all
+apply_patch "touch-control-customization.js" all
 apply_patch "sandbox-economy-settings.js"   all
 apply_patch "sandbox-progression-settings.js" all
 apply_patch "claim-all-rewards.js"          all
@@ -42,6 +43,7 @@ apply_patch "advanced-battle-cheats.js"     all
 apply_patch "advanced-capture-cheats.js"    all
 apply_patch "advanced-progression-cheats.js" all
 apply_patch "candy-jar-cheat.js"            all
+apply_patch "pokemon-editor.js"             all
 apply_patch "organize-cheat-settings.js"    all
 apply_patch "gacha-calendar.js"             all
 apply_patch "community-menu.js"             all

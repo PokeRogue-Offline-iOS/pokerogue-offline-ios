@@ -13,10 +13,9 @@
  * the appVersionText.setText(...) line that patch produces, and relies on
  * the `isApp` import it adds). Must be applied after offline-banner.js.
  *
- * OFFLINE_BUILD_NUMBER reuses the BUILD_NUMBER_PLACEHOLDER token - the
- * existing CI `sed` substitution (global, /g) already replaces every
- * occurrence of this token in the file, so no workflow changes are needed.
- * It's only used here to skip the check on dev/local builds
+ * SILVERSHADOW_VERSION and OFFLINE_BUILD_NUMBER reuse the release/build
+ * tokens that every packaging workflow substitutes in the title handler.
+ * The build token is only used here to skip the check on dev/local builds
  * (OFFLINE_BUILD_NUMBER.includes("DEV")) - the actual "is there an update"
  * decision is version-based, not build-number-based (see update-check-api.ts).
  *
@@ -124,10 +123,10 @@ if (!src.includes(IMPORT_ANCHOR)) {
 const CONSTANTS_BLOCK =
   IMPORT_ANCHOR +
   `\n` +
-  `// update-check: reuses the same build-number token offline-banner.js's\n` +
-  `// placeholder substitutes, so CI's existing global sed replace covers this too.\n` +
-  `// Only used to skip dev/local builds entirely - the update decision itself is\n` +
-  `// version-based (see #system/offline/update-check-api.ts), not build-number-based.\n` +
+  `// update-check: reuses the same release/build tokens offline-banner.js's\n` +
+  `// placeholders substitute, so every platform compares its installed\n` +
+  `// SilverShadow release rather than the independent upstream game version.\n` +
+  `const SILVERSHADOW_VERSION = "SILVERSHADOW_VERSION_PLACEHOLDER";\n` +
   `const OFFLINE_BUILD_NUMBER = "BUILD_NUMBER_PLACEHOLDER";\n` +
   `let hasCheckedForUpdate = false;\n` +
   `\n` +
@@ -157,7 +156,7 @@ const CONSTANTS_BLOCK =
   `  }\n` +
   `\n` +
   `  try {\n` +
-  `    const releases = await checkForUpdates(version);\n` +
+  `    const releases = await checkForUpdates(SILVERSHADOW_VERSION);\n` +
   `    if (releases.length === 0) {\n` +
   `      return;\n` +
   `    }\n` +

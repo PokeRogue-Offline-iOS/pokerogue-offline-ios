@@ -2,16 +2,18 @@ const fs = require('fs');
 const path = require('path');
 
 const version = process.env.APP_VERSION;
+const upstreamVersion = process.env.UPSTREAM_VERSION;
 const buildNumber = process.env.BUILD_NUMBER;
 const date = new Date().toISOString().split('T')[0];
 const ipaSize = parseInt(process.env.IPA_SIZE || '0');
 const tag = `${version}-${buildNumber}`;
 const version2 = `${version}.${buildNumber}`;
 
-const downloadURL = `https://github.com/PokeRogue-Offline/pokerogue-offline/releases/download/v${tag}/PokeRogueOffline.ipa`;
+const artifactBase = `PokeRogueSilverShadow-v${upstreamVersion}-${version}-build${buildNumber}`;
+const downloadURL = `https://github.com/PokeRogue-Offline/pokerogue-offline/releases/download/v${tag}/${artifactBase}.ipa`;
 
-if (!version || !buildNumber) {
-  console.error('Missing APP_VERSION or BUILD_NUMBER');
+if (!version || !upstreamVersion || !buildNumber) {
+  console.error('Missing APP_VERSION, UPSTREAM_VERSION, or BUILD_NUMBER');
   process.exit(1);
 }
 

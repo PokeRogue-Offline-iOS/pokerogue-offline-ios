@@ -238,42 +238,18 @@ encounter requirements also see the expanded compatibility, which is
 consistent with the Pokemon actually being able to learn that TM. Pokedex
 species pages continue to display the legitimate species TM list.
 
-## Deferred: arbitrary starter move editor
+## Full Pokemon Editor and unrestricted moves
 
-The arbitrary starter move editor was not added in this change. It is the one
-request that crosses persistent system-save schema, a large controller/touch
-UI, duplicate-starter editing, and run-start validation. Reusing the existing
-`moveset` field would be unsafe: `setSpeciesDetails()` filters it back to the
-species' legitimate level/egg pool, and `SelectStarterPhase` validates it again
-when creating the run.
+The former arbitrary-starter-move-editor deferral is implemented by the Full
+Pokemon Editor. It keeps legitimate starter moves untouched, stores reusable
+builds in a separate versioned library, supports independent duplicate starter
+copies, and applies custom starter fields once at run creation. Its move
+browser is generated from the live move registry and exposes every safe move
+through controller-friendly browsing, combined filters, sorting, details, and
+pagination; knowing a move name is never required.
 
-The recommended implementation is a separate feature change with this shape:
-
-1. Add a live `Custom Starter Moves` cheat toggle.
-2. Add a separate optional `customMoveset` field to `StarterDataEntry`, its
-   form-indexed equivalent, the compressed system-save key map, defaults, and
-   old-save validation/migration. Never overwrite the legitimate `moveset`.
-3. Add `customMoveset` to the transient selected `Starter` record so duplicate
-   copies can be edited independently during team selection.
-4. Add a distinct `Manage Any Moves` action beside the normal `Manage Moves`
-   action only while the cheat is enabled.
-5. Use a dedicated searchable or type/category-filtered, paged move picker.
-   Passing the complete move registry to the current generic option list would
-   be slow and difficult to use with a controller.
-6. Validate one to four unique, real `MoveId` values and exclude placeholder or
-   unusable internal move records.
-7. At run creation, apply `customMoveset` with validation bypass only when the
-   cheat is currently enabled. When disabled, retain the saved custom data but
-   use and display the untouched legitimate moveset.
-8. Cover species forms, duplicate selected copies, save export/import, old
-   saves without the new key, fresh-start challenges, touch, keyboard, and
-   controller navigation in tests.
-
-The main product choice for that later work is persistence scope. The safest
-default is to persist one custom moveset per species/form, while allowing an
-already-selected duplicate copy to diverge for the current team. Persisting a
-separate permanent moveset for every duplicate slot would require a new
-slot-identity model rather than the existing species-keyed starter save.
+See [Pokemon Editor](POKEMON_EDITOR.md) for settings, saved-build operations,
+runtime semantics, validation rules, manual scenarios, and current limits.
 
 ## Back-to-back manual test plan
 

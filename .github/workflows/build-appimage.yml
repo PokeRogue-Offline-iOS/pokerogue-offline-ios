@@ -38,6 +38,12 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Read shared SilverShadow version
+        run: |
+          VERSION=$(node scripts/read-release-version.js)
+          echo "SILVERSHADOW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SilverShadow version: $VERSION"
+
       - name: Install pnpm
         run: npm install -g pnpm
 
@@ -72,13 +78,18 @@ jobs:
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh appimage
 
-      - name: Inject build number into banner
+      - name: Inject shared version and build number into banner
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          sed -i "s/SILVERSHADOW_VERSION_PLACEHOLDER/${SILVERSHADOW_VERSION}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           if [ "${{ inputs.dev }}" = "true" ]; then
             sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM} DEV/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
           else
             sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUM}/g" pokerogue-src/src/ui/handlers/title-ui-handler.ts
+          fi
+          if grep -q "PLACEHOLDER" pokerogue-src/src/ui/handlers/title-ui-handler.ts; then
+            echo "::error::An unresolved banner placeholder remains."
+            exit 1
           fi
 
       - name: Install PokeRogue dependencies
@@ -113,7 +124,12 @@ jobs:
           cp ${{ github.workspace }}/configs/desktop/electron/main.cjs pokerogue-src/main.cjs
           cp ${{ github.workspace }}/configs/desktop/electron/preload.cjs pokerogue-src/preload.cjs
           cp ${{ github.workspace }}/configs/desktop/electron/electron-builder.appimage.json pokerogue-src/electron-builder.json
-          cp ${{ github.workspace }}/docs/appIcon.png pokerogue-src/appIcon.png
+          if [ "${{ inputs.dev }}" = "true" ]; then
+            ICON_SOURCE="${{ github.workspace }}/configs/android/icon-dev.png"
+          else
+            ICON_SOURCE="${{ github.workspace }}/configs/android/icon-main.png"
+          fi
+          cp "$ICON_SOURCE" pokerogue-src/appIcon.png
           cp pokerogue-src/full_unlocks.prsv pokerogue-src/dist/full_unlocks.prsv
 
       - name: Inject Google OAuth credentials into main.cjs
@@ -136,34 +152,28 @@ jobs:
             if (!pkg.description) pkg.description = 'PokeRogue Offline';
             if (!pkg.author) pkg.author = 'Scooom';
             pkg.main = 'main.cjs';
+            pkg.version = process.env.SILVERSHADOW_VERSION;
             require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
           "
-      - name: Get 3 Num Version
-        id: old_ver
-        working-directory: pokerogue-src
-        shell: bash
-        run: |
-          sed -i -E 's/"version": "([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)"/"version": "\1-\2"/' package.json
-          VERSION=$(jq -r '.version | sub("(?<v>[0-9]+\\.[0-9]+\\.[0-9]+)\\-(?<h>[0-9]+)"; .v + .h)' package.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected Version: '$VERSION'"
-
 
       - name: Generate AppImage
         working-directory: pokerogue-src
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm electron-builder --linux AppImage --config electron-builder.json --config.extraMetadata.version=${{ steps.old_ver.outputs.version }}
+        run: pnpm electron-builder --linux AppImage --config electron-builder.json --config.extraMetadata.version=$SILVERSHADOW_VERSION --config.buildVersion=${{ inputs.build_number || github.run_number }}
 
       - name: Rename and save AppImage
         id: appimage_path
         run: |
           FILE=$(find -type f -name "*.AppImage")
+          BUILD_NUM=${{ inputs.build_number || github.run_number }}
+          POKEROGUE_VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          BASE="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVERSHADOW_VERSION}-build${BUILD_NUM}"
           if [ "${{ inputs.dev }}" = "true" ]; then
-            OUTPUT="./PokeRogueOffline-dev.AppImage"
+            OUTPUT="./${BASE}-dev.AppImage"
           else
-            OUTPUT="./PokeRogueOffline.AppImage"
+            OUTPUT="./${BASE}.AppImage"
           fi
           mv "$FILE" "$OUTPUT"
           echo "AppImage=$OUTPUT" >> $GITHUB_OUTPUT

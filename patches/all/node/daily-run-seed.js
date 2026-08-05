@@ -76,7 +76,7 @@ if (!source.includes(voucherImport)) {
 
 source = source.replace(
   voucherImport,
-  `import { createOfflineDailySeed, getDailyRunSeed } from "#system/offline/daily-run-seed";\n${voucherImport}`,
+  `import { createGeneratedOfflineDailySeed, getDailyRunSeed, getDailyRunSeedStatusText } from "#system/offline/daily-run-seed";\n${voucherImport}`,
 );
 
 // Match the pinned pagefaultgames/pokerogue source text directly. This avoids
@@ -105,7 +105,12 @@ const silverOfflineBranch = `      } else {
             typeof activeOverrides.DAILY_RUN_SEED_OVERRIDE === "string"
               ? activeOverrides.DAILY_RUN_SEED_OVERRIDE
               : JSON.stringify(activeOverrides.DAILY_RUN_SEED_OVERRIDE);
-          generateDaily(seed);
+          globalScene.ui.setMode(UiMode.MESSAGE);
+          globalScene.ui.showText("Using the custom Daily Run seed.", null, null, null, true);
+          globalScene.time.delayedCall(1_200, () => {
+            globalScene.ui.clearText();
+            generateDaily(seed);
+          });
           return;
         }
 
@@ -113,12 +118,16 @@ const silverOfflineBranch = `      } else {
         globalScene.ui.showText("Fetching daily seed...", null, null, null, true);
         getDailyRunSeed()
           .catch(error => {
-            console.warn("Live Daily Run seed unavailable; using the offline seed.", error);
-            return createOfflineDailySeed();
+            console.warn("Daily Run seed feed unavailable; generating today's offline seed.", error);
+            return createGeneratedOfflineDailySeed();
           })
-          .then(seed => {
-            globalScene.ui.clearText();
-            generateDaily(seed);
+          .then(result => {
+            globalScene.ui.showText(getDailyRunSeedStatusText(result.source), null, null, null, true);
+            const statusDuration = result.source === "published-fallback" || result.source === "generated-offline" ? 1_800 : 1_200;
+            globalScene.time.delayedCall(statusDuration, () => {
+              globalScene.ui.clearText();
+              generateDaily(result.seed);
+            });
           });
       }`;
 

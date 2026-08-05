@@ -13,9 +13,9 @@ Before installing an update, export your save data and active session as a preca
 
 The Switch build is an experimental homebrew Alpha. Read the installation and known-issues sections below before using it.
 
-## v1.0.3 Highlights
+## v2.0.0 Highlights
 
-Version 1.0.3 expands the Offline sandbox with starter customization, reward
+Version 2.0.0 expands the Offline sandbox with starter customization, reward
 generation, progression, and battle-debugging options. It also adds the first
 public Nintendo Switch Alpha package, including:
 
@@ -41,7 +41,7 @@ The expanded sandbox includes:
 - **Shiny Rate**, **Always Shiny**, **Rare Eggs**, **Instant Hatch**, and **Form
   Change Items** provide configurable generation and progression shortcuts.
 
-The experimental **Fast Reward UI** option was removed from v1.0.3. Reward
+The experimental **Fast Reward UI** option was removed from v2.0.0. Reward
 claims use the normal game interface and animation flow for stability.
 
 ## Features
@@ -51,13 +51,17 @@ claims use the normal game interface and animation flow for stability.
 - Play without a constant internet connection after the game files are installed.
 - Save data is stored locally on the device.
 - User data and active sessions can be manually imported and exported.
-- The live Daily Run seed is mirrored from PokéRogue's official API by this fork's own workflow and cached by the app.
-  If that feed is unavailable, the game immediately falls back to a deterministic UTC-date seed and remains playable offline.
+- The app first tries PokéRogue's official Daily Run API directly, then this fork's dated seed feed, and finally the
+  deterministic UTC-date seed used by upstream offline mode. A short in-game message identifies which source was used.
 - The app is built from current PokéRogue source with SilverShadow patches applied during the build.
 
-The **Publish Daily Run Seed** workflow requests the seed directly from PokéRogue's official API at 00:15 UTC and
-publishes a dated JSON payload to this fork's own `seed` branch. After enabling Actions on a new fork, run that workflow
-once manually to create the branch immediately; the app does not request another PokéRogue Offline repository or service.
+The **Publish Daily Run Seed** workflow requests the seed from PokéRogue's official API several times during the first
+three UTC hours and publishes a dated JSON payload to this fork's own `seed` branch. To avoid both Cloudflare's command-line
+request block and browser CORS, the workflow adds the official game headers through Chrome DevTools and navigates Chrome
+directly to the first-party API response. It does not use Scooom's server or another offline seed mirror. If the
+official service remains unavailable, it publishes a marked, non-cacheable offline fallback that a later scheduled run
+can replace. After enabling Actions on a new fork, run that workflow once manually to create the branch immediately.
+The app reads this fork's raw `seed` branch URL.
 
 ### SilverShadow Android Branding
 
@@ -172,7 +176,9 @@ All sandbox options:
 Technical behavior, version differences, validation results, and the manual test
 matrix are documented in [Futuba Cheat Analysis](docs/FUTABA_CHEAT_ANALYSIS.md).
 The newer battle, capture, evolution, TM, and multiplier behavior is documented
-in [Advanced Cheats](docs/ADVANCED_CHEATS.md).
+in [Advanced Cheats](docs/ADVANCED_CHEATS.md). The starter and active-party
+editor, saved builds, and unrestricted registry move browser are documented in
+[Pokemon Editor](docs/POKEMON_EDITOR.md).
 
 ## Additional Quality-of-Life Features
 
@@ -191,9 +197,12 @@ Release builds can check GitHub for newer SilverShadow releases when the app lau
 - Update checks fail silently when the device is offline.
 - Development builds skip the release update check.
 
-### Touch-Control Auto Hide
+### Touch-Control Visibility and Layout
 
-Touch controls fade out after two seconds without touch input.
+Touch Controls defaults to Fade, which hides the overlay after two seconds
+without touch input. Always Appear keeps it visible, and Disabled turns it off.
+Move Touch Controls can reposition and resize the D-pad, A, B, C/Start, and
+F/G/R/E/N/V groups, with independent portrait and landscape layouts.
 
 - Touching the screen reveals them again.
 - Keyboard or controller input does not force them to remain visible.
@@ -372,9 +381,14 @@ The fat NRO already contains the nx.js runtime. No separate runtime NRO, NSP for
 
 ### Building the Switch ZIP with GitHub Actions
 
-Run the **Build PokeRogueOffline Switch NRO** workflow manually, or let it run for a matching pull request or push to `main`. The workflow builds the pinned, SilverShadow-patched PokÃ©Rogue source, creates a fat NRO, generates the Homebrew Menu icon from `configs/android/icon-main.png`, builds and verifies the four `.sspack` files, and uploads `SilverShadow-PokeRogue-vX.Y.Z-switch.zip`. The ZIP starts with the `switch/` directory and is ready to extract to an SD-card root.
+Run the **Build PokeRogueOffline Switch NRO** workflow manually, or let it run for a matching pull request or push to `main`. The workflow builds the pinned, SilverShadow-patched PokÃ©Rogue source, creates a fat NRO, generates the Homebrew Menu icon from `configs/android/icon-main.png`, builds and verifies the four `.sspack` files, and uploads `SilverShadow-PokeRogue-v<upstream>-<SilverShadow>-switch.zip`. The ZIP starts with the `switch/` directory and is ready to extract to an SD-card root.
 
-The shared release version comes from `SILVERSHADOW_VERSION` near the top of `.github/workflows/build-android.yml`. Updating that one value controls the Switch manifest, NRO metadata, artifact name, and ZIP filename as well as the Android release version. The workflow rejects an invalid version before beginning the large build.
+The shared release version comes from `configs/release-version.txt`. Updating
+that one file controls Android, iOS, Windows, macOS, Linux AppImage, Switch,
+release tags, native package metadata, title-screen banners, and artifact
+versioning. Every packaged icon is generated from
+`configs/android/icon-main.png`, or `configs/android/icon-dev.png` for supported
+development builds. The workflows reject an invalid version before packaging.
 
 ### Expected Loading Behavior
 

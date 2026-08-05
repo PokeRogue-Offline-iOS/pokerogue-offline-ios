@@ -21,9 +21,6 @@ on:
 permissions:
   contents: read
 
-env:
-  SILVERSHADOW_VERSION: '1.0.3'
-  
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
@@ -59,11 +56,21 @@ jobs:
           version: 10.33.2
           run_install: false
 
+      - name: Read shared SilverShadow version
+        id: silver_version
+        run: |
+          VERSION=$(node scripts/read-release-version.js)
+          echo "SILVERSHADOW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "SilverShadow version: $VERSION"
+
       - name: Get PokeRogue version
         id: pokerogue_version
         run: |
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
+          echo "POKEROGUE_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "PokeRogue version: $VERSION"
 
       - name: Apply patches
         run: |
@@ -84,7 +91,7 @@ jobs:
       - name: Inject SilverShadow version into banner
         run: |
           BUILD_NUM="${{ inputs.build_number || github.run_number }}"
-          SILVER_VERSION="${{ env.SILVERSHADOW_VERSION }}"
+          SILVER_VERSION="$SILVERSHADOW_VERSION"
           BANNER_FILE="pokerogue-src/src/ui/handlers/title-ui-handler.ts"
 
           sed -i \
@@ -435,16 +442,23 @@ jobs:
         working-directory: pokerogue-src/android/app
         run: |
           BUILD_NUM=${{ inputs.build_number || github.run_number }}
-          VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          POKEROGUE_VERSION="${{ steps.pokerogue_version.outputs.version }}"
+          SILVER_VERSION="${{ steps.silver_version.outputs.version }}"
 
-          MAJOR=$(echo "$VERSION" | cut -d. -f1)
-          MINOR=$(echo "$VERSION" | cut -d. -f2)
-          PATCH=$(echo "$VERSION" | cut -d. -f3)
-          HOTFIX=$(echo "$VERSION" | cut -d. -f4)
+          MINOR=$(echo "$POKEROGUE_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$POKEROGUE_VERSION" | cut -d. -f3)
+          HOTFIX=$(echo "$POKEROGUE_VERSION" | cut -d. -f4)
+          HOTFIX=${HOTFIX:-0}
 
+          if [ "$BUILD_NUM" -gt 9999 ]; then
+            echo "::error::Android build number must be at most 9999: $BUILD_NUM"
+            exit 1
+          fi
+
+          # Preserve the established upstream-based code so newer APKs remain
+          # installable over older SilverShadow builds.
           VERSION_CODE=$(( MINOR * 100000000 + PATCH * 1000000 + HOTFIX * 10000 + BUILD_NUM ))
-          SILVER_VERSION="${{ env.SILVERSHADOW_VERSION }}"
-          VERSION_NAME="${VERSION}.${BUILD_NUM}-${SILVER_VERSION}"
+          VERSION_NAME="${POKEROGUE_VERSION}.${BUILD_NUM}-${SILVER_VERSION}"
 
           if [ "${{ inputs.dev }}" = "true" ]; then
             VERSION_NAME="${VERSION_NAME}-dev"
@@ -516,7 +530,7 @@ jobs:
           SOURCE_APK="pokerogue-src/android/app/build/outputs/apk/debug/app-debug.apk"
           BUILD_NUM="${{ inputs.build_number || github.run_number }}"
           POKEROGUE_VERSION="${{ steps.pokerogue_version.outputs.version }}"
-          SILVER_VERSION="${{ env.SILVERSHADOW_VERSION }}"
+          SILVER_VERSION="${{ steps.silver_version.outputs.version }}"
 
           if [ "${{ inputs.dev }}" = "true" ]; then
             OUTPUT="PokeRogueSilverShadow-v${POKEROGUE_VERSION}-${SILVER_VERSION}-build${BUILD_NUM}-dev.apk"

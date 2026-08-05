@@ -68,6 +68,7 @@ const sections = [
       "Offline_Starting_Level",
       "Offline_Unlock_Starter_On_Select",
       "Offline_All_Starters_Pokerus",
+      "Offline_Pokemon_Editor_Mode",
     ],
   },
   {

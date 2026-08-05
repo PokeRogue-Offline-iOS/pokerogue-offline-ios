@@ -162,6 +162,21 @@ if (!uiTypesSource.includes("pageStep?: number;")) {
     "the OptionSelectConfig large-list field",
   );
 }
+if (!uiTypesSource.includes("pageStepMaxIndex?: number;")) {
+  uiTypesSource = replaceRequired(
+    uiTypesSource,
+    `  /** Optional left/right jump size for long native lists. */
+  pageStep?: number;`,
+    `  /** Optional left/right jump size for long native lists. */
+  pageStep?: number;
+  /** Optional inclusive bounds for left/right page jumps. */
+  pageStepMinIndex?: number;
+  pageStepMaxIndex?: number;
+  /** Set false when Up/Down must stop at the list boundaries. */
+  wrapNavigation?: boolean;`,
+    "the OptionSelectConfig page navigation bounds",
+  );
+}
 writeFile(uiTypesPath, uiTypesSource);
 
 const optionSelectPath = path.join("pokerogue-src", "src", "ui", "handlers", "base-option-select-ui-handler.ts");
@@ -214,6 +229,7 @@ if (!optionSelectSource.includes("measureVisibleOptionsOnly ? optionsWithScroll"
     this.optionSelectContainer.setVisible(true);
     this.scrollCursor = 0;
     this.fullCursor = 0;
+    this.cursor = 0;
     const initialCursor = Phaser.Math.Clamp(this.config.initialCursor ?? 0, 0, this.unskippedIndices.length - 1);
     this.setCursor(initialCursor);`,
     "the option select show initialization",
@@ -274,6 +290,74 @@ if (!optionSelectSource.includes("direction * this.config.pageStep")) {
           }
           break;`,
     "the native option picker directional input",
+  );
+}
+if (!optionSelectSource.includes("this.config?.wrapNavigation !== false")) {
+  optionSelectSource = replaceRequired(
+    optionSelectSource,
+    `        case Button.UP:
+          if (this.fullCursor === 0) {
+            success = this.setCursor(this.unskippedIndices.length - 1);
+          } else if (this.fullCursor) {
+            success = this.setCursor(this.fullCursor - 1);
+          }
+          break;
+        case Button.DOWN:
+          if (this.fullCursor < this.unskippedIndices.length - 1) {
+            success = this.setCursor(this.fullCursor + 1);
+          } else {
+            success = this.setCursor(0);
+          }
+          break;`,
+    `        case Button.UP:
+          if (this.fullCursor === 0) {
+            if (this.config?.wrapNavigation !== false) {
+              success = this.setCursor(this.unskippedIndices.length - 1);
+            }
+          } else if (this.fullCursor) {
+            success = this.setCursor(this.fullCursor - 1);
+          }
+          break;
+        case Button.DOWN:
+          if (this.fullCursor < this.unskippedIndices.length - 1) {
+            success = this.setCursor(this.fullCursor + 1);
+          } else if (this.config?.wrapNavigation !== false) {
+            success = this.setCursor(0);
+          }
+          break;`,
+    "the native option picker boundary behavior",
+  );
+}
+if (!optionSelectSource.includes("this.config.pageStepMaxIndex ??")) {
+  optionSelectSource = replaceRequired(
+    optionSelectSource,
+    `                this.fullCursor + direction * this.config.pageStep,
+                0,
+                this.unskippedIndices.length - 1,`,
+    `                this.fullCursor + direction * this.config.pageStep,
+                this.config.pageStepMinIndex ?? 0,
+                this.config.pageStepMaxIndex ?? this.unskippedIndices.length - 1,`,
+    "the native option picker page bounds",
+  );
+}
+if (!optionSelectSource.includes("const pageStepTarget")) {
+  optionSelectSource = replaceRequired(
+    optionSelectSource,
+    `            success = this.setCursor(
+              Phaser.Math.Clamp(
+                this.fullCursor + direction * this.config.pageStep,
+                this.config.pageStepMinIndex ?? 0,
+                this.config.pageStepMaxIndex ?? this.unskippedIndices.length - 1,
+              ),
+            );`,
+    `            const minimum = this.config.pageStepMinIndex ?? 0;
+            const maximum = this.config.pageStepMaxIndex ?? this.unskippedIndices.length - 1;
+            const pageStepTarget =
+              direction < 0 && this.fullCursor < minimum
+                ? this.fullCursor
+                : Phaser.Math.Clamp(this.fullCursor + direction * this.config.pageStep, minimum, maximum);
+            success = this.setCursor(pageStepTarget);`,
+    "the bounded native option picker page target",
   );
 }
 writeFile(optionSelectPath, optionSelectSource);
@@ -518,10 +602,13 @@ if (!offlineSettingsSource.includes("handleCandyJarCountPress")) {
 
     globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
       options,
-      maxOptions: 12,
+      maxOptions: 7,
       initialCursor: Math.min(currentCount, maxPickerCount),
       measureVisibleOptionsOnly: true,
-      pageStep: 100,
+      pageStep: 10,
+      pageStepMinIndex: 0,
+      pageStepMaxIndex: maxPickerCount,
+      wrapNavigation: false,
     });
   }
 
@@ -533,15 +620,19 @@ if (!offlineSettingsSource.includes("handleCandyJarCountPress")) {
     "the Offline clear-data handler",
   );
 }
-if (!offlineSettingsSource.includes("pageStep: 100,")) {
-  offlineSettingsSource = replaceRequired(
-    offlineSettingsSource,
-    `      measureVisibleOptionsOnly: true,
-    });`,
-    `      measureVisibleOptionsOnly: true,
-      pageStep: 100,
-    });`,
-    "the Candy Jar picker large-list options",
+if (offlineSettingsSource.includes("pageStep: 100,")) {
+  offlineSettingsSource = offlineSettingsSource.replace(
+    `      maxOptions: 12,
+      initialCursor: Math.min(currentCount, maxPickerCount),
+      measureVisibleOptionsOnly: true,
+      pageStep: 100,`,
+    `      maxOptions: 7,
+      initialCursor: Math.min(currentCount, maxPickerCount),
+      measureVisibleOptionsOnly: true,
+      pageStep: 10,
+      pageStepMinIndex: 0,
+      pageStepMaxIndex: maxPickerCount,
+      wrapNavigation: false,`,
   );
 }
 writeFile(offlineSettingsPath, offlineSettingsSource);
@@ -553,6 +644,8 @@ for (const marker of [
   "initialCursor",
   "measureVisibleOptionsOnly",
   "pageStep",
+  "pageStepMaxIndex",
+  "wrapNavigation",
 ]) {
   const combined = [settingsSource, overridesSource, modifierSource, uiTypesSource, optionSelectSource, offlineSettingsSource].join("\n");
   if (!combined.includes(marker)) {
