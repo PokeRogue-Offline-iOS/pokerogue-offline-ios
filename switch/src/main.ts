@@ -20,6 +20,7 @@ import {
 } from "./startup";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
+(globalThis as Record<string, unknown>).__SILVERSHADOW_SWITCH_RUNTIME__ = true;
 let localResourceRequestCount = 0;
 const recentLocalResources: { requested: string; resolved: string; kind: string }[] = [];
 

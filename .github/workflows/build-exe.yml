@@ -65,6 +65,9 @@ jobs:
           curl -L https://raw.githubusercontent.com/pagefaultgames/pokerogue/beta/test/utils/saves/full_unlocks_sanitized.prsv \
             -o pokerogue-src/full_unlocks.prsv
 
+      - name: Synchronize embedded Daily Run archive
+        run: node scripts/sync-daily-seed-archive.mjs
+
       - name: Apply patches
         shell: bash
         run: bash scripts/apply-patches.sh exe

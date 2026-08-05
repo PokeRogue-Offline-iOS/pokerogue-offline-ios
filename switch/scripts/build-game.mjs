@@ -179,6 +179,9 @@ async function calculateInputHash() {
     hash.update(`${value}\0`);
   }
   const inputs = [
+    // Daily archive publication is independent of source patches, so it must
+    // participate in the exact-key compiled cache or fresh dates can be lost.
+    "work/generated/daily-seeds.json",
     "new-files",
     "patches/all",
     "patches/switch",

@@ -38,21 +38,19 @@ if (/ssh\.scooom\.xyz|pokerogue-offline\.github\.io/i.test(browserFetch)) {
   throw new Error("browser fetch must not depend on Scooom or another offline seed mirror");
 }
 
-const client = read("new-files/src/system/offline/daily-run-seed.ts");
+const client = read("new-files/src/system/daily-run/daily-run-archive.ts");
 requireText(
   client,
-  "https://raw.githubusercontent.com/silvershadowkat/pokerogue-offline/seed/docs/daily-seed.json",
-  "client seed feed",
+  "https://raw.githubusercontent.com/silvershadowkat/pokerogue-offline/seed/docs/daily-seeds.json",
+  "client archive feed",
 );
-requireText(client, 'published.source !== "offline-fallback"', "fallback cache protection");
-requireText(client, 'fetchOfficialDailyRunSeed(date)', "direct in-game official API attempt");
-requireText(client, 'source: "generated-offline"', "local generated fallback source");
-requireText(client, '"published-fallback"', "published fallback source");
-requireText(client, "Official Daily Run seed loaded directly.", "official seed status message");
+requireText(client, "writeCachedDailyArchive", "validated archive cache replacement");
+requireText(client, "EMBEDDED_DAILY_ARCHIVE_URL", "embedded archive fallback");
+requireText(client, "isSwitchRuntime()", "Switch network exclusion");
 
 const patch = read("patches/all/node/daily-run-seed.js");
-requireText(patch, "getDailyRunSeed()", "title-screen Daily Run integration");
-requireText(patch, "return createGeneratedOfflineDailySeed()", "title-screen network fallback");
-requireText(patch, "getDailyRunSeedStatusText(result.source)", "title-screen seed status message");
+requireText(patch, "showDailyRunTypeMenu", "title-screen Daily Run type menu");
+requireText(patch, "startDailyRunWithSeed", "shared Daily Run launch path");
+requireText(patch, '"assets", "daily-seeds.json"', "embedded archive packaging");
 
-console.log("Daily Run publisher, seed-branch feed, and packaged client are linked consistently.");
+console.log("Daily Run publisher, official archive, and packaged four-mode client are linked consistently.");

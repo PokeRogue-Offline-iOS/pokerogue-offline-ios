@@ -172,6 +172,8 @@ if (!uiTypesSource.includes("pageStepMaxIndex?: number;")) {
   /** Optional inclusive bounds for left/right page jumps. */
   pageStepMinIndex?: number;
   pageStepMaxIndex?: number;
+  /** Page by the number of real options visible between scroll indicators. */
+  pageStepVisibleOptions?: boolean;
   /** Set false when Up/Down must stop at the list boundaries. */
   wrapNavigation?: boolean;`,
     "the OptionSelectConfig page navigation bounds",
@@ -259,7 +261,7 @@ if (!optionSelectSource.includes("measureVisibleOptionsOnly ? optionsWithScroll"
     "the scrolling option list slice",
   );
 }
-if (!optionSelectSource.includes("direction * this.config.pageStep")) {
+if (!optionSelectSource.includes("const pageStepTarget")) {
   optionSelectSource = replaceRequired(
     optionSelectSource,
     `        case Button.DOWN:
@@ -355,9 +357,35 @@ if (!optionSelectSource.includes("const pageStepTarget")) {
             const pageStepTarget =
               direction < 0 && this.fullCursor < minimum
                 ? this.fullCursor
-                : Phaser.Math.Clamp(this.fullCursor + direction * this.config.pageStep, minimum, maximum);
+                : Phaser.Math.Clamp(
+                    this.fullCursor
+                      + direction
+                        * (this.config.pageStepVisibleOptions
+                          ? this.getVisiblePageStep()
+                          : this.config.pageStep),
+                    minimum,
+                    maximum,
+                  );
             success = this.setCursor(pageStepTarget);`,
     "the bounded native option picker page target",
+  );
+}
+if (!optionSelectSource.includes("private getVisiblePageStep(): number")) {
+  optionSelectSource = replaceRequired(
+    optionSelectSource,
+    `  public override processInput(button: Button): boolean {`,
+    `  private getVisiblePageStep(): number {
+    if (!this.config?.maxOptions || this.config.options.length <= this.config.maxOptions) {
+      return this.config?.options.length ?? 1;
+    }
+    const hasUpIndicator = this.scrollCursor > 0;
+    const capacityAfterUp = this.config.maxOptions - (hasUpIndicator ? 1 : 0);
+    const hasDownIndicator = this.scrollCursor + capacityAfterUp < this.config.options.length;
+    return Math.max(1, this.config.maxOptions - (hasUpIndicator ? 1 : 0) - (hasDownIndicator ? 1 : 0));
+  }
+
+  public override processInput(button: Button): boolean {`,
+    "the visible option page-step helper",
   );
 }
 writeFile(optionSelectPath, optionSelectSource);

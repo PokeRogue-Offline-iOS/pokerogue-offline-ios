@@ -25,12 +25,16 @@ This fork implements Daily Run seed retrieval in these files:
 
     .github/workflows/publish-daily-seed.yml
     patches/all/node/daily-run-seed.js
-    new-files/src/system/offline/daily-run-seed.ts
-    new-files/test/tests/system/offline/daily-run-seed.test.ts
+    new-files/src/system/daily-run/
+    new-files/test/tests/system/daily-run/
+    scripts/daily-run-archive-core.mjs
+    scripts/sync-daily-seed-archive.mjs
+    assets/daily-seeds-fallback.json
 
 The workflow requests the seed from the official PokeRogue API and publishes a
 dated JSON document to this fork's own seed branch. The game client requests
-that document from silvershadowkat/pokerogue-offline. It does not request seed
+the historical archive from silvershadowkat/pokerogue-offline and embeds a
+validated snapshot for offline use. It does not request seed
 data from PokeRogue-Offline/pokerogue-offline or from a service operated by
 Scooom.
 

@@ -19,6 +19,7 @@ const liveSettingsPatch = readFileSync(
 );
 const logger = readFileSync(new URL("../src/logger.ts", import.meta.url), "utf8");
 const domShim = readFileSync(new URL("../src/dom-shim.ts", import.meta.url), "utf8");
+const buildGame = readFileSync(new URL("./build-game.mjs", import.meta.url), "utf8");
 
 test("the Switch runtime keeps a bounded freeze flight recorder and dual watchdogs", () => {
   assert.match(diagnostics, /const FLIGHT_RECORDER_INTERVAL_MS = 10_000;/);
@@ -131,6 +132,10 @@ test("nx.js canvas textures bypass the temporary OffscreenCanvas upload path", (
 test("generated runtime patches are idempotent by their installed markers", () => {
   assert.match(gamePatch, /if \(!main\.includes\("__silverShadowLateEndedGuardInstalled"\)\)/);
   assert.match(gamePatch, /if \(!main\.includes\("__silverShadowTypedCanvasUploadInstalled"\)\)/);
+});
+
+test("the compiled game cache tracks the synchronized Daily archive", () => {
+  assert.match(buildGame, /"work\/generated\/daily-seeds\.json"/);
 });
 
 test("Switch UI setup yields measured progress frames from 45 through 99 percent", () => {

@@ -72,6 +72,9 @@ jobs:
           VERSION=$(node -p "require('./pokerogue-src/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Synchronize embedded Daily Run archive
+        run: node scripts/sync-daily-seed-archive.mjs
+
       - name: Apply patches
         run: bash ${{ github.workspace }}/scripts/apply-patches.sh mobile
 

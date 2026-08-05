@@ -1,0 +1,717 @@
+{
+  "schemaVersion": 1,
+  "latestDate": "2026-08-05",
+  "earliestDate": "2026-04-25",
+  "entryCount": 103,
+  "source": {
+    "repository": "silvershadowkat/pokerogue-offline",
+    "branch": "seed",
+    "path": "docs/daily-seeds.json"
+  },
+  "entries": [
+    {
+      "date": "2026-08-05",
+      "format": "seed",
+      "seed": "k5exW8qrITeVWzIKS+3FFg=="
+    },
+    {
+      "date": "2026-08-04",
+      "format": "seed",
+      "seed": "qMHGgKH4OvrKFQ7xdcqALA=="
+    },
+    {
+      "date": "2026-08-03",
+      "format": "seed",
+      "seed": "qTuMC22HaL0VWfH9MLk++A=="
+    },
+    {
+      "date": "2026-08-02",
+      "format": "seed",
+      "seed": "Y9Vzy20KY94EFuXwAlVs1g=="
+    },
+    {
+      "date": "2026-08-01",
+      "format": "seed",
+      "seed": "7Y5DqSShj+C747NCjgen+A=="
+    },
+    {
+      "date": "2026-07-31",
+      "format": "seed",
+      "seed": "I1fYZrBQgMkhBSejHVKLDw=="
+    },
+    {
+      "date": "2026-07-30",
+      "format": "seed",
+      "seed": "POEaMA5+HNT9FuuuYYsLrw=="
+    },
+    {
+      "date": "2026-07-29",
+      "format": "seed",
+      "seed": "7guiMOqKvISJPSWbJBI15A=="
+    },
+    {
+      "date": "2026-07-28",
+      "format": "seed",
+      "seed": "eMz0FmK2Y8Ns5Z4lW55v/w=="
+    },
+    {
+      "date": "2026-07-27",
+      "format": "seed",
+      "seed": "58AV7p6PkE6m7l0dj0z1yw=="
+    },
+    {
+      "date": "2026-07-26",
+      "format": "seed",
+      "seed": "hHzVb2yR1OznsvcbeGMzYw=="
+    },
+    {
+      "date": "2026-07-25",
+      "format": "seed",
+      "seed": "gDDESJo4nqqZjU2dqu7gdA=="
+    },
+    {
+      "date": "2026-07-24",
+      "format": "seed",
+      "seed": "VxSpKAbGq3p54YU2x2GSLQ=="
+    },
+    {
+      "date": "2026-07-23",
+      "format": "seed",
+      "seed": "xf8Jy7BHbEJnxvy+/sVhQg=="
+    },
+    {
+      "date": "2026-07-22",
+      "format": "seed",
+      "seed": "mN0X1e8j+2EY8n/FOd3QOg=="
+    },
+    {
+      "date": "2026-07-21",
+      "format": "seed",
+      "seed": "sNPH0Ilrsvtym5l2PJUTyw=="
+    },
+    {
+      "date": "2026-07-20",
+      "format": "seed",
+      "seed": "rNo70pMGqe+dvUqrOHiG/w=="
+    },
+    {
+      "date": "2026-07-19",
+      "format": "seed",
+      "seed": "2byoPBMtQnAZn09edSC8kw=="
+    },
+    {
+      "date": "2026-07-18",
+      "format": "seed",
+      "seed": "93fsMQspMr5PizMMIeAVZA=="
+    },
+    {
+      "date": "2026-07-17",
+      "format": "seed",
+      "seed": "dtY0sYS7ROi3Kqczre1ugA=="
+    },
+    {
+      "date": "2026-07-16",
+      "format": "seed",
+      "seed": "H0roZ8QIxfk7nqMFRPo39w=="
+    },
+    {
+      "date": "2026-07-15",
+      "format": "seed",
+      "seed": "c6zuH7RF7OyYUUWUv/hHZA=="
+    },
+    {
+      "date": "2026-07-14",
+      "format": "seed",
+      "seed": "DNoyvQKbX/koKnfDHgh4qQ=="
+    },
+    {
+      "date": "2026-07-13",
+      "format": "seed",
+      "seed": "NfeAdOCy/9C8nAG/7D3obw=="
+    },
+    {
+      "date": "2026-07-12",
+      "format": "seed",
+      "seed": "FFyHQoh/TxYGS+h7UA35rA=="
+    },
+    {
+      "date": "2026-07-11",
+      "format": "seed",
+      "seed": "MXVZUM6RmrwAfF3vT6ASsg=="
+    },
+    {
+      "date": "2026-07-10",
+      "format": "seed",
+      "seed": "3rqGvBfbCXh8tIgmhUCSRA=="
+    },
+    {
+      "date": "2026-07-09",
+      "format": "seed",
+      "seed": "aWzjLGoMvoV3POqNCdhvgg=="
+    },
+    {
+      "date": "2026-07-08",
+      "format": "daily-config",
+      "seed": "eeveepride26-10417",
+      "dailyConfig": {
+        "starters": [
+          {
+            "speciesId": 133,
+            "formIndex": 1,
+            "variant": 2,
+            "moveset": [
+              735,
+              24,
+              343,
+              39
+            ],
+            "nature": 3
+          },
+          {
+            "speciesId": 133,
+            "formIndex": 1,
+            "variant": 2,
+            "moveset": [
+              734,
+              129,
+              28,
+              98
+            ],
+            "nature": 10
+          },
+          {
+            "speciesId": 133,
+            "formIndex": 1,
+            "variant": 2,
+            "moveset": [
+              733,
+              376,
+              273,
+              189
+            ],
+            "nature": 5
+          },
+          {
+            "speciesId": 133,
+            "formIndex": 1,
+            "variant": 2,
+            "moveset": [
+              500,
+              526,
+              44,
+              290
+            ],
+            "nature": 24
+          },
+          {
+            "speciesId": 133,
+            "formIndex": 1,
+            "variant": 2,
+            "moveset": [
+              496,
+              204,
+              181,
+              313
+            ],
+            "nature": 15
+          },
+          {
+            "speciesId": 133,
+            "formIndex": 1,
+            "variant": 2,
+            "moveset": [
+              885,
+              216,
+              104,
+              226
+            ],
+            "nature": 24
+          }
+        ],
+        "boss": {
+          "speciesId": 133,
+          "formIndex": 2,
+          "variant": 2,
+          "moveset": [
+            741,
+            737,
+            740,
+            736
+          ],
+          "nature": 13,
+          "segments": 8
+        },
+        "biome": 1,
+        "luck": 14,
+        "startingMoney": 1330,
+        "forcedWaves": [
+          {
+            "waveIndex": 23,
+            "speciesId": 243
+          },
+          {
+            "waveIndex": 26,
+            "speciesId": 244
+          },
+          {
+            "waveIndex": 30,
+            "speciesId": 245
+          }
+        ],
+        "mysteryEncounters": [
+          {
+            "waveIndex": 13,
+            "type": 29
+          },
+          {
+            "waveIndex": 33,
+            "type": 29
+          }
+        ],
+        "trainerManipulations": [
+          {
+            "waveIndex": 30,
+            "isTrainer": false
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-07-07",
+      "format": "seed",
+      "seed": "a0C5mPvVebn/vwNLUILL3Q=="
+    },
+    {
+      "date": "2026-07-06",
+      "format": "seed",
+      "seed": "ze05TXJ+F7U93e3q7dk/cg=="
+    },
+    {
+      "date": "2026-07-05",
+      "format": "seed",
+      "seed": "jFDVj0PCXdnQHv2A6StXmQ=="
+    },
+    {
+      "date": "2026-07-04",
+      "format": "seed",
+      "seed": "U/u8OqJV7awE0d5YMvk5FA=="
+    },
+    {
+      "date": "2026-07-03",
+      "format": "seed",
+      "seed": "Pf7mNwPcHaLEIZb9TYaNGQ=="
+    },
+    {
+      "date": "2026-07-02",
+      "format": "seed",
+      "seed": "KRQixXN2UXaXg7zXvdZMrg=="
+    },
+    {
+      "date": "2026-07-01",
+      "format": "seed",
+      "seed": "1O7f63RFu5zyvA9ajxh3Pw=="
+    },
+    {
+      "date": "2026-06-30",
+      "format": "seed",
+      "seed": "zS44nBzNBJucVbzawwlkJg=="
+    },
+    {
+      "date": "2026-06-29",
+      "format": "seed",
+      "seed": "0ILXlm6nq3IdMkJQ9znQKA=="
+    },
+    {
+      "date": "2026-06-28",
+      "format": "daily-config",
+      "seed": "megapride26-02",
+      "dailyConfig": {
+        "starters": [
+          {
+            "speciesId": 951,
+            "variant": 2,
+            "moveset": [
+              680,
+              787,
+              885,
+              73
+            ],
+            "nature": 2
+          },
+          {
+            "speciesId": 48,
+            "variant": 1,
+            "moveset": [
+              500,
+              147,
+              188,
+              324
+            ],
+            "nature": 15
+          },
+          {
+            "speciesId": 35,
+            "variant": 1,
+            "moveset": [
+              347,
+              577,
+              849,
+              192
+            ],
+            "nature": 5
+          }
+        ],
+        "biome": 3,
+        "luck": 14,
+        "forcedWaves": [
+          {
+            "waveIndex": 28,
+            "tier": 4
+          }
+        ],
+        "boss": {
+          "speciesId": 773,
+          "formIndex": 3,
+          "variant": 2,
+          "moveset": [
+            718,
+            53,
+            57,
+            58
+          ],
+          "nature": 24
+        },
+        "mysteryEncounters": [
+          {
+            "waveIndex": 6,
+            "type": 29
+          },
+          {
+            "waveIndex": 43,
+            "type": 29
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-06-27",
+      "format": "seed",
+      "seed": "OTt8KXxYpofEoYRRndfBaw=="
+    },
+    {
+      "date": "2026-06-26",
+      "format": "seed",
+      "seed": "8ROOsJmuwh/hxxdA3VIHYg=="
+    },
+    {
+      "date": "2026-06-25",
+      "format": "seed",
+      "seed": "PlZTWAYwaFoqXhFN8z/0dw=="
+    },
+    {
+      "date": "2026-06-24",
+      "format": "seed",
+      "seed": "srUcGEmQ0jI9GPEkSdyXxA=="
+    },
+    {
+      "date": "2026-06-23",
+      "format": "seed",
+      "seed": "jhCaWABhmwwXGqmGQ+pwUg=="
+    },
+    {
+      "date": "2026-06-22",
+      "format": "seed",
+      "seed": "z3eorStZA7zS7xbFiujVdw=="
+    },
+    {
+      "date": "2026-06-21",
+      "format": "seed",
+      "seed": "i2OWnPKlmlWG+kbL5BGNzA=="
+    },
+    {
+      "date": "2026-06-20",
+      "format": "seed",
+      "seed": "Am4WyWmU1pZ0BN8//JOYtA=="
+    },
+    {
+      "date": "2026-06-19",
+      "format": "seed",
+      "seed": "eMMsa1EVBu+JqR1oXq8+BA=="
+    },
+    {
+      "date": "2026-06-18",
+      "format": "seed",
+      "seed": "PdfEUbsBH2CRtgpIW/+OjQ=="
+    },
+    {
+      "date": "2026-06-17",
+      "format": "seed",
+      "seed": "sCnxh0sK+0T8PjK1T94+Uw=="
+    },
+    {
+      "date": "2026-06-16",
+      "format": "seed",
+      "seed": "bu3jGKpat93XvkU3XhFJ5A=="
+    },
+    {
+      "date": "2026-06-15",
+      "format": "seed",
+      "seed": "IcfKozkKxNyXOSiq0hQ5eQ=="
+    },
+    {
+      "date": "2026-06-14",
+      "format": "seed",
+      "seed": "XO6g0/Aert8OIPD7r3Aevg=="
+    },
+    {
+      "date": "2026-06-13",
+      "format": "seed",
+      "seed": "zAFQMhTAhKm6uZcSlsABuQ=="
+    },
+    {
+      "date": "2026-06-12",
+      "format": "seed",
+      "seed": "yAUwkB5/a8XDNDRvsCZqfQ=="
+    },
+    {
+      "date": "2026-06-11",
+      "format": "seed",
+      "seed": "5vGJ4bd6tiL5k4g5rHacfA=="
+    },
+    {
+      "date": "2026-06-10",
+      "format": "seed",
+      "seed": "a4JVrOu/5X6OC1bDkCTRWQ=="
+    },
+    {
+      "date": "2026-06-09",
+      "format": "seed",
+      "seed": "IUn2It7gDEZC9KWWAHWktQ=="
+    },
+    {
+      "date": "2026-06-08",
+      "format": "seed",
+      "seed": "1qlyKrgW9A3BUF5k2GX/AA=="
+    },
+    {
+      "date": "2026-06-07",
+      "format": "seed",
+      "seed": "FyQ1iMLDoIibNdmh2aVktA=="
+    },
+    {
+      "date": "2026-06-06",
+      "format": "seed",
+      "seed": "ixaC5epy+ZVRxvgzdjr1AQ=="
+    },
+    {
+      "date": "2026-06-05",
+      "format": "seed",
+      "seed": "UF2STJMw+aFJpth7pm3TAg=="
+    },
+    {
+      "date": "2026-06-04",
+      "format": "seed",
+      "seed": "9mPyfO0c+kdyGbFaZCnn+Q=="
+    },
+    {
+      "date": "2026-06-03",
+      "format": "seed",
+      "seed": "PQiWH2+jWx+QD0B05LRFoA=="
+    },
+    {
+      "date": "2026-06-02",
+      "format": "seed",
+      "seed": "p22UMWcA1iHy2SbHACwL6g=="
+    },
+    {
+      "date": "2026-06-01",
+      "format": "seed",
+      "seed": "UOzYH0iWyymTzHFPsN6KHg=="
+    },
+    {
+      "date": "2026-05-31",
+      "format": "seed",
+      "seed": "/yFT+xu8QypFhuK+WVYVJg=="
+    },
+    {
+      "date": "2026-05-30",
+      "format": "seed",
+      "seed": "AlPhIDnplyCl/dcMryEolQ=="
+    },
+    {
+      "date": "2026-05-29",
+      "format": "seed",
+      "seed": "JIRWZVOprKtPG1hFH8tcYg=="
+    },
+    {
+      "date": "2026-05-28",
+      "format": "seed",
+      "seed": "x8IIjWmFlAX+6jVgMQBCww=="
+    },
+    {
+      "date": "2026-05-27",
+      "format": "seed",
+      "seed": "9am8uh6hU5ioO7fMI1G/cw=="
+    },
+    {
+      "date": "2026-05-26",
+      "format": "seed",
+      "seed": "sY2FX8fgVH4DeuTulz7jNA=="
+    },
+    {
+      "date": "2026-05-25",
+      "format": "seed",
+      "seed": "Q6kDskzj5p2bJ0EkZ7E9yw=="
+    },
+    {
+      "date": "2026-05-24",
+      "format": "seed",
+      "seed": "H7JVFe+6jxT8grewt3s17g=="
+    },
+    {
+      "date": "2026-05-23",
+      "format": "seed",
+      "seed": "uunUkti8je/TzejqnNdzUg=="
+    },
+    {
+      "date": "2026-05-22",
+      "format": "seed",
+      "seed": "YiN29XJU0SSlsteMAxcuHQ=="
+    },
+    {
+      "date": "2026-05-21",
+      "format": "seed",
+      "seed": "rTpF2CUTFFncD0KMZhQ4JQ=="
+    },
+    {
+      "date": "2026-05-20",
+      "format": "seed",
+      "seed": "BPy0CPQrIwowShn4I5sEfg=="
+    },
+    {
+      "date": "2026-05-19",
+      "format": "seed",
+      "seed": "1hmXaaMtRyxmoYd91+qVVw=="
+    },
+    {
+      "date": "2026-05-18",
+      "format": "seed",
+      "seed": "S+pBYmmLgX/0zfm80Ld+0w=="
+    },
+    {
+      "date": "2026-05-17",
+      "format": "seed",
+      "seed": "uP6K4WAiaxiWdv0h0Z2iUg=="
+    },
+    {
+      "date": "2026-05-16",
+      "format": "seed",
+      "seed": "67cBIUlnrYUaaG/QpRN0hQ=="
+    },
+    {
+      "date": "2026-05-15",
+      "format": "seed",
+      "seed": "xjq73B+uBOuDy1ThD8SHzg=="
+    },
+    {
+      "date": "2026-05-14",
+      "format": "seed",
+      "seed": "GWuD8sI0VVqj9bVBvYfkkQ=="
+    },
+    {
+      "date": "2026-05-13",
+      "format": "seed",
+      "seed": "+5DpdfJuNgDKkh6r/pD2Gg=="
+    },
+    {
+      "date": "2026-05-12",
+      "format": "seed",
+      "seed": "xFFreGgflHbUQnbxeXQ13Q=="
+    },
+    {
+      "date": "2026-05-11",
+      "format": "seed",
+      "seed": "oZ+DcjjBpIQAXIq2fvJGjQ=="
+    },
+    {
+      "date": "2026-05-10",
+      "format": "seed",
+      "seed": "5a76gsJ2TFw2zw9V4NAWYw=="
+    },
+    {
+      "date": "2026-05-09",
+      "format": "seed",
+      "seed": "XF2RlSUiCZxiPll60GOCwA=="
+    },
+    {
+      "date": "2026-05-08",
+      "format": "seed",
+      "seed": "jJTRsNh5ggU+3imXv48K+g=="
+    },
+    {
+      "date": "2026-05-07",
+      "format": "seed",
+      "seed": "NgtNf57FeSl1giTTHzACvA=="
+    },
+    {
+      "date": "2026-05-06",
+      "format": "seed",
+      "seed": "DpzeTJQUXcu/ihDInHISDg=="
+    },
+    {
+      "date": "2026-05-05",
+      "format": "seed",
+      "seed": "Az4nLtnqKiCxXL09FEP0oA=="
+    },
+    {
+      "date": "2026-05-04",
+      "format": "seed",
+      "seed": "2RzYQ56TMSWPqnGhHA1D9w=="
+    },
+    {
+      "date": "2026-05-03",
+      "format": "seed",
+      "seed": "mQBFUXHN7obMtf1HKIWvRQ=="
+    },
+    {
+      "date": "2026-05-02",
+      "format": "seed",
+      "seed": "c4Aqsmw5h4fK0sp8lXvOyQ=="
+    },
+    {
+      "date": "2026-05-01",
+      "format": "seed",
+      "seed": "Ynjjk/WaYk0El5Jm48wmbw=="
+    },
+    {
+      "date": "2026-04-30",
+      "format": "seed",
+      "seed": "8xIS3oIrKQMLZDGiurNgsQ=="
+    },
+    {
+      "date": "2026-04-29",
+      "format": "seed",
+      "seed": "SavkEFyV7U2nkbvS+JYnQA=="
+    },
+    {
+      "date": "2026-04-28",
+      "format": "seed",
+      "seed": "VxMcUxXa4x2COzeHbC/kNQ=="
+    },
+    {
+      "date": "2026-04-27",
+      "format": "seed",
+      "seed": "Ue6jvtr07IdWWxraBRjQFA=="
+    },
+    {
+      "date": "2026-04-26",
+      "format": "seed",
+      "seed": "wYX2wrtm6V30XUQiomeZLQ=="
+    },
+    {
+      "date": "2026-04-25",
+      "format": "seed",
+      "seed": "89v8KjUS+0kDf3bm33e7yA=="
+    }
+  ]
+}

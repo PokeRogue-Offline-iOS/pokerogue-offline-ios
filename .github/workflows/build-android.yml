@@ -72,6 +72,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "PokeRogue version: $VERSION"
 
+      - name: Synchronize embedded Daily Run archive
+        run: node scripts/sync-daily-seed-archive.mjs
+
       - name: Apply patches
         run: |
           bash "${{ github.workspace }}/scripts/apply-patches.sh" android
