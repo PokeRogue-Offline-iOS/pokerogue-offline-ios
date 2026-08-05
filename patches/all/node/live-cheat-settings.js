@@ -94,19 +94,33 @@ for (const key of ["Offline_Starter_Points_60", "Offline_Allow_Duplicate_Starter
   }
 }
 
-if (!settingsSource.includes("function refreshModifierSelectCosts(): void")) {
-  const helperAnchor = `/**
- * Updates a setting
- * @param setting string ideally from SettingKeys`;
-  const helper = `/** Refresh already-rendered shop and reroll prices after a live setting change. */
+const unsafeRefreshHelper = `/** Refresh already-rendered shop and reroll prices after a live setting change. */
 function refreshModifierSelectCosts(): void {
   const handler = globalScene.ui?.handlers?.[UiMode.MODIFIER_SELECT] as
     | { updateCostText?: () => void }
     | undefined;
   handler?.updateCostText?.();
-}
-
-${helperAnchor}`;
+}`;
+const safeRefreshHelper = `/** Refresh already-rendered shop and reroll prices after a live setting change. */
+function refreshModifierSelectCosts(): void {
+  const handler = globalScene.ui?.handlers?.[UiMode.MODIFIER_SELECT] as
+    | { updateCostText?: () => void; rerollCost?: number; rerollCostText?: unknown }
+    | undefined;
+  // UI constructs every handler up front.  Before Modifier Select has ever
+  // been shown its rerollCost is intentionally undefined, and formatting it
+  // throws.  Refresh only a handler whose cost display has been initialized;
+  // show() computes the current live cost when the handler is first opened.
+  if (handler?.rerollCostText && Number.isFinite(handler.rerollCost)) {
+    handler.updateCostText?.();
+  }
+}`;
+if (settingsSource.includes(unsafeRefreshHelper)) {
+  settingsSource = settingsSource.replace(unsafeRefreshHelper, safeRefreshHelper);
+} else if (!settingsSource.includes("function refreshModifierSelectCosts(): void")) {
+  const helperAnchor = `/**
+ * Updates a setting
+ * @param setting string ideally from SettingKeys`;
+  const helper = `${safeRefreshHelper}\n\n${helperAnchor}`;
   settingsSource = replaceRequired(settingsSource, helperAnchor, helper, "the setSetting documentation anchor");
 }
 
@@ -135,6 +149,14 @@ for (const marker of [
 ]) {
   if (!settingsSource.includes(marker)) {
     fail(`Missing live cost refresh marker: ${marker}`);
+  }
+}
+
+for (const key of liveSettingKeys) {
+  const rowPattern = new RegExp(`\\n  \\{\\n    key: SettingKeys\\.${key},[\\s\\S]*?\\n  \\},`);
+  const finalRow = settingsSource.match(rowPattern)?.[0];
+  if (!finalRow || finalRow.includes("requireReload")) {
+    fail(`${key} is live but retained requireReload in the final generated settings source`);
   }
 }
 

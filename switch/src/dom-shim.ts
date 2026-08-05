@@ -428,6 +428,83 @@ function installNintendoGamepadIdentity(): void {
   global.__silverShadowNintendoGamepadIdentityInstalled = true;
   const nativeGetGamepads = navigator.getGamepads.bind(navigator);
   const wrappers = new WeakMap<object, object>();
+  const analogStates = new Map<string, boolean[]>();
+  const loggedControllers = new Set<string>();
+  let analogTransitionCount = 0;
+
+  const synthesizeDirectionalButtons = (gamepad: Gamepad): readonly GamepadButton[] => {
+    const nativeButtons = gamepad.buttons;
+    const axes = gamepad.axes;
+    const controllerKey = `${gamepad.index}:${gamepad.id}`;
+    const previous = analogStates.get(controllerKey) ?? [false, false, false, false];
+    const axis = (index: number) => {
+      const value = Number(axes[index]);
+      return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
+    };
+    const leftX = axis(0);
+    const leftY = axis(1);
+    const rightX = axis(2);
+    const rightY = axis(3);
+    const strength = [
+      Math.max(-leftY, -rightY),
+      Math.max(leftY, rightY),
+      Math.max(-leftX, -rightX),
+      Math.max(leftX, rightX),
+    ];
+    const next = strength.map((value, index) =>
+      previous[index] ? value > 0.35 : value >= 0.55,
+    );
+    analogStates.set(controllerKey, next);
+
+    if (!loggedControllers.has(controllerKey)) {
+      loggedControllers.add(controllerKey);
+      appendLog("INFO", "Detected Nintendo gamepad capabilities", {
+        id: gamepad.id,
+        index: gamepad.index,
+        buttons: nativeButtons.length,
+        axes: axes.length,
+        mapping: gamepad.mapping,
+        analogNavigation: "left-and-right-sticks-to-dpad",
+      });
+    }
+
+    const directions = ["UP", "DOWN", "LEFT", "RIGHT"];
+    for (let index = 0; index < next.length; index++) {
+      if (next[index] === previous[index]) continue;
+      analogTransitionCount++;
+      const detail = {
+        count: analogTransitionCount,
+        id: gamepad.id,
+        index: gamepad.index,
+        direction: directions[index],
+        status: next[index] ? "down" : "up",
+        left: [Number(leftX.toFixed(3)), Number(leftY.toFixed(3))],
+        right: [Number(rightX.toFixed(3)), Number(rightY.toFixed(3))],
+      };
+      global.__SILVERSHADOW_ANALOG_SNAPSHOT__ = {
+        ...detail,
+        activeDirections: directions.filter((_, directionIndex) => next[directionIndex]),
+      };
+      if (analogTransitionCount <= 64 || analogTransitionCount % 128 === 0) {
+        appendLog("INFO", "Analog navigation edge", detail);
+      }
+    }
+
+    // Standard Gamepad indices 12..15 are D-pad Up/Down/Left/Right. Merge
+    // either stick into those buttons so Phaser's existing edge/repeat logic,
+    // transition generation, and release rearming apply without a second
+    // input path. Extending short button arrays also helps single Joy-Con
+    // layouts that still expose standard axes through nx.js.
+    return Array.from({ length: Math.max(nativeButtons.length, 16) }, (_, index) => {
+      const native = nativeButtons[index];
+      const directionIndex = index >= 12 && index <= 15 ? index - 12 : -1;
+      const analogPressed = directionIndex >= 0 && next[directionIndex];
+      if (!analogPressed || native?.pressed) {
+        return native ?? { pressed: false, touched: false, value: 0 };
+      }
+      return { pressed: true, touched: true, value: 1 };
+    });
+  };
 
   Object.defineProperty(navigator, "getGamepads", {
     configurable: true,
@@ -445,6 +522,9 @@ function installNintendoGamepadIdentity(): void {
                 // Controller profile, which maps physical A/B and X/Y using
                 // Nintendo labels instead of the generic Xbox layout.
                 return `057e-2009 ${target.id}`;
+              }
+              if (property === "buttons") {
+                return synthesizeDirectionalButtons(target);
               }
               return Reflect.get(target, property, target);
             },

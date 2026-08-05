@@ -12,6 +12,7 @@ const path = require("path");
 const mainPath = path.join("pokerogue-src", "src", "main.ts");
 const battleScenePath = path.join("pokerogue-src", "src", "battle-scene.ts");
 const loadingScenePath = path.join("pokerogue-src", "src", "loading-scene.ts");
+const uiPath = path.join("pokerogue-src", "src", "ui", "ui.ts");
 const phasePath = path.join("pokerogue-src", "src", "phase.ts");
 const phaseManagerPath = path.join("pokerogue-src", "src", "phase-manager.ts");
 const sceneBasePath = path.join("pokerogue-src", "src", "scene-base.ts");
@@ -21,8 +22,17 @@ const attemptCapturePhasePath = path.join("pokerogue-src", "src", "phases", "att
 const encounterPhasePath = path.join("pokerogue-src", "src", "phases", "encounter-phase.ts");
 const partyHealPhasePath = path.join("pokerogue-src", "src", "phases", "party-heal-phase.ts");
 const selectModifierPhasePath = path.join("pokerogue-src", "src", "phases", "select-modifier-phase.ts");
+const selectStarterPhasePath = path.join("pokerogue-src", "src", "phases", "select-starter-phase.ts");
 const switchBiomePhasePath = path.join("pokerogue-src", "src", "phases", "switch-biome-phase.ts");
 const modifierSelectUiPath = path.join("pokerogue-src", "src", "ui", "handlers", "modifier-select-ui-handler.ts");
+const baseSettingsUiPath = path.join("pokerogue-src", "src", "ui", "settings", "base-settings-ui-handler.ts");
+const baseControlSettingsUiPath = path.join(
+  "pokerogue-src",
+  "src",
+  "ui",
+  "settings",
+  "base-control-settings-ui-handler.ts",
+);
 const titlePath = path.join("pokerogue-src", "src", "ui", "handlers", "title-ui-handler.ts");
 const touchControlsPath = path.join("pokerogue-src", "src", "touch-controls.ts");
 
@@ -118,11 +128,186 @@ const audioEndedGuardReplacement = `  const webAudioSoundPrototype = (Phaser.Sou
   }
 
   const game = new Phaser.Game({`;
-if (!main.includes(audioEndedGuardReplacement)) {
+if (!main.includes("__silverShadowLateEndedGuardInstalled")) {
   if (!main.includes(audioEndedGuardAnchor)) {
     fail("Could not find the Phaser WebAudio late-ended guard anchor in src/main.ts");
   }
   main = main.replace(audioEndedGuardAnchor, audioEndedGuardReplacement);
+}
+
+const canvasTextureUploadAnchor = `  const game = new Phaser.Game({`;
+const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser.Renderer.WebGL.WebGLRenderer as any)?.prototype;
+  if (webGlRendererPrototype && !webGlRendererPrototype.__silverShadowTypedCanvasUploadInstalled) {
+    const nativeCanvasToTexture = webGlRendererPrototype.canvasToTexture;
+    let typedCanvasUploads = 0;
+    let typedCanvasUploadBytes = 0;
+    let typedCanvasUploadFallbacks = 0;
+    let typedCanvasAllocations = 0;
+    let typedCanvasResizes = 0;
+    let typedCanvasSubImageUpdates = 0;
+    const publishCanvasUploadSnapshot = (latestSize: [number, number]) => {
+      (globalThis as any).__SILVERSHADOW_CANVAS_UPLOADS__ = {
+        uploads: typedCanvasUploads,
+        uploadedMiB: Number((typedCanvasUploadBytes / 1048576).toFixed(2)),
+        allocations: typedCanvasAllocations,
+        resizes: typedCanvasResizes,
+        subImageUpdates: typedCanvasSubImageUpdates,
+        fallbacks: typedCanvasUploadFallbacks,
+        latestSize,
+        at: Date.now(),
+      };
+    };
+    webGlRendererPrototype.canvasToTexture = function (
+      this: any,
+      srcCanvas: HTMLCanvasElement,
+      dstTexture?: any,
+      noRepeat = false,
+      flipY = false,
+    ) {
+      const width = Number(srcCanvas?.width) || 0;
+      const height = Number(srcCanvas?.height) || 0;
+      if (!srcCanvas?.getContext || width <= 0 || height <= 0) {
+        return nativeCanvasToTexture.call(this, srcCanvas, dstTexture, noRepeat, flipY);
+      }
+      try {
+        // nx.js' CanvasSource texImage2D overload creates a temporary
+        // OffscreenCanvas for every Phaser Text refresh. Repeated UI updates
+        // fragmented the native arena until that temporary allocation failed.
+        // The typed-array overload uploads the same pixels without creating a
+        // second native canvas/context for every refresh.
+        const context = srcCanvas.getContext("2d", { willReadFrequently: true });
+        if (!context) throw new Error("2D context unavailable for typed canvas upload");
+        const imageData = context.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        const pixels = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        const gl = this.gl;
+        let minFilter = gl.NEAREST;
+        let magFilter = gl.NEAREST;
+        const pow = Phaser.Math.Pow2.IsSize(width, height);
+        const wrapping = !noRepeat && pow ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+        if (this.config.antialias) {
+          minFilter = pow && this.mipmapFilter ? this.mipmapFilter : gl.LINEAR;
+          magFilter = gl.LINEAR;
+        }
+        let texture = dstTexture;
+        if (!texture) {
+          typedCanvasAllocations++;
+          texture = this.createTexture2D(
+            0,
+            minFilter,
+            magFilter,
+            wrapping,
+            wrapping,
+            gl.RGBA,
+            pixels,
+            width,
+            height,
+            true,
+            true,
+            flipY,
+          );
+        } else if (
+          texture.webGLTexture
+          && texture.width === width
+          && texture.height === height
+          && typeof gl.texSubImage2D === "function"
+        ) {
+          // Phaser normally calls texImage2D for every Text refresh, even when
+          // the allocation size is unchanged. That repeatedly reallocates
+          // Mesa texture storage. Two hardware crashes branched into Mesa data
+          // after tens of thousands of these updates. Preserve the allocation
+          // and replace only its pixels when the dimensions are unchanged.
+          gl.activeTexture(gl.TEXTURE0);
+          const previousTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+          gl.bindTexture(gl.TEXTURE_2D, texture.webGLTexture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapping);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapping);
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY);
+          gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            texture.mipLevel ?? 0,
+            0,
+            0,
+            width,
+            height,
+            texture.format ?? gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            pixels,
+          );
+          if (pow) gl.generateMipmap(gl.TEXTURE_2D);
+          gl.bindTexture(gl.TEXTURE_2D, previousTexture ?? null);
+          texture.minFilter = minFilter;
+          texture.magFilter = magFilter;
+          texture.wrapS = wrapping;
+          texture.wrapT = wrapping;
+          texture.pma = true;
+          texture.flipY = flipY;
+          typedCanvasSubImageUpdates++;
+        } else {
+          typedCanvasResizes++;
+          texture.update(
+            pixels,
+            width,
+            height,
+            flipY,
+            wrapping,
+            wrapping,
+            minFilter,
+            magFilter,
+            texture.format,
+          );
+        }
+        // Preserve Phaser's original context-restore source instead of
+        // retaining this one-upload ImageData view.
+        texture.pixels = srcCanvas;
+        typedCanvasUploads++;
+        typedCanvasUploadBytes += pixels.byteLength;
+        publishCanvasUploadSnapshot([width, height]);
+        if (typedCanvasUploads === 1 || typedCanvasUploads % 250 === 0) {
+          (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(
+            "webgl:typed-canvas-upload",
+            {
+              uploads: typedCanvasUploads,
+              uploadedMiB: Number((typedCanvasUploadBytes / 1048576).toFixed(2)),
+              fallbacks: typedCanvasUploadFallbacks,
+              allocations: typedCanvasAllocations,
+              resizes: typedCanvasResizes,
+              subImageUpdates: typedCanvasSubImageUpdates,
+              latestSize: [width, height],
+              textureWrappers: this.glTextureWrappers?.length ?? null,
+            },
+          );
+        }
+        return texture;
+      } catch (error) {
+        typedCanvasUploadFallbacks++;
+        publishCanvasUploadSnapshot([width, height]);
+        if (typedCanvasUploadFallbacks <= 4) {
+          (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(
+            "webgl:typed-canvas-upload-fallback",
+            {
+              fallback: typedCanvasUploadFallbacks,
+              size: [width, height],
+              message: error instanceof Error ? error.message : String(error),
+            },
+            true,
+          );
+        }
+        return nativeCanvasToTexture.call(this, srcCanvas, dstTexture, noRepeat, flipY);
+      }
+    };
+    webGlRendererPrototype.__silverShadowTypedCanvasUploadInstalled = true;
+  }
+
+  const game = new Phaser.Game({`;
+if (!main.includes("__silverShadowTypedCanvasUploadInstalled")) {
+  if (!main.includes(canvasTextureUploadAnchor)) {
+    fail("Could not find the Phaser canvas texture upload anchor in src/main.ts");
+  }
+  main = main.replace(canvasTextureUploadAnchor, canvasTextureUploadReplacement);
 }
 
 const createdAnchor = `  game.sound.pauseOnBlur = false;`;
@@ -147,7 +332,141 @@ if (!main.includes(createdReplacement)) {
 }
 write(mainPath, main);
 
+let ui = read(uiPath);
+const uiSetupAnchor = `  setup(): void {
+    this.setName(\`ui-\${UiMode[this.mode]}\`);
+    for (const handler of this.handlers) {
+      handler.setup();
+    }
+    this.overlay = globalScene.add.rectangle(0, 0, globalScene.scaledCanvas.width, globalScene.scaledCanvas.height, 0);`;
+const uiSetupReplacement = `  async setup(
+    onProgress?: (completed: number, total: number, stage: string) => void,
+  ): Promise<void> {
+    this.setName(\`ui-\${UiMode[this.mode]}\`);
+    const totalSteps = this.handlers.length + 3;
+    let completedSteps = 0;
+    const completeStep = async (stage: string) => {
+      completedSteps++;
+      onProgress?.(completedSteps, totalSteps, stage);
+      if (onProgress) {
+        // UI construction occupied the main thread for ~28 seconds on nx.js.
+        // Yield after each handler so Phaser can render measured progress.
+        await new Promise<void>(resolve => {
+          globalScene.game.events.once(Phaser.Core.Events.POST_RENDER, resolve);
+        });
+      }
+    };
+    for (const handler of this.handlers) {
+      handler.setup();
+      await completeStep(handler.constructor.name);
+    }
+    this.overlay = globalScene.add.rectangle(0, 0, globalScene.scaledCanvas.width, globalScene.scaledCanvas.height, 0);`;
+if (!ui.includes(uiSetupReplacement)) {
+  if (!ui.includes(uiSetupAnchor)) fail("Could not find UI setup batching anchor");
+  ui = ui.replace(uiSetupAnchor, uiSetupReplacement);
+}
+const uiTooltipStepAnchor = `    this.setupTooltip();
+
+    this.achvBar = new AchvBar();`;
+const uiTooltipStepReplacement = `    this.setupTooltip();
+    await completeStep("tooltip");
+
+    this.achvBar = new AchvBar();`;
+if (!ui.includes(uiTooltipStepReplacement)) {
+  if (!ui.includes(uiTooltipStepAnchor)) fail("Could not find UI tooltip progress anchor");
+  ui = ui.replace(uiTooltipStepAnchor, uiTooltipStepReplacement);
+}
+const uiBarsStepAnchor = `    globalScene.uiContainer.add(this.achvBar);
+
+    this.savingIcon = new SavingIconContainer();`;
+const uiBarsStepReplacement = `    globalScene.uiContainer.add(this.achvBar);
+    await completeStep("achievement bar");
+
+    this.savingIcon = new SavingIconContainer();`;
+if (!ui.includes(uiBarsStepReplacement)) {
+  if (!ui.includes(uiBarsStepAnchor)) fail("Could not find UI achievement progress anchor");
+  ui = ui.replace(uiBarsStepAnchor, uiBarsStepReplacement);
+}
+const uiSavingStepAnchor = `    globalScene.uiContainer.add(this.savingIcon);
+  }`;
+const uiSavingStepReplacement = `    globalScene.uiContainer.add(this.savingIcon);
+    await completeStep("saving indicator");
+  }`;
+if (!ui.includes(uiSavingStepReplacement)) {
+  if (!ui.includes(uiSavingStepAnchor)) fail("Could not find UI saving progress anchor");
+  ui = ui.replace(uiSavingStepAnchor, uiSavingStepReplacement);
+}
+const uiUpdateGuardAnchor = `  update(): void {
+    if (this.tooltipContainer.visible) {`;
+const uiUpdateGuardReplacement = `  update(): void {
+    // BattleScene can render between async setup batches. The tooltip is the
+    // last shared UI object created, so skip updates until it exists.
+    if (!this.tooltipContainer) return;
+    if (this.tooltipContainer.visible) {`;
+if (!ui.includes(uiUpdateGuardReplacement)) {
+  if (!ui.includes(uiUpdateGuardAnchor)) fail("Could not find partial UI update guard anchor");
+  ui = ui.replace(uiUpdateGuardAnchor, uiUpdateGuardReplacement);
+}
+write(uiPath, ui);
+
 let loadingScene = read(loadingScenePath);
+const loadingCachedUrlImportAnchor = `import { hasAllLocalizedSprites, localPing } from "#utils/common";`;
+const loadingCachedUrlImportReplacement = `${loadingCachedUrlImportAnchor}
+import { getCachedUrl } from "#utils/fetch-utils";`;
+if (!loadingScene.includes(loadingCachedUrlImportReplacement)) {
+  if (!loadingScene.includes(loadingCachedUrlImportAnchor)) fail("Could not find LoadingScene cached URL import anchor");
+  loadingScene = loadingScene.replace(loadingCachedUrlImportAnchor, loadingCachedUrlImportReplacement);
+}
+const loadingProgressApiAnchor = `  readonly LOAD_EVENTS = Phaser.Loader.Events;
+
+  constructor() {
+    super(LoadingScene.KEY);
+
+    Phaser.Plugins.PluginCache.register("Loader", CacheBustedLoaderPlugin, "load");
+  }
+
+  preload() {`;
+const loadingProgressApiReplacement = `  readonly LOAD_EVENTS = Phaser.Loader.Events;
+
+  private switchProgressBar?: GameObjects.Graphics;
+  private switchPercentText?: GameObjects.Text;
+  private switchAssetText?: GameObjects.Text;
+  private switchProgressMidWidth = 0;
+  private switchDisplayedProgress = 0;
+  private switchLastLoggedPercent = -10;
+
+  constructor() {
+    super(LoadingScene.KEY);
+
+    Phaser.Plugins.PluginCache.register("Loader", CacheBustedLoaderPlugin, "load");
+  }
+
+  /** Report monotonic progress across asset loading and synchronous game setup. */
+  public setSwitchStartupProgress(progress: number, label?: string): void {
+    const bounded = Phaser.Math.Clamp(progress, this.switchDisplayedProgress, 1);
+    this.switchDisplayedProgress = bounded;
+    this.switchPercentText?.setText(\`\${Math.floor(bounded * 100)}%\`);
+    if (label) this.switchAssetText?.setText(label);
+    this.switchProgressBar
+      ?.clear()
+      .fillStyle(0xffffff, 0.8)
+      .fillRect(this.switchProgressMidWidth - 320, 360, 640 * bounded, 64);
+    const percent = Math.floor(bounded * 100);
+    if (label || percent >= this.switchLastLoggedPercent + 10 || percent === 100) {
+      this.switchLastLoggedPercent = percent;
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("startup-progress", {
+        progress: Number(bounded.toFixed(3)),
+        percent,
+        label: label ?? null,
+      });
+    }
+  }
+
+  preload() {`;
+if (!loadingScene.includes(loadingProgressApiReplacement)) {
+  if (!loadingScene.includes(loadingProgressApiAnchor)) fail("Could not find LoadingScene progress API anchor");
+  loadingScene = loadingScene.replace(loadingProgressApiAnchor, loadingProgressApiReplacement);
+}
 const loadingPreloadAnchor = `  preload() {
     localPing();`;
 const loadingPreloadReplacement = `  preload() {
@@ -162,6 +481,23 @@ if (!loadingScene.includes(loadingPreloadReplacement)) {
     fail("Could not find the LoadingScene preload diagnostic anchor");
   }
   loadingScene = loadingScene.replace(loadingPreloadAnchor, loadingPreloadReplacement);
+}
+
+const loadingMenuBgmAnchor = `    this.loadLoadingScreen();
+
+    initializeGame();`;
+const loadingMenuBgmReplacement = `    // Decode the starter-select BGM while the truthful startup indicator is
+    // still visible. On nx.js this 91-second track blocks the JS thread for
+    // several seconds; loading it on Starter Select made a short first D-pad
+    // tap disappear while Phaser could not poll the controller.
+    this.load.audio("menu", getCachedUrl("audio/bgm/menu.mp3"));
+
+    this.loadLoadingScreen();
+
+    initializeGame();`;
+if (!loadingScene.includes(loadingMenuBgmReplacement)) {
+  if (!loadingScene.includes(loadingMenuBgmAnchor)) fail("Could not find LoadingScene menu BGM preload anchor");
+  loadingScene = loadingScene.replace(loadingMenuBgmAnchor, loadingMenuBgmReplacement);
 }
 
 const loadingCreateAnchor = `  async create() {
@@ -217,9 +553,142 @@ if (!loadingScene.includes(loadingIntroReplacement)) {
   }
   loadingScene = loadingScene.replace(loadingIntroAnchor, loadingIntroReplacement);
 }
+
+const loadingProgressObjectsAnchor = `    const disclaimerText = this.make`;
+const loadingProgressObjectsReplacement = `    this.switchProgressBar = progressBar;
+    this.switchPercentText = percentText;
+    this.switchAssetText = assetText;
+    this.switchProgressMidWidth = midWidth;
+
+    const disclaimerText = this.make`;
+if (!loadingScene.includes(loadingProgressObjectsReplacement)) {
+  if (!loadingScene.includes(loadingProgressObjectsAnchor)) fail("Could not find loading progress object anchor");
+  loadingScene = loadingScene.replace(loadingProgressObjectsAnchor, loadingProgressObjectsReplacement);
+}
+
+const loadingProgressEventAnchor = `      .on(this.LOAD_EVENTS.PROGRESS, (progress: number) => {
+        percentText.setText(\`\${Math.floor(progress * 100)}%\`);
+        // need to reset fill style due to \`clear\` restting it
+        progressBar
+          .clear()
+          .fillStyle(0xffffff, 0.8)
+          .fillRect(midWidth - 320, 360, 640 * progress, 64);
+      })`;
+const loadingProgressEventReplacement = `      .on(this.LOAD_EVENTS.PROGRESS, (progress: number) => {
+        // The Phaser loader is only about 40% of observed time-to-interactive
+        // on Switch. Reserve the remainder for BattleScene construction so
+        // the display cannot claim 100% while the main thread is still busy.
+        this.setSwitchStartupProgress(progress * 0.4);
+      })`;
+if (!loadingScene.includes(loadingProgressEventReplacement)) {
+  if (!loadingScene.includes(loadingProgressEventAnchor)) fail("Could not find loading progress event anchor");
+  loadingScene = loadingScene.replace(loadingProgressEventAnchor, loadingProgressEventReplacement);
+}
+
+const loadingCompleteAnchor = `      .on(this.LOAD_EVENTS.COMPLETE, () => {
+        for (const g of loadingGraphics) {
+          g.destroy();
+        }
+        intro.destroy();
+      });`;
+const loadingCompleteReplacement = `      .on(this.LOAD_EVENTS.COMPLETE, () => {
+        this.setSwitchStartupProgress(0.42, "Preparing game...");
+        intro.destroy();
+      });`;
+if (!loadingScene.includes(loadingCompleteReplacement)) {
+  if (!loadingScene.includes(loadingCompleteAnchor)) fail("Could not find loading completion anchor");
+  loadingScene = loadingScene.replace(loadingCompleteAnchor, loadingCompleteReplacement);
+}
+
+const loadingLaunchAnchor = `    this.scene.start("battle");`;
+const loadingLaunchReplacement = `    // Keep the progress scene alive above BattleScene until its first
+    // interactive frame is fully constructed.
+    this.scene.launch("battle");
+    this.scene.bringToTop(LoadingScene.KEY);`;
+if (!loadingScene.includes(loadingLaunchReplacement)) {
+  if (!loadingScene.includes(loadingLaunchAnchor)) fail("Could not find loading-to-battle launch anchor");
+  loadingScene = loadingScene.replace(loadingLaunchAnchor, loadingLaunchReplacement);
+}
 write(loadingScenePath, loadingScene);
 
 let battleScene = read(battleScenePath);
+const freshRunSeedMethodAnchor = `  setSeed(seed: string): void {
+    this.seed = seed;`;
+const freshRunSeedMethodReplacement = `  /** Create a fresh non-daily run seed that survives deterministic Math.random startup. */
+  refreshFreshRunSeed(reason: string): string {
+    if (activeOverrides.SEED_OVERRIDE) {
+      this.setSeed(activeOverrides.SEED_OVERRIDE);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("run-seed:reserved", {
+        reason,
+        source: "override",
+        seed: this.seed,
+      }, true);
+      return this.seed;
+    }
+
+    const global = globalThis as any;
+    const storageKey = "silvershadowSwitchRunSeedNonce";
+    let persistedNonce = 0;
+    let persisted = false;
+    try {
+      persistedNonce = Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0;
+      persistedNonce = (persistedNonce + 1) % 2176782336; // 36^6
+      localStorage.setItem(storageKey, String(persistedNonce));
+      persisted = true;
+    } catch {
+      persistedNonce = ((Number(global.__SILVERSHADOW_RUN_SEED_NONCE__) || 0) + 1) % 2176782336;
+      global.__SILVERSHADOW_RUN_SEED_NONCE__ = persistedNonce;
+    }
+
+    const entropy = new Uint32Array(4);
+    let entropySource = "crypto";
+    try {
+      if (!global.crypto?.getRandomValues) throw new Error("crypto.getRandomValues unavailable");
+      global.crypto.getRandomValues(entropy);
+    } catch {
+      entropySource = "clock+math";
+      const now = Date.now();
+      entropy[0] = now >>> 0;
+      entropy[1] = Math.floor(now / 0x100000000) >>> 0;
+      entropy[2] = Math.floor(performance.now() * 1000) >>> 0;
+      entropy[3] = Math.floor(Math.random() * 0x100000000) >>> 0;
+    }
+
+    // Timestamp and the crash-safe monotonic nonce are placed first so even a
+    // runtime with identical Math.random state cannot replay a cold-start run.
+    const seed = [
+      Date.now().toString(36),
+      persistedNonce.toString(36).padStart(6, "0"),
+      ...Array.from(entropy, value => value.toString(36).padStart(7, "0")),
+    ].join("").slice(0, 24);
+    this.setSeed(seed);
+    global.__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("run-seed:reserved", {
+      reason,
+      source: persisted ? \`persisted-nonce+\${entropySource}\` : \`process-nonce+\${entropySource}\`,
+      nonce: persistedNonce,
+      seed,
+    }, true);
+    return seed;
+  }
+
+  setSeed(seed: string): void {
+    this.seed = seed;`;
+if (!battleScene.includes(freshRunSeedMethodReplacement)) {
+  if (!battleScene.includes(freshRunSeedMethodAnchor)) fail("Could not find BattleScene seed method anchor");
+  battleScene = battleScene.replace(freshRunSeedMethodAnchor, freshRunSeedMethodReplacement);
+}
+
+const resetRunSeedAnchor = `    this.setSeed(activeOverrides.SEED_OVERRIDE || randomString(24));
+    console.log("Seed:", this.seed);`;
+const resetRunSeedReplacement = `    this.refreshFreshRunSeed("scene-reset");
+    console.log("Seed:", this.seed);`;
+if (!battleScene.includes(resetRunSeedReplacement)) {
+  if (!battleScene.includes(resetRunSeedAnchor)) fail("Could not find BattleScene reset seed anchor");
+  battleScene = battleScene.replace(resetRunSeedAnchor, resetRunSeedReplacement);
+}
+if (battleScene.includes("  randomString,\n")) {
+  battleScene = battleScene.replace("  randomString,\n", "");
+}
 const battlePreloadAnchor = `  public async preload(): Promise<void> {
     /**`;
 const battlePreloadReplacement = `  public async preload(): Promise<void> {
@@ -238,16 +707,27 @@ if (!battleScene.includes(battlePreloadReplacement)) {
 
 const battleCreateAnchor = `  public create(): void {
     this.scene.remove(LoadingScene.KEY);`;
-const battleCreateReplacement = `  public create(): void {
+const battleCreateReplacement = `  public async create(): Promise<void> {
     (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("battle-scene:create-start", {
       scene: "battle",
     }, true);
-    this.scene.remove(LoadingScene.KEY);`;
+    const switchLoadingScene = this.scene.isActive(LoadingScene.KEY)
+      ? (this.scene.get(LoadingScene.KEY) as LoadingScene)
+      : undefined;
+    switchLoadingScene?.setSwitchStartupProgress(0.45, "Building game world...");
+    if (switchLoadingScene) this.scene.bringToTop(LoadingScene.KEY);`;
 if (!battleScene.includes(battleCreateReplacement)) {
-  if (!battleScene.includes(battleCreateAnchor)) {
+  const previousBattleCreateReplacement = battleCreateReplacement.replace(
+    "  public async create(): Promise<void> {",
+    "  public create(): void {",
+  );
+  if (battleScene.includes(previousBattleCreateReplacement)) {
+    battleScene = battleScene.replace(previousBattleCreateReplacement, battleCreateReplacement);
+  } else if (!battleScene.includes(battleCreateAnchor)) {
     fail("Could not find the BattleScene create diagnostic anchor");
+  } else {
+    battleScene = battleScene.replace(battleCreateAnchor, battleCreateReplacement);
   }
-  battleScene = battleScene.replace(battleCreateAnchor, battleCreateReplacement);
 }
 
 const battleLaunchAnchor = `    this.launchBattle();
@@ -263,7 +743,7 @@ const previousBattleLaunchReplacement = `    this.launchBattle();
   }
 
   update()`;
-const battleLaunchReplacement = `    this.launchBattle();
+const battleLaunchReplacement = `    await this.launchBattle(switchLoadingScene);
     const runtimeDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
     runtimeDiagnostics?.setGameStateProvider?.(() => {
       const currentPhase = this.phaseManager?.getCurrentPhase?.();
@@ -310,11 +790,25 @@ const battleLaunchReplacement = `    this.launchBattle();
       biome: this.arena?.biomeId ?? null,
       wave: this.currentBattle?.waveIndex ?? null,
     }, true);
+    switchLoadingScene?.setSwitchStartupProgress(1, "Ready");
+    if (switchLoadingScene) {
+      // Render one truthful 100% frame, then remove the overlay. The previous
+      // build removed it before synchronous setup and left a stale 100% frame.
+      this.game.events.once(Phaser.Core.Events.POST_RENDER, () => {
+        this.scene.remove(LoadingScene.KEY);
+      });
+    }
   }
 
   update()`;
 if (!battleScene.includes(battleLaunchReplacement)) {
-  if (battleScene.includes(previousBattleLaunchReplacement)) {
+  const previousAwaitlessBattleLaunchReplacement = battleLaunchReplacement.replace(
+    "    await this.launchBattle(switchLoadingScene);",
+    "    this.launchBattle();",
+  );
+  if (battleScene.includes(previousAwaitlessBattleLaunchReplacement)) {
+    battleScene = battleScene.replace(previousAwaitlessBattleLaunchReplacement, battleLaunchReplacement);
+  } else if (battleScene.includes(previousBattleLaunchReplacement)) {
     battleScene = battleScene.replace(previousBattleLaunchReplacement, battleLaunchReplacement);
   } else if (battleScene.includes(battleLaunchAnchor)) {
     battleScene = battleScene.replace(battleLaunchAnchor, battleLaunchReplacement);
@@ -503,6 +997,22 @@ const resetClearSceneAnchor = `    if (clearScene) {
 
       audioManager.fadeOutBgm(250);`;
 const resetClearSceneReplacement = `    if (clearScene) {
+      (globalThis as any).__SILVERSHADOW_TITLE_RETURN_STARTED_AT__ = switchResetStartedAt;
+      switchDiagnostics?.checkpoint?.("scene-reset:clear-scene-start", {
+        elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+      }, true);
+      // Both variant manifests are cached during the initial preload. This
+      // call therefore swaps the selected data synchronously and atomically;
+      // it must not leave an SD-card read racing scene destruction.
+      this.initVariantData();
+      switchDiagnostics?.checkpoint?.("scene-reset:variant-data-ready", {
+        elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+      }, true);
+
+      audioManager.fadeOutBgm(250);`;
+if (!battleScene.includes(resetClearSceneReplacement)) {
+  const previousResetClearSceneReplacement = `    if (clearScene) {
+      (globalThis as any).__SILVERSHADOW_TITLE_RETURN_STARTED_AT__ = switchResetStartedAt;
       switchDiagnostics?.checkpoint?.("scene-reset:clear-scene-start", {
         elapsedMs: Math.round(performance.now() - switchResetStartedAt),
       }, true);
@@ -513,11 +1023,188 @@ const resetClearSceneReplacement = `    if (clearScene) {
       }, true);
 
       audioManager.fadeOutBgm(250);`;
-if (!battleScene.includes(resetClearSceneReplacement)) {
-  if (!battleScene.includes(resetClearSceneAnchor)) {
+  if (battleScene.includes(previousResetClearSceneReplacement)) {
+    battleScene = battleScene.replace(previousResetClearSceneReplacement, resetClearSceneReplacement);
+  } else if (!battleScene.includes(resetClearSceneAnchor)) {
     fail("Could not find the BattleScene clear-scene diagnostic anchor");
+  } else {
+    battleScene = battleScene.replace(resetClearSceneAnchor, resetClearSceneReplacement);
   }
-  battleScene = battleScene.replace(resetClearSceneAnchor, resetClearSceneReplacement);
+}
+
+const variantDataAnchor = `  async initVariantData(): Promise<void> {
+    clearVariantData();
+    const otherVariantData = await cachedFetch("./images/pokemon/variant/_masterlist.json").then(r => r.json());
+    for (const k of Object.keys(otherVariantData)) {
+      variantData[k] = otherVariantData[k];
+    }
+    if (!this.experimentalSprites) {
+      return;
+    }
+    const expVariantData = await cachedFetch("./images/pokemon/variant/_exp_masterlist.json").then(r => r.json());
+    deepMergeSpriteData(variantData, expVariantData);
+  }`;
+const variantDataReplacement = `  async initVariantData(): Promise<void> {
+    type SwitchVariantCache = {
+      standard?: Record<string, any>;
+      experimental?: Record<string, any>;
+    };
+    const switchGlobal = globalThis as any;
+    const cache: SwitchVariantCache = switchGlobal.__SILVERSHADOW_VARIANT_DATA_CACHE__ ??= {};
+    if (!cache.standard || !cache.experimental) {
+      const [standard, experimental] = await Promise.all([
+        cachedFetch("./images/pokemon/variant/_masterlist.json").then(r => r.json()),
+        cachedFetch("./images/pokemon/variant/_exp_masterlist.json").then(r => r.json()),
+      ]);
+      cache.standard = standard;
+      cache.experimental = experimental;
+      switchGlobal.__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("variant-data:cache-ready", {
+        standardKeys: Object.keys(standard).length,
+        experimentalKeys: Object.keys(experimental).length,
+      }, true);
+    }
+
+    // Do not clear the live table until every input is resident. On later
+    // scene resets this method has no await path, so callers that retain the
+    // upstream void contract still receive a complete atomic swap.
+    clearVariantData();
+    const standard = cache.standard!;
+    for (const k of Object.keys(standard)) {
+      variantData[k] = standard[k];
+    }
+    if (this.experimentalSprites) {
+      deepMergeSpriteData(variantData, cache.experimental!);
+    }
+  }`;
+if (!battleScene.includes(variantDataReplacement)) {
+  if (!battleScene.includes(variantDataAnchor)) {
+    fail("Could not find the BattleScene variant-data lifecycle anchor");
+  }
+  battleScene = battleScene.replace(variantDataAnchor, variantDataReplacement);
+}
+
+const launchBattleStartAnchor = `  launchBattle() {
+    const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
+const launchBattleStartReplacement = `  async launchBattle(
+    switchLoadingScene?: LoadingScene,
+    switchTitleReturn = false,
+  ): Promise<void> {
+    const switchLaunchStartedAt = performance.now();
+    const switchLaunchCheckpoint = (stage: string) =>
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(\`battle-launch:\${stage}\`, {
+        elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+        children: this.children?.list?.length ?? null,
+      }, true);
+    let switchTitleReturnOverlay: Phaser.GameObjects.Container | undefined;
+    let switchTitleReturnText: Phaser.GameObjects.Text | undefined;
+    let switchTitleReturnLastPercent = -10;
+    const setSwitchTitleReturnProgress = (progress: number, label: string) => {
+      if (!switchTitleReturnOverlay || !switchTitleReturnText) return;
+      const percent = Math.round(Phaser.Math.Clamp(progress, 0, 1) * 100);
+      switchTitleReturnText.setText(\`\${label} \${percent}%\`);
+      this.children.bringToTop(switchTitleReturnOverlay);
+      if (percent === 100 || percent >= switchTitleReturnLastPercent + 10) {
+        switchTitleReturnLastPercent = percent;
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title-return-loading:progress", {
+          percent,
+          label,
+          elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+        }, true);
+      }
+    };
+    if (switchTitleReturn) {
+      switchTitleReturnOverlay = this.add.container(0, 0).setDepth(10000).setScale(6);
+      switchTitleReturnOverlay.setName("switch-title-return-loading");
+      const switchTitleReturnBackdrop = this.add
+        .rectangle(0, 0, this.scaledCanvas.width, this.scaledCanvas.height, 0x000000)
+        .setOrigin(0);
+      switchTitleReturnText = addTextObject(
+        this.scaledCanvas.width / 2,
+        this.scaledCanvas.height / 2,
+        "Loading... 0%",
+        TextStyle.WINDOW,
+      ).setOrigin(0.5);
+      switchTitleReturnOverlay.add([switchTitleReturnBackdrop, switchTitleReturnText]);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title-return-loading:shown", {
+        elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+      }, true);
+      setSwitchTitleReturnProgress(0, "Loading...");
+    }
+    switchLaunchCheckpoint("start");
+    const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
+if (!battleScene.includes(launchBattleStartReplacement)) {
+  const previousLaunchBattleStartReplacement = launchBattleStartReplacement.replace(
+    `  async launchBattle(
+    switchLoadingScene?: LoadingScene,
+    switchTitleReturn = false,
+  ): Promise<void> {`,
+    "  launchBattle() {",
+  );
+  if (battleScene.includes(previousLaunchBattleStartReplacement)) {
+    battleScene = battleScene.replace(previousLaunchBattleStartReplacement, launchBattleStartReplacement);
+  } else if (!battleScene.includes(launchBattleStartAnchor)) {
+    fail("Could not find launchBattle start timing anchor");
+  } else {
+    battleScene = battleScene.replace(launchBattleStartAnchor, launchBattleStartReplacement);
+  }
+}
+
+const launchResetAnchor = `    this.reset(false, false, true);
+
+    // Initialize UI-related aspects and then start the login phase.`;
+const launchResetReplacement = `    switchLaunchCheckpoint("display-tree-created");
+    setSwitchTitleReturnProgress(0.08, "Building game world...");
+    this.reset(false, false, true);
+    switchLaunchCheckpoint("initial-reset-complete");
+    setSwitchTitleReturnProgress(0.1, "Preparing interface...");
+
+    // Initialize UI-related aspects and then start the login phase.`;
+if (!battleScene.includes(launchResetReplacement)) {
+  if (!battleScene.includes(launchResetAnchor)) fail("Could not find launchBattle reset timing anchor");
+  battleScene = battleScene.replace(launchResetAnchor, launchResetReplacement);
+}
+
+const launchUiAnchor = `    this.ui.setup();
+
+    this.phaseManager.toTitleScreen(true);`;
+const launchUiReplacement = `    await this.ui.setup(
+      switchLoadingScene
+        ? (completed, total) => {
+            const progress = 0.45 + (completed / total) * 0.54;
+            switchLoadingScene.setSwitchStartupProgress(progress, "Preparing interface...");
+          }
+        : switchTitleReturn
+          ? (completed, total) => {
+              const progress = 0.1 + (completed / total) * 0.89;
+              setSwitchTitleReturnProgress(progress, "Loading...");
+            }
+          : undefined,
+    );
+    switchLaunchCheckpoint("ui-setup-complete");
+
+    setSwitchTitleReturnProgress(1, "Ready");
+    this.phaseManager.toTitleScreen(true);
+    if (switchTitleReturnOverlay) {
+      const overlay = switchTitleReturnOverlay;
+      this.game.events.once(Phaser.Core.Events.POST_RENDER, () => {
+        overlay.destroy(true);
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title-return-loading:hidden", {
+          elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+        }, true);
+      });
+    }`;
+if (!battleScene.includes(launchUiReplacement)) {
+  const previousLaunchUiReplacement = `    this.ui.setup();
+    switchLaunchCheckpoint("ui-setup-complete");
+
+    this.phaseManager.toTitleScreen(true);`;
+  if (battleScene.includes(previousLaunchUiReplacement)) {
+    battleScene = battleScene.replace(previousLaunchUiReplacement, launchUiReplacement);
+  } else if (!battleScene.includes(launchUiAnchor)) {
+    fail("Could not find launchBattle UI timing anchor");
+  } else {
+    battleScene = battleScene.replace(launchUiAnchor, launchUiReplacement);
+  }
 }
 
 const resetDestroyAnchor = `        onComplete: () => {
@@ -547,7 +1234,7 @@ const resetDestroyReplacement = `        onComplete: () => {
             children: this.children?.list?.length ?? null,
           }, true);
           // TODO: \`launchBattle\` calls \`reset(false, false, true)\`
-          this.launchBattle();
+          void this.launchBattle(undefined, true);
           switchDiagnostics?.checkpoint?.("scene-reset:launch-returned", {
             elapsedMs: Math.round(performance.now() - switchResetStartedAt),
           }, true);
@@ -583,6 +1270,53 @@ if (!battleScene.includes(resetEndReplacement)) {
   battleScene = battleScene.replace(resetEndAnchor, resetEndReplacement);
 }
 write(battleScenePath, battleScene);
+
+// nx.js reports the Switch's Nintendo-face-button sprites through the
+// web-gamepad logical names, whose A/B artwork is reversed for these two
+// settings footers. Swap only the prompt lookup keys; gameplay mappings stay
+// untouched (ACTION remains the physical A button and CANCEL remains B).
+for (const settingsUiPath of [baseSettingsUiPath, baseControlSettingsUiPath]) {
+  let settingsUi = read(settingsUiPath);
+  const actionPromptAnchor = `    this.navigationIcons["BUTTON_ACTION"] = iconAction;`;
+  const actionPromptReplacement = `    iconAction.setName("switch-settings-prompt-action-a");
+    this.navigationIcons["BUTTON_CANCEL"] = iconAction;`;
+  if (!settingsUi.includes(actionPromptReplacement)) {
+    if (!settingsUi.includes(actionPromptAnchor)) {
+      fail(`Could not find the Switch Action prompt anchor in ${settingsUiPath}`);
+    }
+    settingsUi = settingsUi.replace(actionPromptAnchor, actionPromptReplacement);
+  }
+
+  const cancelPromptAnchor = `    this.navigationIcons["BUTTON_CANCEL"] = iconCancel;`;
+  const cancelPromptReplacement = `    iconCancel.setName("switch-settings-prompt-back-b");
+    this.navigationIcons["BUTTON_ACTION"] = iconCancel;`;
+  if (!settingsUi.includes(cancelPromptReplacement)) {
+    if (!settingsUi.includes(cancelPromptAnchor)) {
+      fail(`Could not find the Switch Back prompt anchor in ${settingsUiPath}`);
+    }
+    settingsUi = settingsUi.replace(cancelPromptAnchor, cancelPromptReplacement);
+  }
+  write(settingsUiPath, settingsUi);
+}
+
+let selectStarterPhase = read(selectStarterPhasePath);
+const freshStarterSeedAnchor = `  start() {
+    super.start();
+
+    audioManager.playBgm("menu");`;
+const freshStarterSeedReplacement = `  start() {
+    super.start();
+
+    // A new Classic/Challenge selection is a new run even when it overwrites
+    // a crashed session. Never inherit the previous session's deterministic
+    // encounter/reward sequence.
+    globalScene.refreshFreshRunSeed("new-run-selection");
+    audioManager.playBgm("menu");`;
+if (!selectStarterPhase.includes(freshStarterSeedReplacement)) {
+  if (!selectStarterPhase.includes(freshStarterSeedAnchor)) fail("Could not find SelectStarterPhase seed anchor");
+  selectStarterPhase = selectStarterPhase.replace(freshStarterSeedAnchor, freshStarterSeedReplacement);
+}
+write(selectStarterPhasePath, selectStarterPhase);
 
 let phase = read(phasePath);
 const phaseEndAnchor = `  public end(): void {
@@ -1044,6 +1778,36 @@ if (!sceneBase.includes(loadBgmReplacement)) {
 write(sceneBasePath, sceneBase);
 
 let backgroundMusic = read(backgroundMusicPath);
+const bgmStaticAnchor = `  private static readonly refCounts = new Map<string, number>();`;
+const bgmStaticReplacement = `  private static readonly refCounts = new Map<string, number>();
+
+  /** Invalidate stale delayed evictions whenever a decoded key is reused. */
+  private static readonly evictionEpoch = new Map<string, number>();
+
+  /** Let nx.js's native audio worker settle before releasing decoded PCM. */
+  private static retireDecodedKey(key: string): void {
+    const epoch = (BackgroundMusic.evictionEpoch.get(key) ?? 0) + 1;
+    BackgroundMusic.evictionEpoch.set(key, epoch);
+    setTimeout(() => {
+      if ((BackgroundMusic.refCounts.get(key) ?? 0) > 0 || BackgroundMusic.evictionEpoch.get(key) !== epoch) {
+        return;
+      }
+      BackgroundMusic.evictionEpoch.delete(key);
+      const existed = globalScene.cache.audio.exists(key);
+      if (existed) globalScene.cache.audio.remove(key);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-cache-retired", {
+        key,
+        existed,
+        settleMs: 1500,
+      }, true);
+    }, 1500);
+  }`;
+if (!backgroundMusic.includes(bgmStaticReplacement)) {
+  if (!backgroundMusic.includes(bgmStaticAnchor)) {
+    fail("Could not find the BackgroundMusic static refcount anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmStaticAnchor, bgmStaticReplacement);
+}
 const bgmConstructorAnchor = `    this.key = key;
     BackgroundMusic.refCounts.set(key, (BackgroundMusic.refCounts.get(key) ?? 0) + 1);
 
@@ -1056,6 +1820,7 @@ const bgmConstructorAnchor = `    this.key = key;
         this.sound = globalScene.sound.add(key, { loop });`;
 const bgmConstructorReplacement = `    this.key = key;
     BackgroundMusic.refCounts.set(key, (BackgroundMusic.refCounts.get(key) ?? 0) + 1);
+    BackgroundMusic.evictionEpoch.set(key, (BackgroundMusic.evictionEpoch.get(key) ?? 0) + 1);
     const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
     switchDiagnostics?.audio?.("bgm-created", {
       key,
@@ -1074,6 +1839,7 @@ const bgmConstructorReplacement = `    this.key = key;
           cached: globalScene.cache.audio.exists(key),
         }, true);
         if (this.destroyed) {
+          BackgroundMusic.retireDecodedKey(key);
           return;
         }
         this.sound = globalScene.sound.add(key, { loop });
@@ -1167,6 +1933,50 @@ if (!backgroundMusic.includes(bgmNativeLoopReplacement)) {
   backgroundMusic = backgroundMusic.replace(bgmNativeLoopAnchor, bgmNativeLoopReplacement);
 }
 
+const bgmFadeAnchor = `  public fadeOut(duration: number, fixed = false, destroy = true): void {
+    const realDuration = fixed ? fixedInt(duration) : duration;
+    this.withSound(sound => {
+      SoundFade.fadeOut(globalScene, sound, realDuration, false);
+    });
+    globalScene.time.delayedCall(realDuration + 100, () => {
+      if (this.destroyed) {
+        return;
+      }
+      if (destroy) {
+        this.destroy();
+      } else if (this.sound) {
+        this.sound.pause();
+      }
+    });
+  }`;
+const bgmFadeReplacement = `  public fadeOut(duration: number, fixed = false, destroy = true): void {
+    // SoundFade repeatedly writes a live WebAudio gain parameter. The pinned
+    // the latest instruction abort began before that first frame completed.
+    // Immediate pause/destroy uses the same native lifecycle already proven
+    // by ordinary BGM handoffs and avoids retaining an overlapping decode.
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-fade-native-bypassed", {
+      key: this.key,
+      requestedDuration: duration,
+      fixed,
+      destroy,
+      wasPlaying: this.sound?.isPlaying ?? false,
+    }, true);
+    if (destroy) {
+      this.destroy();
+    } else {
+      this.pause();
+    }
+  }`;
+if (!backgroundMusic.includes(bgmFadeReplacement)) {
+  if (!backgroundMusic.includes(bgmFadeAnchor)) {
+    fail("Could not find the BackgroundMusic native fade anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmFadeAnchor, bgmFadeReplacement);
+}
+
+backgroundMusic = backgroundMusic.replace('import { fixedInt } from "#utils/common";\n', "");
+backgroundMusic = backgroundMusic.replace('import SoundFade from "phaser3-rex-plugins/plugins/soundfade";\n', "");
+
 const bgmPlayAnchor = `      if (!sound.isPlaying) {
         sound.play();
       }`;
@@ -1233,16 +2043,39 @@ if (!backgroundMusic.includes(bgmDestroyReplacement)) {
   backgroundMusic = backgroundMusic.replace(bgmDestroyAnchor, bgmDestroyReplacement);
 }
 
+const bgmSoundRemovalAnchor = `    if (this.sound != null) {
+      globalScene.sound.remove(this.sound);
+      this.sound = undefined;
+    }`;
+const bgmSoundRemovalReplacement = `    if (this.sound != null) {
+      const retiredSound = this.sound;
+      this.sound = undefined;
+      setTimeout(() => {
+        globalScene.sound.remove(retiredSound);
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-sound-retired", {
+          key: this.key,
+          settleMs: 750,
+        }, true);
+      }, 750);
+    }`;
+if (!backgroundMusic.includes(bgmSoundRemovalReplacement)) {
+  if (!backgroundMusic.includes(bgmSoundRemovalAnchor)) {
+    fail("Could not find the BackgroundMusic sound removal anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmSoundRemovalAnchor, bgmSoundRemovalReplacement);
+}
+
 const bgmCacheRemoveAnchor = `    if (remaining <= 0) {
       BackgroundMusic.refCounts.delete(this.key);
       globalScene.cache.audio.remove(this.key);
     } else {`;
 const bgmCacheRemoveReplacement = `    if (remaining <= 0) {
       BackgroundMusic.refCounts.delete(this.key);
-      globalScene.cache.audio.remove(this.key);
-      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-cache-removed", {
+      BackgroundMusic.retireDecodedKey(this.key);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-cache-retirement-scheduled", {
         key: this.key,
         remaining,
+        settleMs: 1500,
       }, true);
     } else {`;
 if (!backgroundMusic.includes(bgmCacheRemoveReplacement)) {
@@ -1270,6 +2103,27 @@ const bgmHandoffAnchor = `    const previous = this.currentBgm;
       newBgm.play(volume);
     }`;
 const bgmHandoffReplacement = `    const previous = this.currentBgm;
+    const requestedFade = Boolean(fadeOutPrevious && previous?.isPlaying);
+    // Never overlap decoded BGM buffers on Switch. The native gain-fade path
+    // is unsafe in beta.6, while immediate destruction is hardware-proven.
+    previous?.destroy();
+    const newBgm = new BackgroundMusic(resolvedName, loop, loopPoint);
+    this.currentBgm = newBgm;
+
+    globalScene.ui.bgmBar.setBgmToBgmBar(resolvedName);
+
+    const volume = this.getVolume(VolumeSetting.BGM);
+
+    if (requestedFade) {
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-crossfade-native-bypassed", {
+        from: previous?.key ?? null,
+        to: resolvedName,
+        requestedDuration: fadeDuration,
+      }, true);
+    }
+    newBgm.play(volume);`;
+if (!audioManager.includes(bgmHandoffReplacement)) {
+  const previousBgmHandoffReplacement = `    const previous = this.currentBgm;
     const shouldOverlapForFade = Boolean(fadeOutPrevious && previous?.isPlaying);
     if (!shouldOverlapForFade) {
       // BackgroundMusic starts decoding in its constructor. Release the old
@@ -1290,12 +2144,15 @@ const bgmHandoffReplacement = `    const previous = this.currentBgm;
     } else {
       newBgm.play(volume);
     }`;
-if (!audioManager.includes(bgmHandoffReplacement)) {
-  if (!audioManager.includes(bgmHandoffAnchor)) {
+  if (audioManager.includes(previousBgmHandoffReplacement)) {
+    audioManager = audioManager.replace(previousBgmHandoffReplacement, bgmHandoffReplacement);
+  } else if (!audioManager.includes(bgmHandoffAnchor)) {
     fail("Could not find the AudioManager BGM handoff anchor");
+  } else {
+    audioManager = audioManager.replace(bgmHandoffAnchor, bgmHandoffReplacement);
   }
-  audioManager = audioManager.replace(bgmHandoffAnchor, bgmHandoffReplacement);
 }
+audioManager = audioManager.replace('import { fixedInt } from "#utils/common";\n', "");
 write(audioManagerPath, audioManager);
 
 let partyHealPhase = read(partyHealPhasePath);
@@ -1961,6 +2818,29 @@ for (const [placeholder, replacement] of [
     fail(`Could not find ${placeholder} in the patched title handler`);
   }
   title = title.replaceAll(placeholder, replacement);
+}
+const titleShowAnchor = `  show(args: any[]): boolean {
+    const ret = super.show(args);`;
+const titleShowReplacement = `  show(args: any[]): boolean {
+    const global = globalThis as any;
+    const showCount = (global.__SILVERSHADOW_TITLE_SHOW_COUNT__ ?? 0) + 1;
+    global.__SILVERSHADOW_TITLE_SHOW_COUNT__ = showCount;
+    const returnStartedAt = Number(global.__SILVERSHADOW_TITLE_RETURN_STARTED_AT__);
+    const bootStartedAt = Number(global.__SILVERSHADOW_BOOT_STARTED_AT__);
+    global.__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title:show", {
+      showCount,
+      kind: Number.isFinite(returnStartedAt) ? "return" : "initial",
+      elapsedMs: Number.isFinite(returnStartedAt)
+        ? Math.round(performance.now() - returnStartedAt)
+        : Number.isFinite(bootStartedAt)
+          ? Math.round(performance.now() - bootStartedAt)
+          : null,
+    }, true);
+    global.__SILVERSHADOW_TITLE_RETURN_STARTED_AT__ = undefined;
+    const ret = super.show(args);`;
+if (!title.includes(titleShowReplacement)) {
+  if (!title.includes(titleShowAnchor)) fail("Could not find title show timing anchor");
+  title = title.replace(titleShowAnchor, titleShowReplacement);
 }
 write(titlePath, title);
 

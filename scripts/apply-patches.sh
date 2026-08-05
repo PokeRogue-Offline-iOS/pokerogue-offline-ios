@@ -78,6 +78,7 @@ if [[ "$PLATFORM" == "switch" ]]; then
   # Hand the real Phaser application the nx.js screen canvas and inject the
   # Switch Milestone 2 build label. Browser compatibility stays in the nx.js
   # bootstrap so failures remain observable and narrowly scoped.
+  apply_patch "input-stabilization.js" switch
   apply_patch "nxjs-bootstrap.js" switch
 
 fi

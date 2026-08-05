@@ -120,6 +120,7 @@ for (const file of manifest.requiredFiles) {
 
 const entryPath = safeGamePath(manifest.compiledEntryPoint);
 const entry = await readFile(entryPath, "utf8");
+const runtimeEntry = await readFile(path.join(switchRoot, "romfs", "main.js"), "utf8");
 if (
   entry.length < 1_000_000 ||
   !entry.includes("__SILVERSHADOW_WEB_BOOTSTRAP_STARTED__") ||
@@ -131,6 +132,48 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 new AsyncFunction("globalThis", `"use strict";\n${entry}`);
 if (entry.includes("import.meta")) {
   throw new Error("Compiled entry still contains import.meta and cannot be evaluated by the controlled loader.");
+}
+for (const marker of [
+  "rerollCostText",
+  "physicalDown",
+  "suppressedUntilRelease",
+  "duplicate-down",
+  "unmatched-up",
+  "bgm-sound-retired",
+  "bgm-cache-retired",
+  "battle-launch:",
+  "title:show",
+  "startup-progress",
+  "Preparing game...",
+  "Building game world...",
+  "run-seed:reserved",
+  "new-run-selection",
+  "audio/bgm/menu.mp3",
+  "scene-reset:variant-data-ready",
+  "variant-data:cache-ready",
+  "bgm-fade-native-bypassed",
+  "bgm-crossfade-native-bypassed",
+  "title-return-loading:shown",
+  "title-return-loading:progress",
+  "title-return-loading:hidden",
+  "switch-settings-prompt-action-a",
+  "switch-settings-prompt-back-b",
+]) {
+  if (!entry.includes(marker)) {
+    throw new Error(`Compiled Switch entry is missing required stabilization marker: ${marker}`);
+  }
+}
+for (const marker of [
+  "left-and-right-sticks-to-dpad",
+  "Analog navigation edge",
+  "__SILVERSHADOW_ANALOG_SNAPSHOT__",
+]) {
+  if (!runtimeEntry.includes(marker)) {
+    throw new Error(`Compiled nx.js runtime entry is missing required controller marker: ${marker}`);
+  }
+}
+if (!/rerollCostText[^;]{0,160}Number\.isFinite\([^)]*\.rerollCost\)/.test(entry)) {
+  throw new Error("Compiled Switch entry can refresh an uninitialized reroll cost.");
 }
 
 const compiledJavaScript = (await listFiles(gameRoot)).filter(file => /\.(?:m?js)$/i.test(file));

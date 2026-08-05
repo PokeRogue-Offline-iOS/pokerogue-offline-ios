@@ -9,7 +9,7 @@ import {
   SWITCH_PLATFORM_VERSION,
 } from "./constants";
 import type { AssetPackManifest } from "./asset-packs";
-import { readMemorySnapshot } from "./diagnostics";
+import { readGraphicsSnapshot, readMemorySnapshot } from "./diagnostics";
 import { appendLog } from "./logger";
 
 interface RequiredFile {
@@ -71,10 +71,19 @@ let currentStage: StartupStage = "native-bootstrap";
 let activeManifest: SwitchGameManifest | null = null;
 let requestedResource: string | null = null;
 let requestedResourceKind: "embedded" | "sd-card" | "local" | "network" | "unknown" = "unknown";
+const startupStartedAt = performance.now();
+let previousStageAt = startupStartedAt;
+(globalThis as any).__SILVERSHADOW_BOOT_STARTED_AT__ = startupStartedAt;
 
 export function setStartupStage(stage: StartupStage, detail?: unknown): void {
+  const now = performance.now();
   currentStage = stage;
-  appendLog("INFO", `Startup stage: ${stage}`, detail ?? "");
+  appendLog("INFO", `Startup stage: ${stage}`, {
+    totalMs: Number((now - startupStartedAt).toFixed(3)),
+    sincePreviousMs: Number((now - previousStageAt).toFixed(3)),
+    detail: detail ?? null,
+  });
+  previousStageAt = now;
 }
 
 export function setRequestedResource(path: string, kind: typeof requestedResourceKind): void {
@@ -269,6 +278,7 @@ export function showFatalError(error: unknown): void {
     manifestVersion: activeManifest?.schemaVersion ?? null,
     compatibilityShims: activeManifest?.compatibilityShims ?? [],
     memory: readMemorySnapshot(),
+    graphics: readGraphicsSnapshot(),
   };
   appendLog("ERROR", "Fatal startup failure", diagnostics);
 
