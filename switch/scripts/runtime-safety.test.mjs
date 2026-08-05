@@ -96,6 +96,18 @@ test("startup progress reserves completion for a rendered ready frame", () => {
   assert.match(gamePatch, /percent >= this\.switchLastLoggedPercent \+ 10/);
 });
 
+test("title returns stay visibly progressive and Switch settings show Nintendo A/B prompts", () => {
+  assert.match(gamePatch, /title-return-loading:shown/);
+  assert.match(gamePatch, /title-return-loading:progress/);
+  assert.match(gamePatch, /title-return-loading:hidden/);
+  assert.match(gamePatch, /0\.1 \+ \(completed \/ total\) \* 0\.89/);
+  assert.match(gamePatch, /void this\.launchBattle\(undefined, true\)/);
+  assert.match(gamePatch, /switch-settings-prompt-action-a/);
+  assert.match(gamePatch, /switch-settings-prompt-back-b/);
+  assert.match(gamePatch, /navigationIcons\["BUTTON_CANCEL"\] = iconAction/);
+  assert.match(gamePatch, /navigationIcons\["BUTTON_ACTION"\] = iconCancel/);
+});
+
 test("starter selection is responsive and every new run receives fresh Switch entropy", () => {
   assert.match(gamePatch, /this\.load\.audio\("menu", getCachedUrl\("audio\/bgm\/menu\.mp3"\)\)/);
   assert.match(gamePatch, /refreshFreshRunSeed\(reason: string\)/);

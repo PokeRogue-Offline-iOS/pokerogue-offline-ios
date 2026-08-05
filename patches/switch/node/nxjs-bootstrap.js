@@ -25,6 +25,14 @@ const selectModifierPhasePath = path.join("pokerogue-src", "src", "phases", "sel
 const selectStarterPhasePath = path.join("pokerogue-src", "src", "phases", "select-starter-phase.ts");
 const switchBiomePhasePath = path.join("pokerogue-src", "src", "phases", "switch-biome-phase.ts");
 const modifierSelectUiPath = path.join("pokerogue-src", "src", "ui", "handlers", "modifier-select-ui-handler.ts");
+const baseSettingsUiPath = path.join("pokerogue-src", "src", "ui", "settings", "base-settings-ui-handler.ts");
+const baseControlSettingsUiPath = path.join(
+  "pokerogue-src",
+  "src",
+  "ui",
+  "settings",
+  "base-control-settings-ui-handler.ts",
+);
 const titlePath = path.join("pokerogue-src", "src", "ui", "handlers", "title-ui-handler.ts");
 const touchControlsPath = path.join("pokerogue-src", "src", "touch-controls.ts");
 
@@ -1077,18 +1085,59 @@ if (!battleScene.includes(variantDataReplacement)) {
 
 const launchBattleStartAnchor = `  launchBattle() {
     const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
-const launchBattleStartReplacement = `  async launchBattle(switchLoadingScene?: LoadingScene): Promise<void> {
+const launchBattleStartReplacement = `  async launchBattle(
+    switchLoadingScene?: LoadingScene,
+    switchTitleReturn = false,
+  ): Promise<void> {
     const switchLaunchStartedAt = performance.now();
     const switchLaunchCheckpoint = (stage: string) =>
       (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(\`battle-launch:\${stage}\`, {
         elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
         children: this.children?.list?.length ?? null,
       }, true);
+    let switchTitleReturnOverlay: Phaser.GameObjects.Container | undefined;
+    let switchTitleReturnText: Phaser.GameObjects.Text | undefined;
+    let switchTitleReturnLastPercent = -10;
+    const setSwitchTitleReturnProgress = (progress: number, label: string) => {
+      if (!switchTitleReturnOverlay || !switchTitleReturnText) return;
+      const percent = Math.round(Phaser.Math.Clamp(progress, 0, 1) * 100);
+      switchTitleReturnText.setText(\`\${label} \${percent}%\`);
+      this.children.bringToTop(switchTitleReturnOverlay);
+      if (percent === 100 || percent >= switchTitleReturnLastPercent + 10) {
+        switchTitleReturnLastPercent = percent;
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title-return-loading:progress", {
+          percent,
+          label,
+          elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+        }, true);
+      }
+    };
+    if (switchTitleReturn) {
+      switchTitleReturnOverlay = this.add.container(0, 0).setDepth(10000).setScale(6);
+      switchTitleReturnOverlay.setName("switch-title-return-loading");
+      const switchTitleReturnBackdrop = this.add
+        .rectangle(0, 0, this.scaledCanvas.width, this.scaledCanvas.height, 0x000000)
+        .setOrigin(0);
+      switchTitleReturnText = addTextObject(
+        this.scaledCanvas.width / 2,
+        this.scaledCanvas.height / 2,
+        "Loading... 0%",
+        TextStyle.WINDOW,
+      ).setOrigin(0.5);
+      switchTitleReturnOverlay.add([switchTitleReturnBackdrop, switchTitleReturnText]);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title-return-loading:shown", {
+        elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+      }, true);
+      setSwitchTitleReturnProgress(0, "Loading...");
+    }
     switchLaunchCheckpoint("start");
     const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
 if (!battleScene.includes(launchBattleStartReplacement)) {
   const previousLaunchBattleStartReplacement = launchBattleStartReplacement.replace(
-    "  async launchBattle(switchLoadingScene?: LoadingScene): Promise<void> {",
+    `  async launchBattle(
+    switchLoadingScene?: LoadingScene,
+    switchTitleReturn = false,
+  ): Promise<void> {`,
     "  launchBattle() {",
   );
   if (battleScene.includes(previousLaunchBattleStartReplacement)) {
@@ -1104,8 +1153,10 @@ const launchResetAnchor = `    this.reset(false, false, true);
 
     // Initialize UI-related aspects and then start the login phase.`;
 const launchResetReplacement = `    switchLaunchCheckpoint("display-tree-created");
+    setSwitchTitleReturnProgress(0.08, "Building game world...");
     this.reset(false, false, true);
     switchLaunchCheckpoint("initial-reset-complete");
+    setSwitchTitleReturnProgress(0.1, "Preparing interface...");
 
     // Initialize UI-related aspects and then start the login phase.`;
 if (!battleScene.includes(launchResetReplacement)) {
@@ -1122,11 +1173,26 @@ const launchUiReplacement = `    await this.ui.setup(
             const progress = 0.45 + (completed / total) * 0.54;
             switchLoadingScene.setSwitchStartupProgress(progress, "Preparing interface...");
           }
-        : undefined,
+        : switchTitleReturn
+          ? (completed, total) => {
+              const progress = 0.1 + (completed / total) * 0.89;
+              setSwitchTitleReturnProgress(progress, "Loading...");
+            }
+          : undefined,
     );
     switchLaunchCheckpoint("ui-setup-complete");
 
-    this.phaseManager.toTitleScreen(true);`;
+    setSwitchTitleReturnProgress(1, "Ready");
+    this.phaseManager.toTitleScreen(true);
+    if (switchTitleReturnOverlay) {
+      const overlay = switchTitleReturnOverlay;
+      this.game.events.once(Phaser.Core.Events.POST_RENDER, () => {
+        overlay.destroy(true);
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title-return-loading:hidden", {
+          elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+        }, true);
+      });
+    }`;
 if (!battleScene.includes(launchUiReplacement)) {
   const previousLaunchUiReplacement = `    this.ui.setup();
     switchLaunchCheckpoint("ui-setup-complete");
@@ -1168,7 +1234,7 @@ const resetDestroyReplacement = `        onComplete: () => {
             children: this.children?.list?.length ?? null,
           }, true);
           // TODO: \`launchBattle\` calls \`reset(false, false, true)\`
-          void this.launchBattle();
+          void this.launchBattle(undefined, true);
           switchDiagnostics?.checkpoint?.("scene-reset:launch-returned", {
             elapsedMs: Math.round(performance.now() - switchResetStartedAt),
           }, true);
@@ -1204,6 +1270,34 @@ if (!battleScene.includes(resetEndReplacement)) {
   battleScene = battleScene.replace(resetEndAnchor, resetEndReplacement);
 }
 write(battleScenePath, battleScene);
+
+// nx.js reports the Switch's Nintendo-face-button sprites through the
+// web-gamepad logical names, whose A/B artwork is reversed for these two
+// settings footers. Swap only the prompt lookup keys; gameplay mappings stay
+// untouched (ACTION remains the physical A button and CANCEL remains B).
+for (const settingsUiPath of [baseSettingsUiPath, baseControlSettingsUiPath]) {
+  let settingsUi = read(settingsUiPath);
+  const actionPromptAnchor = `    this.navigationIcons["BUTTON_ACTION"] = iconAction;`;
+  const actionPromptReplacement = `    iconAction.setName("switch-settings-prompt-action-a");
+    this.navigationIcons["BUTTON_CANCEL"] = iconAction;`;
+  if (!settingsUi.includes(actionPromptReplacement)) {
+    if (!settingsUi.includes(actionPromptAnchor)) {
+      fail(`Could not find the Switch Action prompt anchor in ${settingsUiPath}`);
+    }
+    settingsUi = settingsUi.replace(actionPromptAnchor, actionPromptReplacement);
+  }
+
+  const cancelPromptAnchor = `    this.navigationIcons["BUTTON_CANCEL"] = iconCancel;`;
+  const cancelPromptReplacement = `    iconCancel.setName("switch-settings-prompt-back-b");
+    this.navigationIcons["BUTTON_ACTION"] = iconCancel;`;
+  if (!settingsUi.includes(cancelPromptReplacement)) {
+    if (!settingsUi.includes(cancelPromptAnchor)) {
+      fail(`Could not find the Switch Back prompt anchor in ${settingsUiPath}`);
+    }
+    settingsUi = settingsUi.replace(cancelPromptAnchor, cancelPromptReplacement);
+  }
+  write(settingsUiPath, settingsUi);
+}
 
 let selectStarterPhase = read(selectStarterPhasePath);
 const freshStarterSeedAnchor = `  start() {

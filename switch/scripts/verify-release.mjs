@@ -153,6 +153,11 @@ for (const marker of [
   "variant-data:cache-ready",
   "bgm-fade-native-bypassed",
   "bgm-crossfade-native-bypassed",
+  "title-return-loading:shown",
+  "title-return-loading:progress",
+  "title-return-loading:hidden",
+  "switch-settings-prompt-action-a",
+  "switch-settings-prompt-back-b",
 ]) {
   if (!entry.includes(marker)) {
     throw new Error(`Compiled Switch entry is missing required stabilization marker: ${marker}`);
