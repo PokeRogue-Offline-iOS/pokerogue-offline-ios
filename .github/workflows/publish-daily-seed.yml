@@ -43,7 +43,9 @@ jobs:
           # first-party browser context as the official game, without using
           # Scooom's server, another mirror, or any third-party proxy.
           echo "Fetching the official seed from a first-party pokerogue.net browser context."
-          if candidate="$(POKEROGUE_CLIENT_VERSION="$client_version" node scripts/fetch-official-daily-seed.js)"; then
+          # Use the runner's virtual display so Cloudflare sees a normal
+          # non-headless Chrome session rather than Chrome's headless mode.
+          if candidate="$(xvfb-run -a env POKEROGUE_CHROME_HEADFUL=1 POKEROGUE_CLIENT_VERSION="$client_version" node scripts/fetch-official-daily-seed.js)"; then
             candidate="$(printf '%s' "$candidate" | tr -d '\r\n')"
             if [[ -n "$candidate" && ${#candidate} -le 131072 && "$candidate" =~ ^[A-Za-z0-9+/=_-]+$ ]]; then
               seed="$candidate"

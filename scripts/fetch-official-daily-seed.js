@@ -103,8 +103,19 @@ async function fetchSeed() {
   try {
     await waitForDriver(driver);
 
+    const chromeArguments = [
+      "--disable-blink-features=AutomationControlled",
+      "--disable-dev-shm-usage",
+      "--no-sandbox",
+      "--window-size=1280,720",
+    ];
+    if (process.env.POKEROGUE_CHROME_HEADFUL !== "1") {
+      chromeArguments.push("--headless=new");
+    }
     const chromeOptions = {
-      args: ["--disable-dev-shm-usage", "--headless=new", "--no-sandbox", "--window-size=1280,720"],
+      args: chromeArguments,
+      excludeSwitches: ["enable-automation"],
+      useAutomationExtension: false,
     };
     if (process.env.CHROME_BIN) {
       chromeOptions.binary = process.env.CHROME_BIN;
