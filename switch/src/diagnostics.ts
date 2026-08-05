@@ -1,4 +1,4 @@
-import { appendLog } from "./logger";
+import { appendLog, readLogIoStats } from "./logger";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const FLIGHT_RECORDER_INTERVAL_MS = 10_000;
@@ -835,11 +835,20 @@ function attachPhaserGame(game: any): void {
     counters.stepCount++;
     counters.lastStepAt = now;
   });
+  let firstRenderRecorded = false;
   game.events.on("postrender", () => {
     const now = Date.now();
     recordFrameGap("render", counters.lastRenderAt, now);
     counters.renderCount++;
     counters.lastRenderAt = now;
+    if (!firstRenderRecorded) {
+      firstRenderRecorded = true;
+      const bootStartedAt = Number((globalThis as any).__SILVERSHADOW_BOOT_STARTED_AT__);
+      appendLog("INFO", "Startup timing", {
+        stage: "first-render",
+        elapsedMs: Number.isFinite(bootStartedAt) ? Number((performance.now() - bootStartedAt).toFixed(3)) : null,
+      });
+    }
   });
   audioCapabilities = game.device?.audio ?? "unavailable";
   audioContextState = {
@@ -946,6 +955,7 @@ function flightRecorder(): void {
       window: completedWindow,
     },
     audio: readCompactAudioSnapshot(),
+    io: readIoStats(),
     memory: compactMemory(tryReadMemoryValues()),
     webgl: readWebGlHealth(false),
   });
@@ -1029,9 +1039,17 @@ function heartbeat(): void {
     },
     webgl: readWebGlHealth(true),
     audio: readAudioSnapshot(),
+    io: readIoStats(),
     memory: readMemorySnapshot(),
   });
   lastHeartbeatCounters = current;
+}
+
+function readIoStats(): unknown {
+  return {
+    log: readLogIoStats(),
+    storage: (globalThis as any).__SILVERSHADOW_STORAGE_IO__ ?? null,
+  };
 }
 
 export function installRuntimeDiagnostics(): void {

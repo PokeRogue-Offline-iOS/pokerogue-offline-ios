@@ -8,7 +8,7 @@ import {
 } from "./asset-packs";
 import { installAudioCompatibilityShims } from "./audio-shim";
 import { captureMemorySnapshot, installRuntimeDiagnostics } from "./diagnostics";
-import { appendLog } from "./logger";
+import { appendLog, flushLog } from "./logger";
 import { installPersistentStorage } from "./storage";
 import { installXmlHttpRequestShim } from "./xhr-shim";
 import {
@@ -20,6 +20,8 @@ import {
 } from "./startup";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
+let localResourceRequestCount = 0;
+const recentLocalResources: { requested: string; resolved: string; kind: string }[] = [];
 
 addEventListener("error", (event: any) => {
   appendLog("ERROR", "Global error", {
@@ -62,11 +64,22 @@ async function boot(): Promise<void> {
         : "diagnostics-unavailable",
     });
     captureMemorySnapshot("plus-button-exit-request");
+    flushLog();
   });
 
+  let timingStartedAt = performance.now();
   const manifest = await validateStartup();
+  appendLog("INFO", "Startup timing", {
+    stage: "validation",
+    elapsedMs: Number((performance.now() - timingStartedAt).toFixed(3)),
+  });
+  timingStartedAt = performance.now();
   await initializeAssetPacks(manifest.assetPacks);
   await verifyPackedAssetPrefix("fonts/");
+  appendLog("INFO", "Startup timing", {
+    stage: "asset-pack-index-and-font-prefix",
+    elapsedMs: Number((performance.now() - timingStartedAt).toFixed(3)),
+  });
   setStartupStage("asset-packs-checked", {
     packs: manifest.assetPacks.packCount,
     entries: manifest.assetPacks.entryCount,
@@ -76,6 +89,7 @@ async function boot(): Promise<void> {
     appendLog("WARN", "Continuing after a Canvas regression diagnostic failure", diagnostics);
   }
 
+  timingStartedAt = performance.now();
   const { installDomShim } = await import("./dom-shim");
   installDomShim();
   installLocationShim();
@@ -86,6 +100,10 @@ async function boot(): Promise<void> {
   installFontFaceShim();
   installFonts();
   logFontMetrics();
+  appendLog("INFO", "Startup timing", {
+    stage: "shims-and-fonts",
+    elapsedMs: Number((performance.now() - timingStartedAt).toFixed(3)),
+  });
   setStartupStage("compatibility-shims-installed", {
     active: manifest.compatibilityShims,
   });
@@ -93,11 +111,23 @@ async function boot(): Promise<void> {
 
   const entryPath = `${GAME_ROOT}/${manifest.compiledEntryPoint}`;
   setRequestedResource(entryPath, "sd-card");
+  timingStartedAt = performance.now();
   const entryData = readGameFileSync(entryPath);
   if (entryData === null) {
     throw new Error(`Compiled entry is missing after manifest validation: ${entryPath}`);
   }
+  appendLog("INFO", "Startup timing", {
+    stage: "bundle-read",
+    elapsedMs: Number((performance.now() - timingStartedAt).toFixed(3)),
+    bytes: entryData.byteLength,
+  });
+  timingStartedAt = performance.now();
   const entryCode = new TextDecoder().decode(entryData);
+  appendLog("INFO", "Startup timing", {
+    stage: "bundle-decode",
+    elapsedMs: Number((performance.now() - timingStartedAt).toFixed(3)),
+    characters: entryCode.length,
+  });
   setStartupStage("compiled-entry-resolved", {
     path: entryPath,
     bytes: entryData.byteLength,
@@ -108,11 +138,21 @@ async function boot(): Promise<void> {
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (
     ...args: string[]
   ) => (...values: unknown[]) => Promise<unknown>;
+  timingStartedAt = performance.now();
   const evaluate = new AsyncFunction(
     "globalThis",
     `"use strict";\n${entryCode}\n//# sourceURL=${entryPath}`,
   );
+  appendLog("INFO", "Startup timing", {
+    stage: "bundle-compile",
+    elapsedMs: Number((performance.now() - timingStartedAt).toFixed(3)),
+  });
+  timingStartedAt = performance.now();
   await evaluate(globalThis);
+  appendLog("INFO", "Startup timing", {
+    stage: "bundle-evaluation",
+    elapsedMs: Number((performance.now() - timingStartedAt).toFixed(3)),
+  });
   setStartupStage("compiled-entry-evaluated", {
     bootstrapStarted: Boolean((globalThis as any).__SILVERSHADOW_WEB_BOOTSTRAP_STARTED__),
     bootstrapResolved: Boolean((globalThis as any).__SILVERSHADOW_WEB_BOOTSTRAP_RESOLVED__),
@@ -182,11 +222,22 @@ function installOfflineFetch(): void {
           : `Unsupported or out-of-root resource URL is blocked: ${original}`,
       );
     }
-    appendLog("INFO", "Local resource request", {
+    const resourceEvent = {
       requested: original,
       resolved: resolution.url,
       kind: resolution.kind,
-    });
+    };
+    localResourceRequestCount++;
+    recentLocalResources.push(resourceEvent);
+    if (recentLocalResources.length > 32) recentLocalResources.shift();
+    (globalThis as any).__SILVERSHADOW_RESOURCE_EVENTS__ = recentLocalResources;
+    if (localResourceRequestCount <= 48 || localResourceRequestCount % 128 === 0) {
+      appendLog("INFO", "Local resource requests", {
+        count: localResourceRequestCount,
+        current: resourceEvent,
+        recent: localResourceRequestCount % 128 === 0 ? recentLocalResources : undefined,
+      });
+    }
     if (resolution.kind === "sd-card") {
       return readSdCardResponse(resolution.url, input, init);
     }

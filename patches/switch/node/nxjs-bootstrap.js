@@ -503,6 +503,7 @@ const resetClearSceneAnchor = `    if (clearScene) {
 
       audioManager.fadeOutBgm(250);`;
 const resetClearSceneReplacement = `    if (clearScene) {
+      (globalThis as any).__SILVERSHADOW_TITLE_RETURN_STARTED_AT__ = switchResetStartedAt;
       switchDiagnostics?.checkpoint?.("scene-reset:clear-scene-start", {
         elapsedMs: Math.round(performance.now() - switchResetStartedAt),
       }, true);
@@ -518,6 +519,47 @@ if (!battleScene.includes(resetClearSceneReplacement)) {
     fail("Could not find the BattleScene clear-scene diagnostic anchor");
   }
   battleScene = battleScene.replace(resetClearSceneAnchor, resetClearSceneReplacement);
+}
+
+const launchBattleStartAnchor = `  launchBattle() {
+    const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
+const launchBattleStartReplacement = `  launchBattle() {
+    const switchLaunchStartedAt = performance.now();
+    const switchLaunchCheckpoint = (stage: string) =>
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(\`battle-launch:\${stage}\`, {
+        elapsedMs: Math.round(performance.now() - switchLaunchStartedAt),
+        children: this.children?.list?.length ?? null,
+      }, true);
+    switchLaunchCheckpoint("start");
+    const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
+if (!battleScene.includes(launchBattleStartReplacement)) {
+  if (!battleScene.includes(launchBattleStartAnchor)) fail("Could not find launchBattle start timing anchor");
+  battleScene = battleScene.replace(launchBattleStartAnchor, launchBattleStartReplacement);
+}
+
+const launchResetAnchor = `    this.reset(false, false, true);
+
+    // Initialize UI-related aspects and then start the login phase.`;
+const launchResetReplacement = `    switchLaunchCheckpoint("display-tree-created");
+    this.reset(false, false, true);
+    switchLaunchCheckpoint("initial-reset-complete");
+
+    // Initialize UI-related aspects and then start the login phase.`;
+if (!battleScene.includes(launchResetReplacement)) {
+  if (!battleScene.includes(launchResetAnchor)) fail("Could not find launchBattle reset timing anchor");
+  battleScene = battleScene.replace(launchResetAnchor, launchResetReplacement);
+}
+
+const launchUiAnchor = `    this.ui.setup();
+
+    this.phaseManager.toTitleScreen(true);`;
+const launchUiReplacement = `    this.ui.setup();
+    switchLaunchCheckpoint("ui-setup-complete");
+
+    this.phaseManager.toTitleScreen(true);`;
+if (!battleScene.includes(launchUiReplacement)) {
+  if (!battleScene.includes(launchUiAnchor)) fail("Could not find launchBattle UI timing anchor");
+  battleScene = battleScene.replace(launchUiAnchor, launchUiReplacement);
 }
 
 const resetDestroyAnchor = `        onComplete: () => {
@@ -1044,6 +1086,36 @@ if (!sceneBase.includes(loadBgmReplacement)) {
 write(sceneBasePath, sceneBase);
 
 let backgroundMusic = read(backgroundMusicPath);
+const bgmStaticAnchor = `  private static readonly refCounts = new Map<string, number>();`;
+const bgmStaticReplacement = `  private static readonly refCounts = new Map<string, number>();
+
+  /** Invalidate stale delayed evictions whenever a decoded key is reused. */
+  private static readonly evictionEpoch = new Map<string, number>();
+
+  /** Let nx.js's native audio worker settle before releasing decoded PCM. */
+  private static retireDecodedKey(key: string): void {
+    const epoch = (BackgroundMusic.evictionEpoch.get(key) ?? 0) + 1;
+    BackgroundMusic.evictionEpoch.set(key, epoch);
+    setTimeout(() => {
+      if ((BackgroundMusic.refCounts.get(key) ?? 0) > 0 || BackgroundMusic.evictionEpoch.get(key) !== epoch) {
+        return;
+      }
+      BackgroundMusic.evictionEpoch.delete(key);
+      const existed = globalScene.cache.audio.exists(key);
+      if (existed) globalScene.cache.audio.remove(key);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-cache-retired", {
+        key,
+        existed,
+        settleMs: 1500,
+      }, true);
+    }, 1500);
+  }`;
+if (!backgroundMusic.includes(bgmStaticReplacement)) {
+  if (!backgroundMusic.includes(bgmStaticAnchor)) {
+    fail("Could not find the BackgroundMusic static refcount anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmStaticAnchor, bgmStaticReplacement);
+}
 const bgmConstructorAnchor = `    this.key = key;
     BackgroundMusic.refCounts.set(key, (BackgroundMusic.refCounts.get(key) ?? 0) + 1);
 
@@ -1056,6 +1128,7 @@ const bgmConstructorAnchor = `    this.key = key;
         this.sound = globalScene.sound.add(key, { loop });`;
 const bgmConstructorReplacement = `    this.key = key;
     BackgroundMusic.refCounts.set(key, (BackgroundMusic.refCounts.get(key) ?? 0) + 1);
+    BackgroundMusic.evictionEpoch.set(key, (BackgroundMusic.evictionEpoch.get(key) ?? 0) + 1);
     const switchDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
     switchDiagnostics?.audio?.("bgm-created", {
       key,
@@ -1074,6 +1147,7 @@ const bgmConstructorReplacement = `    this.key = key;
           cached: globalScene.cache.audio.exists(key),
         }, true);
         if (this.destroyed) {
+          BackgroundMusic.retireDecodedKey(key);
           return;
         }
         this.sound = globalScene.sound.add(key, { loop });
@@ -1233,16 +1307,39 @@ if (!backgroundMusic.includes(bgmDestroyReplacement)) {
   backgroundMusic = backgroundMusic.replace(bgmDestroyAnchor, bgmDestroyReplacement);
 }
 
+const bgmSoundRemovalAnchor = `    if (this.sound != null) {
+      globalScene.sound.remove(this.sound);
+      this.sound = undefined;
+    }`;
+const bgmSoundRemovalReplacement = `    if (this.sound != null) {
+      const retiredSound = this.sound;
+      this.sound = undefined;
+      setTimeout(() => {
+        globalScene.sound.remove(retiredSound);
+        (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-sound-retired", {
+          key: this.key,
+          settleMs: 750,
+        }, true);
+      }, 750);
+    }`;
+if (!backgroundMusic.includes(bgmSoundRemovalReplacement)) {
+  if (!backgroundMusic.includes(bgmSoundRemovalAnchor)) {
+    fail("Could not find the BackgroundMusic sound removal anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmSoundRemovalAnchor, bgmSoundRemovalReplacement);
+}
+
 const bgmCacheRemoveAnchor = `    if (remaining <= 0) {
       BackgroundMusic.refCounts.delete(this.key);
       globalScene.cache.audio.remove(this.key);
     } else {`;
 const bgmCacheRemoveReplacement = `    if (remaining <= 0) {
       BackgroundMusic.refCounts.delete(this.key);
-      globalScene.cache.audio.remove(this.key);
-      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-cache-removed", {
+      BackgroundMusic.retireDecodedKey(this.key);
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-cache-retirement-scheduled", {
         key: this.key,
         remaining,
+        settleMs: 1500,
       }, true);
     } else {`;
 if (!backgroundMusic.includes(bgmCacheRemoveReplacement)) {
@@ -1961,6 +2058,29 @@ for (const [placeholder, replacement] of [
     fail(`Could not find ${placeholder} in the patched title handler`);
   }
   title = title.replaceAll(placeholder, replacement);
+}
+const titleShowAnchor = `  show(args: any[]): boolean {
+    const ret = super.show(args);`;
+const titleShowReplacement = `  show(args: any[]): boolean {
+    const global = globalThis as any;
+    const showCount = (global.__SILVERSHADOW_TITLE_SHOW_COUNT__ ?? 0) + 1;
+    global.__SILVERSHADOW_TITLE_SHOW_COUNT__ = showCount;
+    const returnStartedAt = Number(global.__SILVERSHADOW_TITLE_RETURN_STARTED_AT__);
+    const bootStartedAt = Number(global.__SILVERSHADOW_BOOT_STARTED_AT__);
+    global.__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("title:show", {
+      showCount,
+      kind: Number.isFinite(returnStartedAt) ? "return" : "initial",
+      elapsedMs: Number.isFinite(returnStartedAt)
+        ? Math.round(performance.now() - returnStartedAt)
+        : Number.isFinite(bootStartedAt)
+          ? Math.round(performance.now() - bootStartedAt)
+          : null,
+    }, true);
+    global.__SILVERSHADOW_TITLE_RETURN_STARTED_AT__ = undefined;
+    const ret = super.show(args);`;
+if (!title.includes(titleShowReplacement)) {
+  if (!title.includes(titleShowAnchor)) fail("Could not find title show timing anchor");
+  title = title.replace(titleShowAnchor, titleShowReplacement);
 }
 write(titlePath, title);
 

@@ -9,6 +9,15 @@ const gamePatch = readFileSync(
   new URL("../../patches/switch/node/nxjs-bootstrap.js", import.meta.url),
   "utf8",
 );
+const inputPatch = readFileSync(
+  new URL("../../patches/switch/node/input-stabilization.js", import.meta.url),
+  "utf8",
+);
+const liveSettingsPatch = readFileSync(
+  new URL("../../patches/all/node/live-cheat-settings.js", import.meta.url),
+  "utf8",
+);
+const logger = readFileSync(new URL("../src/logger.ts", import.meta.url), "utf8");
 
 test("the Switch runtime keeps a bounded freeze flight recorder and dual watchdogs", () => {
   assert.match(diagnostics, /const FLIGHT_RECORDER_INTERVAL_MS = 10_000;/);
@@ -33,4 +42,26 @@ test("Plus remains routed to game input while diagnostics only observe the reque
   assert.match(main, /event\.preventDefault\(\);/);
   assert.match(main, /captureMemorySnapshot\("plus-button-exit-request"\);/);
   assert.doesNotMatch(main, /Switch\.exit\(\)/);
+});
+
+test("command buttons are edge-triggered while only directions repeat across a UI generation", () => {
+  assert.match(inputPatch, /if \(!this\.isDirectional\(mapped\)\) return/);
+  assert.match(inputPatch, /generation !== this\.transitionGeneration/);
+  assert.match(inputPatch, /suppressedUntilRelease/);
+  assert.match(inputPatch, /recordPhysicalInput\("unmatched-up"/);
+  assert.match(inputPatch, /beginUiTransition\(this\.mode, mode\)/);
+});
+
+test("live settings cannot retain reload and inactive reroll UI is not refreshed uninitialized", () => {
+  assert.match(liveSettingsPatch, /finalRow\.includes\("requireReload"\)/);
+  assert.match(liveSettingsPatch, /Number\.isFinite\(handler\.rerollCost\)/);
+  assert.match(liveSettingsPatch, /handler\?\.rerollCostText/);
+});
+
+test("logging is bounded and audio teardown crosses a native settle window", () => {
+  assert.match(logger, /const MAX_PENDING_BYTES = 64 \* 1024/);
+  assert.match(logger, /const FLUSH_INTERVAL_MS = 250/);
+  assert.match(gamePatch, /bgm-sound-retired/);
+  assert.match(gamePatch, /bgm-cache-retired/);
+  assert.match(gamePatch, /settleMs: 1500/);
 });

@@ -132,6 +132,24 @@ new AsyncFunction("globalThis", `"use strict";\n${entry}`);
 if (entry.includes("import.meta")) {
   throw new Error("Compiled entry still contains import.meta and cannot be evaluated by the controlled loader.");
 }
+for (const marker of [
+  "rerollCostText",
+  "physicalDown",
+  "suppressedUntilRelease",
+  "duplicate-down",
+  "unmatched-up",
+  "bgm-sound-retired",
+  "bgm-cache-retired",
+  "battle-launch:",
+  "title:show",
+]) {
+  if (!entry.includes(marker)) {
+    throw new Error(`Compiled Switch entry is missing required stabilization marker: ${marker}`);
+  }
+}
+if (!/rerollCostText[^;]{0,160}Number\.isFinite\([^)]*\.rerollCost\)/.test(entry)) {
+  throw new Error("Compiled Switch entry can refresh an uninitialized reroll cost.");
+}
 
 const compiledJavaScript = (await listFiles(gameRoot)).filter(file => /\.(?:m?js)$/i.test(file));
 if (

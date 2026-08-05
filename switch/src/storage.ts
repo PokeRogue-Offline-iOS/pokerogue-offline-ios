@@ -6,6 +6,16 @@ interface StorageDocument {
   values: Record<string, string>;
 }
 
+const storageIoStats = {
+  writes: 0,
+  skippedUnchanged: 0,
+  bytes: 0,
+  totalMs: 0,
+  maxMs: 0,
+  slowWrites: 0,
+  lastMs: 0,
+};
+
 function readDocument(path: string): StorageDocument | null {
   const data = Switch.readFileSync(path);
   if (data === null) {
@@ -35,6 +45,7 @@ export function installPersistentStorage(): void {
   const values: Record<string, string> = { ...(primary ?? backup ?? { values: {} }).values };
 
   const persist = (): void => {
+    const startedAt = performance.now();
     const document: StorageDocument = { schemaVersion: 1, values };
     const encoded = `${JSON.stringify(document, null, 2)}\n`;
     Switch.writeFileSync(STORAGE_TEMP_PATH, encoded);
@@ -45,6 +56,21 @@ export function installPersistentStorage(): void {
       Switch.renameSync(STORAGE_PATH, STORAGE_BACKUP_PATH);
     }
     Switch.renameSync(STORAGE_TEMP_PATH, STORAGE_PATH);
+    const elapsed = performance.now() - startedAt;
+    storageIoStats.writes++;
+    storageIoStats.bytes += encoded.length;
+    storageIoStats.totalMs += elapsed;
+    storageIoStats.maxMs = Math.max(storageIoStats.maxMs, elapsed);
+    storageIoStats.lastMs = elapsed;
+    if (elapsed >= 25 && storageIoStats.slowWrites < 8) {
+      storageIoStats.slowWrites++;
+      appendLog("WARN", "Slow crash-safe localStorage persistence", {
+        elapsedMs: Number(elapsed.toFixed(3)),
+        bytes: encoded.length,
+        keys: Object.keys(values).length,
+        sample: storageIoStats.slowWrites,
+      });
+    }
   };
 
   const methods = {
@@ -58,7 +84,13 @@ export function installPersistentStorage(): void {
       return Object.hasOwn(values, String(key)) ? values[String(key)] : null;
     },
     setItem(key: string, value: string): void {
-      values[String(key)] = String(value);
+      const normalizedKey = String(key);
+      const normalizedValue = String(value);
+      if (values[normalizedKey] === normalizedValue) {
+        storageIoStats.skippedUnchanged++;
+        return;
+      }
+      values[normalizedKey] = normalizedValue;
       persist();
     },
     removeItem(key: string): void {
@@ -84,7 +116,12 @@ export function installPersistentStorage(): void {
     },
     set(_target, property, value) {
       if (typeof property === "string") {
-        values[property] = String(value);
+        const normalizedValue = String(value);
+        if (values[property] === normalizedValue) {
+          storageIoStats.skippedUnchanged++;
+          return true;
+        }
+        values[property] = normalizedValue;
         persist();
         return true;
       }
@@ -120,6 +157,10 @@ export function installPersistentStorage(): void {
     configurable: true,
     enumerable: true,
     value: createMemoryStorage(),
+  });
+  Object.defineProperty(globalThis, "__SILVERSHADOW_STORAGE_IO__", {
+    configurable: true,
+    value: storageIoStats,
   });
   appendLog("INFO", "Persistent localStorage installed", {
     path: STORAGE_PATH,
