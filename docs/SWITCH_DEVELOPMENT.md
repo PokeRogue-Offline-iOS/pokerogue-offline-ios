@@ -139,11 +139,12 @@ leakage, or packaged `saves`, `config`, or `logs`.
 ## GitHub Actions release ZIP
 
 `.github/workflows/build-switch-poc.yml` exposes the **Build PokeRogueOffline
-Switch NRO** workflow. It treats the verified uncompressed release tree above
-as the build authority and only then creates a store-mode ZIP containing the
-top-level `switch/` directory. CI checks that the ZIP contains one fat NRO,
-the checksum and pack index, exactly four `.sspack` files, and none of the old
-many-file static asset directories.
+Switch NRO** workflow. It is started manually with `workflow_dispatch`; pushes
+and pull requests do not start Switch builds. It treats the verified
+uncompressed release tree above as the build authority and only then creates a
+store-mode ZIP containing the top-level `switch/` directory. CI checks that the
+ZIP contains one fat NRO, the checksum and pack index, exactly four `.sspack`
+files, and none of the old many-file static asset directories.
 
 The workflow reads `SILVERSHADOW_VERSION` from
 `configs/release-version.txt`, exports it to the Switch build, and

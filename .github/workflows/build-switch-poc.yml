@@ -2,34 +2,6 @@ name: Build PokeRogueOffline Switch NRO
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "switch/**"
-      - "configs/android/icon-main.png"
-      - "configs/release-version.txt"
-      - "scripts/read-release-version.js"
-      - "patches/all/**"
-      - "patches/switch/**"
-      - "new-files/**"
-      - "scripts/**"
-      - "docs/SWITCH_*.md"
-      - ".github/workflows/build-android.yml"
-      - ".github/workflows/build-switch-poc.yml"
-  push:
-    branches:
-      - main
-      - fix/switch-alpha-runtime
-    paths:
-      - "switch/**"
-      - "configs/android/icon-main.png"
-      - "configs/release-version.txt"
-      - "scripts/read-release-version.js"
-      - "patches/all/**"
-      - "patches/switch/**"
-      - "new-files/**"
-      - "scripts/**"
-      - ".github/workflows/build-android.yml"
-      - ".github/workflows/build-switch-poc.yml"
 
 permissions:
   contents: read

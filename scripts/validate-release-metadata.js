@@ -81,7 +81,14 @@ const switchConfig = read("switch/scripts/config.mjs");
 requireText(switchConfig, 'new URL("../../configs/release-version.txt", import.meta.url)', "local Switch release version");
 
 const switchBootstrap = read("patches/switch/node/nxjs-bootstrap.js");
-requireText(switchBootstrap, 'path.join("configs", "release-version.txt")', "Switch patched title version");
+requireText(
+  switchBootstrap,
+  'path.resolve(__dirname, "..", "..", "..", "configs", "release-version.txt")',
+  "Switch patched title version",
+);
+if (switchBootstrap.includes('read(path.join("configs", "release-version.txt"))')) {
+  throw new Error("Switch patched title version must not resolve relative to the temporary upstream checkout");
+}
 
 const updatePatch = read("patches/all/node/update-check.js");
 requireText(updatePatch, 'checkForUpdates(SILVERSHADOW_VERSION)', "update checker installed version");

@@ -1923,7 +1923,8 @@ if (!modifierSelectUi.includes(modifierMarkClaimedReplacement)) {
 write(modifierSelectUiPath, modifierSelectUi);
 
 let title = read(titlePath);
-const silverShadowVersion = read(path.join("configs", "release-version.txt")).trim();
+const releaseVersionPath = path.resolve(__dirname, "..", "..", "..", "configs", "release-version.txt");
+const silverShadowVersion = read(releaseVersionPath).trim();
 if (!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(silverShadowVersion)) {
   fail(`Invalid shared SilverShadow version: ${JSON.stringify(silverShadowVersion)}`);
 }
