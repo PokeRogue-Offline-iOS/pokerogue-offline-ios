@@ -316,7 +316,8 @@ hardware-driven, one-blocker-at-a-time workflow.
 
 The immediate proof gates are:
 
-1. distinguish the native Plus crash from post-reload memory pressure;
+1. reproduce the long-session freeze with continuous diagnostics through the
+   first visible stall, without assuming the last controller input was causal;
 2. log Phaser loader failures and stop move animations from using unregistered
    texture keys;
 3. establish a minimized nx.js audio decode/playback result;

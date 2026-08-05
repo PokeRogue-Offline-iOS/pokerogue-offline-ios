@@ -1948,15 +1948,22 @@ const observerAnchor = `    this.autoHideObserver = new MutationObserver(() => {
 const observerReplacement = `    this.autoHideObserver = typeof MutationObserver === "undefined"
       ? null
       : new MutationObserver(() => {`;
+const formattedObserverGuard = `    this.autoHideObserver =
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver(() => {`;
 const observerAnchorCount = touchControls.split(observerAnchor).length - 1;
 const observerReplacementCount = touchControls.split(observerReplacement).length - 1;
-if (observerReplacementCount === 1 && observerAnchorCount === 0) {
+const formattedObserverGuardCount = touchControls.split(formattedObserverGuard).length - 1;
+if (formattedObserverGuardCount === 1 && observerReplacementCount === 0 && observerAnchorCount === 0) {
+  console.log("nx.js optional touch-control observer guard already applied in the all-platform layer.");
+} else if (observerReplacementCount === 1 && formattedObserverGuardCount === 0 && observerAnchorCount === 0) {
   console.log("nx.js optional touch-control observer guard already applied.");
-} else if (observerReplacementCount === 0 && observerAnchorCount === 1) {
+} else if (observerReplacementCount === 0 && formattedObserverGuardCount === 0 && observerAnchorCount === 1) {
   touchControls = touchControls.replace(observerAnchor, observerReplacement);
 } else {
   fail(
-    `Expected exactly one SilverShadow touch-control MutationObserver anchor, found ${observerAnchorCount} unguarded and ${observerReplacementCount} guarded`,
+    `Expected exactly one SilverShadow touch-control MutationObserver anchor, found ${observerAnchorCount} unguarded, ${observerReplacementCount} compact guarded, and ${formattedObserverGuardCount} formatted guarded`,
   );
 }
 const observeAnchor = `    this.autoHideObserver.observe(touchControls, {`;

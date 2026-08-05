@@ -29,8 +29,9 @@ if (/ssh\.scooom\.xyz|pokerogue-offline\.github\.io/i.test(workflow)) {
 }
 
 const browserFetch = read("scripts/fetch-official-daily-seed.js");
-requireText(browserFetch, 'url: "https://pokerogue.net/robots.txt"', "official browser origin");
-requireText(browserFetch, 'fetch("https://api.pokerogue.net/daily/seed"', "official browser API request");
+requireText(browserFetch, 'cmd: "Network.setExtraHTTPHeaders"', "official browser headers");
+requireText(browserFetch, 'url: "https://api.pokerogue.net/daily/seed"', "official browser navigation");
+requireText(browserFetch, 'document.body?.innerText', "official browser seed extraction");
 if (/ssh\.scooom\.xyz|pokerogue-offline\.github\.io/i.test(browserFetch)) {
   throw new Error("browser fetch must not depend on Scooom or another offline seed mirror");
 }
@@ -42,9 +43,14 @@ requireText(
   "client seed feed",
 );
 requireText(client, 'published.source !== "offline-fallback"', "fallback cache protection");
+requireText(client, 'fetchOfficialDailyRunSeed(date)', "direct in-game official API attempt");
+requireText(client, 'source: "generated-offline"', "local generated fallback source");
+requireText(client, '"published-fallback"', "published fallback source");
+requireText(client, "Official Daily Run seed loaded directly.", "official seed status message");
 
 const patch = read("patches/all/node/daily-run-seed.js");
 requireText(patch, "getDailyRunSeed()", "title-screen Daily Run integration");
-requireText(patch, "return createOfflineDailySeed()", "title-screen network fallback");
+requireText(patch, "return createGeneratedOfflineDailySeed()", "title-screen network fallback");
+requireText(patch, "getDailyRunSeedStatusText(result.source)", "title-screen seed status message");
 
 console.log("Daily Run publisher, seed-branch feed, and packaged client are linked consistently.");

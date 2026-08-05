@@ -60,6 +60,11 @@ valid bounds, and never wrap. IV page jumps stop at 1; **Set All to 0** remains
 the explicit zero-IV shortcut. Returning from a picker or toggling a field
 keeps the cursor on the field that was just changed.
 
+Form rows use the registry's distinct form labels (for example, Urshifu's
+Single Strike Style and Rapid Strike Style) rather than repeating the species
+name. Returning between picker pages resets the visible-row cursor before
+restoring the saved selection, preventing an invalid empty scroll window.
+
 When duplicate starters are enabled:
 
 - editing from a selected team icon targets only that exact copy;

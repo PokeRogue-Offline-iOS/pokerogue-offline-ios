@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Fetch the official Daily Run seed from a real pokerogue.net browser context.
+ * Fetch the official Daily Run seed through a real browser navigation.
  *
- * Cloudflare rejects direct requests from GitHub-hosted runner IPs even when
- * curl supplies the same headers as the game. GitHub's Ubuntu image includes
- * matching Chrome and ChromeDriver installations, so this script uses the
- * public endpoint exactly as the official browser client does. It does not
- * contact a proxy or another offline build's seed mirror.
+ * Cloudflare rejects direct command-line requests from GitHub-hosted runner
+ * IPs even when curl supplies the same headers as the game. ChromeDriver's
+ * DevTools bridge adds the official client headers before navigating Chrome
+ * directly to the endpoint. Top-level navigation avoids the cross-origin
+ * fetch restriction while retaining a first-party PokeRogue connection.
  */
 
 const fs = require("fs");
@@ -128,39 +128,46 @@ async function fetchSeed() {
       pageLoad: 60_000,
       script: 30_000,
     });
+    await webdriverRequest("POST", `/session/${sessionId}/goog/cdp/execute`, {
+      cmd: "Network.enable",
+      params: {},
+    });
+    await webdriverRequest("POST", `/session/${sessionId}/goog/cdp/execute`, {
+      cmd: "Network.setExtraHTTPHeaders",
+      params: {
+        headers: {
+          Authorization: "",
+          "Content-Type": "application/json",
+          "PKR-Client-Version": clientVersion,
+        },
+      },
+    });
     await webdriverRequest("POST", `/session/${sessionId}/url`, {
-      url: "https://pokerogue.net/robots.txt",
+      url: "https://api.pokerogue.net/daily/seed",
     });
 
-    const result = await webdriverRequest("POST", `/session/${sessionId}/execute/async`, {
-      args: [clientVersion],
-      script: `
-        const clientVersion = arguments[0];
-        const done = arguments[arguments.length - 1];
-        fetch("https://api.pokerogue.net/daily/seed", {
-          headers: {
-            Authorization: "",
-            "Content-Type": "application/json",
-            "PKR-Client-Version": clientVersion,
-          },
-          method: "GET",
-        })
-          .then(async response => done({ body: await response.text(), status: response.status }))
-          .catch(error => done({ error: String(error) }));
-      `,
-    });
-
-    const fetchResult = result.value;
-    if (fetchResult?.error) {
-      throw new Error(`Official browser request failed: ${fetchResult.error}`);
-    }
-    if (fetchResult?.status !== 200) {
-      throw new Error(`Official browser request returned HTTP ${fetchResult?.status}: ${fetchResult?.body}`);
+    let seed = "";
+    let lastBody = "";
+    for (let attempt = 1; attempt <= 30; attempt++) {
+      const result = await webdriverRequest("POST", `/session/${sessionId}/execute/sync`, {
+        args: [],
+        script: `return {
+          body: document.body?.innerText ?? document.documentElement?.textContent ?? "",
+          contentType: document.contentType,
+          readyState: document.readyState,
+          url: location.href,
+        };`,
+      });
+      lastBody = String(result.value?.body ?? "").replace(/[\r\n]/g, "").trim();
+      if (lastBody && lastBody.length <= 131_072 && /^[A-Za-z0-9+/=_-]+$/.test(lastBody)) {
+        seed = lastBody;
+        break;
+      }
+      await delay(1_000);
     }
 
-    const seed = String(fetchResult.body ?? "").replace(/[\r\n]/g, "");
-    if (!seed || seed.length > 131_072 || !/^[A-Za-z0-9+/=_-]+$/.test(seed)) {
-      throw new Error("Official browser request returned an invalid seed.");
+    if (!seed) {
+      throw new Error(`Official browser navigation returned an invalid seed: ${lastBody.slice(0, 500)}`);
     }
 
     process.stdout.write(seed);

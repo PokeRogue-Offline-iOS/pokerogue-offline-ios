@@ -95,7 +95,7 @@ following:
 | Only the bottom-left of the logical game is visible | Scale default-framebuffer viewport/scissor calls from 1920x1080 to 1280x720 while preserving offscreen targets | `6e9118f` |
 | Text is fragmented because nx.js reports zero ascent/descent metrics | Return width-only fallback metrics so Phaser uses its pixel scan | `fd3ad56` |
 | A/B use Xbox semantics | Present the controller identity that selects PokéRogue's Pro Controller profile | `fd3ad56` |
-| Plus immediately exits instead of reaching the game menu | Cancel the nx.js default exit request so the game can receive Plus; still unstable in one later hardware case | `fd3ad56` |
+| Plus immediately exits instead of reaching the game menu | Cancel the nx.js default exit request so the game can receive Plus | `fd3ad56` |
 | `Invalid BitmapText key: item-count` stalls reward/session loading | Add the XML DOM subset Phaser needs to parse the bitmap-font metadata | `77ba54b` |
 
 The branch also adds reproducible pinned builds, exact caches, offline asset
@@ -105,19 +105,25 @@ iteration workflow.
 
 ## Known Alpha bugs
 
-### Native crash after Plus
+### Native crash with inconclusive trigger
 
-Plus worked in earlier screens, but pressing it during a later rival battle
-produced a Switch software crash. The final JavaScript log line was:
+An earlier crash happened after Plus was pressed during a later rival battle.
+The final JavaScript log line was:
 
 ```text
 2026-07-29T21:57:08.121Z [INFO] Intercepted Plus-button exit request for game input
 ```
 
-There was no JavaScript exception or rejection after that line. The current
-evidence cannot distinguish an nx.js Plus/exit conflict from native memory
-pressure after an expensive in-process reload. Plus must be considered unsafe
-until memory snapshots and native-boundary diagnostics are added.
+There was no JavaScript exception or rejection after that line. A follow-up
+August 2 capture also ended after the Plus interception, but the game had
+already appeared frozen to the player. Its final snapshot still had about
+640 MiB of native memory free, used 220.75 MiB of the 512 MiB V8 heap, retained
+one native context and no detached contexts, and reported a healthy WebGL
+context. The Atmosphere report was an instruction abort in `hbloader`, not an
+in-app JavaScript out-of-memory error. These captures therefore prove neither
+Plus nor memory exhaustion as the cause. Plus remains mapped to the in-game
+input and is not disabled or repurposed; further diagnosis needs a reproduction
+whose log continues through the first visible freeze.
 
 ### Battle animations use missing textures
 
@@ -215,8 +221,9 @@ Recommended order:
    at the former 2250 MiB threshold.
 3. Add Phaser loader-error logging and wait for required animation texture
    keys before playback.
-4. Reproduce the rival-battle Plus failure without first enabling all cheats
-   to separate input handling from memory pressure.
+4. Reproduce the long-session freeze while preserving logs from before the
+   first visible stall through the native failure, and record any input only as
+   timeline context rather than assuming it was the trigger.
 5. Add an early loading indicator without touching the WebGL-owned fatal
    screen.
 6. Replace keyboard/Xbox prompt artwork with Switch-specific prompts.

@@ -47,9 +47,16 @@ but it repositions the DOM `.control-group` elements. Portrait and landscape
 positions are stored separately in local storage under
 `touchControlPositionsPortrait` and `touchControlPositionsLandscape`.
 
-The existing `Touch Controls` setting stores Auto or Disabled. Control size is
-derived from the CSS `--controls-size` viewport rules; opacity and hit-area size
-are not user settings.
+The SilverShadow `Touch Controls` setting offers Fade, Always Appear, and
+Disabled. Fade is the default and retains the two-second inactivity behavior;
+Always Appear keeps the overlay visible. Existing saved Disabled values are
+migrated when the third option is introduced.
+
+Move Touch Controls adds one corner handle to each existing control group. The
+D-pad, A, B, C/Start cluster, and F/G/R/E/N/V cluster scale independently from
+60% through 180%. Artwork and the matching hit region scale together. Sizes,
+like positions, are stored separately for portrait and landscape under
+`touchControlScalesPortrait` and `touchControlScalesLandscape`.
 
 SilverShadow's existing auto-hide patch adds `auto-hidden` two seconds after the
 last finger is lifted. It hides with opacity, not `display: none`, so the first
@@ -321,13 +328,13 @@ public-domain artwork notice. Only the five required D-pad images were copied.
 
 ## Known differences and future work
 
-This iteration keeps PokéRogue's existing layout editor, repeat timing,
-settings, and input event contract. It does not port Gen1Recomp's launcher
-editor, size range, orientation-specific scale setting, or controller-driven
+This iteration keeps PokéRogue's existing repeat timing and input event
+contract while extending its layout editor with orientation-specific group
+scales. It does not port Gen1Recomp's launcher editor or controller-driven
 overlay hiding. The browser cannot infer CSS failure reliably; therefore the
 flat and upstream fallback layers remain in markup and are selected when the
 rocking layer cannot initialize.
 
 Potential later additions include explicitly mapped Speed Up and Slow Down
-touch controls, directional hysteresis, per-control sizing,
-richer layout customization, and expanded device/accessibility settings.
+touch controls, directional hysteresis, richer layout customization, and
+expanded device/accessibility settings.

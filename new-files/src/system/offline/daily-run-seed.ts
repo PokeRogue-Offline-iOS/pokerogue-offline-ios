@@ -1,3 +1,6 @@
+import { version } from "#package.json";
+
+const OFFICIAL_DAILY_SEED_URL = "https://api.pokerogue.net/daily/seed";
 const DAILY_SEED_FEED_URL =
   "https://raw.githubusercontent.com/silvershadowkat/pokerogue-offline/seed/docs/daily-seed.json";
 
@@ -5,6 +8,7 @@ export const DAILY_SEED_STORAGE_KEYS = {
   date: "daily_seed_date",
   fetchedAt: "daily_seed_fetched_at",
   seed: "daily_seed",
+  source: "daily_seed_source",
 } as const;
 
 interface PublishedDailySeed {
@@ -16,6 +20,19 @@ interface PublishedDailySeed {
 interface ParsedDailySeed {
   cacheable: boolean;
   seed: string;
+  source: "official-feed" | "published-fallback";
+}
+
+export type DailyRunSeedSource =
+  | "official-api"
+  | "official-feed"
+  | "official-cache"
+  | "published-fallback"
+  | "generated-offline";
+
+export interface DailyRunSeedResult {
+  seed: string;
+  source: DailyRunSeedSource;
 }
 
 export interface DailySeedCacheSnapshot {
@@ -43,9 +60,26 @@ export function getDailySeedCacheSnapshot(): DailySeedCacheSnapshot {
   };
 }
 
-function readCurrentCachedSeed(date = new Date()): string | null {
+function readCurrentCachedSeed(date = new Date()): DailyRunSeedResult | null {
   const snapshot = getDailySeedCacheSnapshot();
-  return snapshot.date === getUtcDateKey(date) && snapshot.seed ? snapshot.seed : null;
+  return snapshot.date === getUtcDateKey(date) && snapshot.seed
+    ? { seed: snapshot.seed, source: "official-cache" }
+    : null;
+}
+
+function cacheOfficialSeed(seed: string, expectedDate: string): void {
+  localStorage.setItem(DAILY_SEED_STORAGE_KEYS.date, expectedDate);
+  localStorage.setItem(DAILY_SEED_STORAGE_KEYS.seed, seed);
+  localStorage.setItem(DAILY_SEED_STORAGE_KEYS.fetchedAt, Date.now().toString());
+  localStorage.setItem(DAILY_SEED_STORAGE_KEYS.source, "official");
+}
+
+function validateSeed(seed: string, label: string): string {
+  const normalized = seed.replace(/[\r\n]/g, "");
+  if (!normalized || normalized.length > 131_072 || !/^[A-Za-z0-9+/=_-]+$/.test(normalized)) {
+    throw new Error(`${label} returned an invalid seed.`);
+  }
+  return normalized;
 }
 
 function parsePublishedSeed(payload: string, expectedDate: string): ParsedDailySeed {
@@ -78,10 +112,36 @@ function parsePublishedSeed(payload: string, expectedDate: string): ParsedDailyS
   return {
     cacheable: published.source !== "offline-fallback",
     seed: published.seed,
+    source: published.source === "offline-fallback" ? "published-fallback" : "official-feed",
   };
 }
 
-export async function refreshDailyRunSeed(date = new Date()): Promise<string> {
+export async function fetchOfficialDailyRunSeed(date = new Date()): Promise<DailyRunSeedResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4_000);
+
+  try {
+    const response = await fetch(OFFICIAL_DAILY_SEED_URL, {
+      cache: "no-store",
+      headers: {
+        Authorization: "",
+        "Content-Type": "application/json",
+        "PKR-Client-Version": version,
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Official daily seed request failed with HTTP ${response.status}.`);
+    }
+    const seed = validateSeed(await response.text(), "The official Daily Run API");
+    cacheOfficialSeed(seed, getUtcDateKey(date));
+    return { seed, source: "official-api" };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function refreshDailyRunSeed(date = new Date()): Promise<DailyRunSeedResult> {
   const expectedDate = getUtcDateKey(date);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10_000);
@@ -98,16 +158,43 @@ export async function refreshDailyRunSeed(date = new Date()): Promise<string> {
 
     const published = parsePublishedSeed(await response.text(), expectedDate);
     if (published.cacheable) {
-      localStorage.setItem(DAILY_SEED_STORAGE_KEYS.date, expectedDate);
-      localStorage.setItem(DAILY_SEED_STORAGE_KEYS.seed, published.seed);
-      localStorage.setItem(DAILY_SEED_STORAGE_KEYS.fetchedAt, Date.now().toString());
+      cacheOfficialSeed(published.seed, expectedDate);
     }
-    return published.seed;
+    return { seed: published.seed, source: published.source };
   } finally {
     clearTimeout(timeoutId);
   }
 }
 
-export async function getDailyRunSeed(date = new Date()): Promise<string> {
-  return readCurrentCachedSeed(date) ?? refreshDailyRunSeed(date);
+export async function getDailyRunSeed(date = new Date()): Promise<DailyRunSeedResult> {
+  const cached = readCurrentCachedSeed(date);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    return await fetchOfficialDailyRunSeed(date);
+  } catch (error) {
+    console.warn("Direct official Daily Run seed request unavailable; trying the published feed.", error);
+    return refreshDailyRunSeed(date);
+  }
+}
+
+export function createGeneratedOfflineDailySeed(date = new Date()): DailyRunSeedResult {
+  return { seed: createOfflineDailySeed(date), source: "generated-offline" };
+}
+
+export function getDailyRunSeedStatusText(source: DailyRunSeedSource): string {
+  switch (source) {
+    case "official-api":
+      return "Official Daily Run seed loaded directly.";
+    case "official-feed":
+      return "Official Daily Run seed loaded.";
+    case "official-cache":
+      return "Official Daily Run seed loaded from today's cache.";
+    case "published-fallback":
+      return "Official seed unavailable.\nUsing the published offline fallback.";
+    case "generated-offline":
+      return "Seed feed unavailable.\nGenerated today's offline seed.";
+  }
 }

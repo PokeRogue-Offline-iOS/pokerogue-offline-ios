@@ -78,7 +78,8 @@ default-position tests.
 12. Enter and leave Move Touch Controls while fingers are down. Confirm inputs
     release, configuration remains visible, saved positions still work, and
     controls resume afterward.
-13. Set Touch Controls to Disabled while holding input. Confirm everything
+13. Set Touch Controls to Always Appear, wait beyond two seconds, and confirm
+    the overlay does not fade. Then set it to Disabled while holding input and confirm everything
     releases and touching the former regions does nothing.
 14. Connect and use a physical controller, then use keyboard input on a desktop
     build if available. Confirm neither behavior changed.
@@ -152,6 +153,9 @@ baseline for this iteration.
 11. Wait for auto-hide and wake the enlarged D-pad with the first touch.
 12. Rapidly circle and tap multiple buttons while watching for a performance
     regression.
+13. Resize each of the five groups, save, rotate, resize them differently,
+    save, and rotate both ways again. Confirm each orientation restores its own
+    sizes and the artwork and hit regions remain aligned.
 
 This checklist is D-pad-only. Do not accept visual, layout, mapping, hitbox, or
 behavior changes to any action/context button in this pass.

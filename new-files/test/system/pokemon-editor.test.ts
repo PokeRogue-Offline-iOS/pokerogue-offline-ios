@@ -17,6 +17,7 @@ import {
   deleteSavedPokemonBuild,
   duplicateSavedPokemonBuild,
   getImplementedPokemonEditorMoves,
+  getPokemonEditorFormLabel,
   getSavedPokemonBuildsForSpecies,
   normalizePokemonBuildLibrary,
   normalizePokemonEditorMoves,
@@ -150,6 +151,17 @@ describe("Pokemon Editor starter isolation", () => {
     expect(disabled.editorData).toBeUndefined();
     expect(disabled.moveset).toEqual([MoveId.TACKLE]);
     expect(disabled.ivs).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
+describe("Pokemon Editor form labels", () => {
+  it("distinguishes Urshifu's selectable fighting styles", () => {
+    const singleStrike = getPokemonEditorFormLabel(SpeciesId.URSHIFU, 0);
+    const rapidStrike = getPokemonEditorFormLabel(SpeciesId.URSHIFU, 1);
+
+    expect(singleStrike).not.toBe(rapidStrike);
+    expect(singleStrike).toMatch(/Single.*Strike/i);
+    expect(rapidStrike).toMatch(/Rapid.*Strike/i);
   });
 });
 
@@ -302,6 +314,7 @@ describe("Pokemon Editor menu integration", () => {
     expect(uiSource).toContain("this.getHandler().show(args);\n    return Promise.resolve();");
     expect(optionSource).toContain("const activeConfig = this.config;");
     expect(optionSource).toContain("!option.keepOpen && this.config === activeConfig");
+    expect(optionSource).toContain("this.fullCursor = 0;\n    this.cursor = 0;");
     const optionSelectMode = ["UiMode", "OPTION_SELECT"].join(".");
     expect(editorUiSource).toContain(`globalScene.ui.refreshOverlayMode(${optionSelectMode}`);
   });

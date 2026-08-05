@@ -51,14 +51,14 @@ claims use the normal game interface and animation flow for stability.
 - Play without a constant internet connection after the game files are installed.
 - Save data is stored locally on the device.
 - User data and active sessions can be manually imported and exported.
-- The live Daily Run seed is mirrored from PokéRogue's official API by this fork's own workflow and cached by the app.
-  If that feed is unavailable, the game immediately falls back to a deterministic UTC-date seed and remains playable offline.
+- The app first tries PokéRogue's official Daily Run API directly, then this fork's dated seed feed, and finally the
+  deterministic UTC-date seed used by upstream offline mode. A short in-game message identifies which source was used.
 - The app is built from current PokéRogue source with SilverShadow patches applied during the build.
 
 The **Publish Daily Run Seed** workflow requests the seed from PokéRogue's official API several times during the first
-three UTC hours and publishes a dated JSON payload to this fork's own `seed` branch. To avoid Cloudflare rejecting a
-command-line request from a GitHub runner, the workflow uses a real first-party `pokerogue.net` browser context with the
-Chrome and ChromeDriver already installed on the runner. It does not use Scooom's server or another offline seed mirror. If the
+three UTC hours and publishes a dated JSON payload to this fork's own `seed` branch. To avoid both Cloudflare's command-line
+request block and browser CORS, the workflow adds the official game headers through Chrome DevTools and navigates Chrome
+directly to the first-party API response. It does not use Scooom's server or another offline seed mirror. If the
 official service remains unavailable, it publishes a marked, non-cacheable offline fallback that a later scheduled run
 can replace. After enabling Actions on a new fork, run that workflow once manually to create the branch immediately.
 The app reads this fork's raw `seed` branch URL.
@@ -197,9 +197,12 @@ Release builds can check GitHub for newer SilverShadow releases when the app lau
 - Update checks fail silently when the device is offline.
 - Development builds skip the release update check.
 
-### Touch-Control Auto Hide
+### Touch-Control Visibility and Layout
 
-Touch controls fade out after two seconds without touch input.
+Touch Controls defaults to Fade, which hides the overlay after two seconds
+without touch input. Always Appear keeps it visible, and Disabled turns it off.
+Move Touch Controls can reposition and resize the D-pad, A, B, C/Start, and
+F/G/R/E/N/V groups, with independent portrait and landscape layouts.
 
 - Touching the screen reveals them again.
 - Keyboard or controller input does not force them to remain visible.

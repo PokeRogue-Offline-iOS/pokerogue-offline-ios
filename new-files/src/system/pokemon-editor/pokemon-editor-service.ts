@@ -346,6 +346,19 @@ export function getSafePokemonEditorFormIndices(speciesId: SpeciesId): number[] 
   return safe.length > 0 ? safe : [0];
 }
 
+/** A distinct registry-backed label for a selectable form, not the repeated species name. */
+export function getPokemonEditorFormLabel(speciesId: SpeciesId, formIndex: number): string {
+  const species = getSpecies(speciesId);
+  const form = species?.forms[formIndex];
+  if (!species || !form) {
+    return `Form ${formIndex + 1}`;
+  }
+
+  return (
+    species.getFormNameToDisplay(formIndex)?.trim() || form.formName?.trim() || form.formKey || `Form ${formIndex + 1}`
+  );
+}
+
 export function getPokemonEditorGenders(speciesId: SpeciesId): Gender[] {
   const malePercent = getSpecies(speciesId)?.malePercent;
   if (malePercent == null) {

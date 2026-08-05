@@ -229,6 +229,7 @@ if (!optionSelectSource.includes("measureVisibleOptionsOnly ? optionsWithScroll"
     this.optionSelectContainer.setVisible(true);
     this.scrollCursor = 0;
     this.fullCursor = 0;
+    this.cursor = 0;
     const initialCursor = Phaser.Math.Clamp(this.config.initialCursor ?? 0, 0, this.unskippedIndices.length - 1);
     this.setCursor(initialCursor);`,
     "the option select show initialization",

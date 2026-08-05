@@ -1,5 +1,4 @@
 import { globalScene } from "#app/global-scene";
-import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { getNatureName } from "#data/nature";
 import { Color, TypeColor, TypeShadow } from "#enums/color";
@@ -18,6 +17,7 @@ import {
   deleteSavedPokemonBuild,
   duplicateSavedPokemonBuild,
   getImplementedPokemonEditorMoves,
+  getPokemonEditorFormLabel,
   getPokemonEditorGenders,
   getSafePokemonEditorFormIndices,
   getSavedPokemonBuildsForSpecies,
@@ -168,7 +168,6 @@ export function showPokemonEditor(initialDraft: PokemonEditorDraft, context: Pok
   const showMain = (initialCursor = mainCursor) => {
     mainCursor = initialCursor;
     clearTooltip();
-    const species = speciesDataRegistry.getSpecies(draft.speciesId);
     const options: OptionSelectItem[] = [
       {
         label: `Level: ${draft.level.toLocaleString()}`,
@@ -183,7 +182,7 @@ export function showPokemonEditor(initialDraft: PokemonEditorDraft, context: Pok
           ),
       },
       {
-        label: `Form: ${species.getName(draft.formIndex)}`,
+        label: `Form: ${getPokemonEditorFormLabel(draft.speciesId, draft.formIndex)}`,
         handler: () => showFormPicker(draft, () => showMain(1)),
       },
       {
@@ -268,11 +267,10 @@ function showIntegerPicker(
 }
 
 function showFormPicker(draft: PokemonEditorDraft, back: () => void): boolean {
-  const species = speciesDataRegistry.getSpecies(draft.speciesId);
   const formIndices = getSafePokemonEditorFormIndices(draft.speciesId);
   // Form registry order is meaningful: the standard/default form comes first,
   // followed by the game's own progression of alternate forms.
-  const forms = formIndices.map(index => ({ index, label: species.getName(index) }));
+  const forms = formIndices.map(index => ({ index, label: getPokemonEditorFormLabel(draft.speciesId, index) }));
   const options: OptionSelectItem[] = forms.map(form => ({
     label: form.label,
     handler: () => {
@@ -729,7 +727,7 @@ export function showPokemonBuildLibrary(library: PokemonBuildLibrary, context: P
     clearTooltip();
     const builds = getSavedPokemonBuildsForSpecies(library, context.draft.speciesId);
     const options: OptionSelectItem[] = builds.map((build, index) => ({
-      label: `${build.name}${build.formIndex === context.draft.formIndex ? "" : ` (${speciesDataRegistry.getSpecies(build.speciesId).getName(build.formIndex)})`}`,
+      label: `${build.name}${build.formIndex === context.draft.formIndex ? "" : ` (${getPokemonEditorFormLabel(build.speciesId, build.formIndex)})`}`,
       handler: () => {
         listCursor = index;
         return showBuild(build);
