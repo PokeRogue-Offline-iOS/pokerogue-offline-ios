@@ -868,6 +868,10 @@ function attachPhaserGame(game: any): void {
   appendLog("INFO", "Installed Phaser frame diagnostics");
 }
 
+function readInputSnapshot(): unknown {
+  return (globalThis as any).__SILVERSHADOW_INPUT_SNAPSHOT__ ?? "input-unavailable";
+}
+
 export function readGraphicsSnapshot(): unknown {
   if (!phaserGame) {
     return "game-unavailable";
@@ -901,6 +905,7 @@ export function readGraphicsSnapshot(): unknown {
         canvasSources,
         imageSources,
       },
+      canvasUploads: (globalThis as any).__SILVERSHADOW_CANVAS_UPLOADS__ ?? null,
       scenes: phaserGame.scene?.getScenes?.(true)?.map((scene: any) => ({
         key: scene.scene?.key ?? null,
         displayObjects: scene.children?.list?.length ?? null,
@@ -1005,6 +1010,7 @@ function flightRecorder(): void {
       window: completedWindow,
     },
     audio: readCompactAudioSnapshot(),
+    input: readInputSnapshot(),
     graphics: readGraphicsSnapshot(),
     io: readIoStats(),
     memory: compactMemory(tryReadMemoryValues()),
@@ -1025,6 +1031,7 @@ function frameWatchdog(): void {
       state: readGameState(),
       frames: counters,
       audio: readAudioSnapshot(),
+      input: readInputSnapshot(),
       memory: readMemorySnapshot(),
       webgl: readWebGlHealth(true),
     });
@@ -1049,6 +1056,7 @@ function frameWatchdog(): void {
       state: readGameState(),
       frames: counters,
       audio: readAudioSnapshot(),
+      input: readInputSnapshot(),
       memory: readMemorySnapshot(),
       webgl: readWebGlHealth(true),
     });
@@ -1091,6 +1099,7 @@ function heartbeat(): void {
     webgl: readWebGlHealth(true),
     graphics: readGraphicsSnapshot(),
     audio: readAudioSnapshot(),
+    input: readInputSnapshot(),
     io: readIoStats(),
     memory: readMemorySnapshot(),
   });

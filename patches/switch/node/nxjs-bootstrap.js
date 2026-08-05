@@ -119,7 +119,7 @@ const audioEndedGuardReplacement = `  const webAudioSoundPrototype = (Phaser.Sou
   }
 
   const game = new Phaser.Game({`;
-if (!main.includes(audioEndedGuardReplacement)) {
+if (!main.includes("__silverShadowLateEndedGuardInstalled")) {
   if (!main.includes(audioEndedGuardAnchor)) {
     fail("Could not find the Phaser WebAudio late-ended guard anchor in src/main.ts");
   }
@@ -133,6 +133,21 @@ const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser
     let typedCanvasUploads = 0;
     let typedCanvasUploadBytes = 0;
     let typedCanvasUploadFallbacks = 0;
+    let typedCanvasAllocations = 0;
+    let typedCanvasResizes = 0;
+    let typedCanvasSubImageUpdates = 0;
+    const publishCanvasUploadSnapshot = (latestSize: [number, number]) => {
+      (globalThis as any).__SILVERSHADOW_CANVAS_UPLOADS__ = {
+        uploads: typedCanvasUploads,
+        uploadedMiB: Number((typedCanvasUploadBytes / 1048576).toFixed(2)),
+        allocations: typedCanvasAllocations,
+        resizes: typedCanvasResizes,
+        subImageUpdates: typedCanvasSubImageUpdates,
+        fallbacks: typedCanvasUploadFallbacks,
+        latestSize,
+        at: Date.now(),
+      };
+    };
     webGlRendererPrototype.canvasToTexture = function (
       this: any,
       srcCanvas: HTMLCanvasElement,
@@ -167,6 +182,7 @@ const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser
         }
         let texture = dstTexture;
         if (!texture) {
+          typedCanvasAllocations++;
           texture = this.createTexture2D(
             0,
             minFilter,
@@ -181,7 +197,48 @@ const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser
             true,
             flipY,
           );
+        } else if (
+          texture.webGLTexture
+          && texture.width === width
+          && texture.height === height
+          && typeof gl.texSubImage2D === "function"
+        ) {
+          // Phaser normally calls texImage2D for every Text refresh, even when
+          // the allocation size is unchanged. That repeatedly reallocates
+          // Mesa texture storage. Two hardware crashes branched into Mesa data
+          // after tens of thousands of these updates. Preserve the allocation
+          // and replace only its pixels when the dimensions are unchanged.
+          gl.activeTexture(gl.TEXTURE0);
+          const previousTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+          gl.bindTexture(gl.TEXTURE_2D, texture.webGLTexture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapping);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapping);
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY);
+          gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            texture.mipLevel ?? 0,
+            0,
+            0,
+            width,
+            height,
+            texture.format ?? gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            pixels,
+          );
+          if (pow) gl.generateMipmap(gl.TEXTURE_2D);
+          gl.bindTexture(gl.TEXTURE_2D, previousTexture ?? null);
+          texture.minFilter = minFilter;
+          texture.magFilter = magFilter;
+          texture.wrapS = wrapping;
+          texture.wrapT = wrapping;
+          texture.pma = true;
+          texture.flipY = flipY;
+          typedCanvasSubImageUpdates++;
         } else {
+          typedCanvasResizes++;
           texture.update(
             pixels,
             width,
@@ -199,6 +256,7 @@ const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser
         texture.pixels = srcCanvas;
         typedCanvasUploads++;
         typedCanvasUploadBytes += pixels.byteLength;
+        publishCanvasUploadSnapshot([width, height]);
         if (typedCanvasUploads === 1 || typedCanvasUploads % 250 === 0) {
           (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(
             "webgl:typed-canvas-upload",
@@ -206,6 +264,9 @@ const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser
               uploads: typedCanvasUploads,
               uploadedMiB: Number((typedCanvasUploadBytes / 1048576).toFixed(2)),
               fallbacks: typedCanvasUploadFallbacks,
+              allocations: typedCanvasAllocations,
+              resizes: typedCanvasResizes,
+              subImageUpdates: typedCanvasSubImageUpdates,
               latestSize: [width, height],
               textureWrappers: this.glTextureWrappers?.length ?? null,
             },
@@ -214,6 +275,7 @@ const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser
         return texture;
       } catch (error) {
         typedCanvasUploadFallbacks++;
+        publishCanvasUploadSnapshot([width, height]);
         if (typedCanvasUploadFallbacks <= 4) {
           (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(
             "webgl:typed-canvas-upload-fallback",
@@ -232,7 +294,7 @@ const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser
   }
 
   const game = new Phaser.Game({`;
-if (!main.includes(canvasTextureUploadReplacement)) {
+if (!main.includes("__silverShadowTypedCanvasUploadInstalled")) {
   if (!main.includes(canvasTextureUploadAnchor)) {
     fail("Could not find the Phaser canvas texture upload anchor in src/main.ts");
   }

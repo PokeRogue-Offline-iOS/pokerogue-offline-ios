@@ -39,6 +39,9 @@ source = replaceRequired(
   private readonly suppressedUntilRelease = new Set<string>();
   private transitionGeneration = 0;
   private inputDiagnosticCount = 0;
+  private inputEventCount = 0;
+  private readonly inputStatusCounts: Record<string, number> = {};
+  private readonly inputMappedCounts: Record<string, number> = {};
   private touchControls: TouchControl;`,
   "input lifecycle fields",
 );
@@ -142,6 +145,20 @@ const helpers = `  /** Prevent input state created in one UI generation from ent
     const events = (global.__SILVERSHADOW_INPUT_EVENTS__ ??= []) as unknown[];
     events.push(entry);
     if (events.length > 96) events.shift();
+    this.inputEventCount++;
+    this.inputStatusCounts[status] = (this.inputStatusCounts[status] ?? 0) + 1;
+    if (entry.mapped) {
+      this.inputMappedCounts[entry.mapped] = (this.inputMappedCounts[entry.mapped] ?? 0) + 1;
+    }
+    global.__SILVERSHADOW_INPUT_SNAPSHOT__ = {
+      totalEvents: this.inputEventCount,
+      generation: this.transitionGeneration,
+      physicalDown: this.physicalDown.size,
+      suppressedUntilRelease: this.suppressedUntilRelease.size,
+      statusCounts: { ...this.inputStatusCounts },
+      mappedCounts: { ...this.inputMappedCounts },
+      recent: events.slice(-12),
+    };
     if (this.inputDiagnosticCount < 256 || status === "unmatched-up" || status === "suppressed") {
       this.inputDiagnosticCount++;
       global.__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(\`input:\${status}\`, entry);
@@ -287,6 +304,7 @@ for (const marker of [
   `if (!this.isDirectional(mapped)) return`,
   `recordPhysicalInput("unmatched-up"`,
   `beginUiTransition(from: UiMode, to: UiMode)`,
+  `__SILVERSHADOW_INPUT_SNAPSHOT__`,
 ]) {
   if (!source.includes(marker)) fail(`Final input source is missing ${marker}`);
 }

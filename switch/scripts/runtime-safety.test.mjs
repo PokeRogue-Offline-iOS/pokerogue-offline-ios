@@ -50,6 +50,8 @@ test("command buttons are edge-triggered while only directions repeat across a U
   assert.match(inputPatch, /suppressedUntilRelease/);
   assert.match(inputPatch, /recordPhysicalInput\("unmatched-up"/);
   assert.match(inputPatch, /beginUiTransition\(this\.mode, mode\)/);
+  assert.match(inputPatch, /__SILVERSHADOW_INPUT_SNAPSHOT__/);
+  assert.match(diagnostics, /input: readInputSnapshot\(\)/);
 });
 
 test("live settings cannot retain reload and inactive reroll UI is not refreshed uninitialized", () => {
@@ -80,8 +82,16 @@ test("nx.js canvas textures bypass the temporary OffscreenCanvas upload path", (
   assert.match(gamePatch, /new Uint8Array\(data\.buffer, data\.byteOffset, data\.byteLength\)/);
   assert.match(gamePatch, /texture\.pixels = srcCanvas/);
   assert.match(gamePatch, /webgl:typed-canvas-upload/);
+  assert.match(gamePatch, /gl\.texSubImage2D\(/);
+  assert.match(gamePatch, /texture\.width === width/);
+  assert.match(gamePatch, /__SILVERSHADOW_CANVAS_UPLOADS__/);
   assert.match(diagnostics, /textureWrappers/);
   assert.match(diagnostics, /readGraphicsSnapshot/);
+});
+
+test("generated runtime patches are idempotent by their installed markers", () => {
+  assert.match(gamePatch, /if \(!main\.includes\("__silverShadowLateEndedGuardInstalled"\)\)/);
+  assert.match(gamePatch, /if \(!main\.includes\("__silverShadowTypedCanvasUploadInstalled"\)\)/);
 });
 
 test("Switch UI setup yields measured progress frames from 45 through 99 percent", () => {
