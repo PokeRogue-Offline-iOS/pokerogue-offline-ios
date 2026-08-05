@@ -65,3 +65,12 @@ test("logging is bounded and audio teardown crosses a native settle window", () 
   assert.match(gamePatch, /bgm-cache-retired/);
   assert.match(gamePatch, /settleMs: 1500/);
 });
+
+test("startup progress reserves completion for a rendered ready frame", () => {
+  assert.match(gamePatch, /setSwitchStartupProgress\(progress \* 0\.4\)/);
+  assert.match(gamePatch, /setSwitchStartupProgress\(0\.42, "Preparing game\.\.\."\)/);
+  assert.match(gamePatch, /setSwitchStartupProgress\(1, "Ready"\)/);
+  assert.match(gamePatch, /Phaser\.Core\.Events\.POST_RENDER/);
+  assert.match(gamePatch, /this\.scene\.launch\("battle"\)/);
+  assert.match(gamePatch, /percent >= this\.switchLastLoggedPercent \+ 10/);
+});

@@ -142,6 +142,9 @@ for (const marker of [
   "bgm-cache-retired",
   "battle-launch:",
   "title:show",
+  "startup-progress",
+  "Preparing game...",
+  "Building game world...",
 ]) {
   if (!entry.includes(marker)) {
     throw new Error(`Compiled Switch entry is missing required stabilization marker: ${marker}`);

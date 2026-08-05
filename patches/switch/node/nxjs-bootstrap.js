@@ -148,6 +148,56 @@ if (!main.includes(createdReplacement)) {
 write(mainPath, main);
 
 let loadingScene = read(loadingScenePath);
+const loadingProgressApiAnchor = `  readonly LOAD_EVENTS = Phaser.Loader.Events;
+
+  constructor() {
+    super(LoadingScene.KEY);
+
+    Phaser.Plugins.PluginCache.register("Loader", CacheBustedLoaderPlugin, "load");
+  }
+
+  preload() {`;
+const loadingProgressApiReplacement = `  readonly LOAD_EVENTS = Phaser.Loader.Events;
+
+  private switchProgressBar?: GameObjects.Graphics;
+  private switchPercentText?: GameObjects.Text;
+  private switchAssetText?: GameObjects.Text;
+  private switchProgressMidWidth = 0;
+  private switchDisplayedProgress = 0;
+  private switchLastLoggedPercent = -10;
+
+  constructor() {
+    super(LoadingScene.KEY);
+
+    Phaser.Plugins.PluginCache.register("Loader", CacheBustedLoaderPlugin, "load");
+  }
+
+  /** Report monotonic progress across asset loading and synchronous game setup. */
+  public setSwitchStartupProgress(progress: number, label?: string): void {
+    const bounded = Phaser.Math.Clamp(progress, this.switchDisplayedProgress, 1);
+    this.switchDisplayedProgress = bounded;
+    this.switchPercentText?.setText(\`\${Math.floor(bounded * 100)}%\`);
+    if (label) this.switchAssetText?.setText(label);
+    this.switchProgressBar
+      ?.clear()
+      .fillStyle(0xffffff, 0.8)
+      .fillRect(this.switchProgressMidWidth - 320, 360, 640 * bounded, 64);
+    const percent = Math.floor(bounded * 100);
+    if (label || percent >= this.switchLastLoggedPercent + 10 || percent === 100) {
+      this.switchLastLoggedPercent = percent;
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("startup-progress", {
+        progress: Number(bounded.toFixed(3)),
+        percent,
+        label: label ?? null,
+      });
+    }
+  }
+
+  preload() {`;
+if (!loadingScene.includes(loadingProgressApiReplacement)) {
+  if (!loadingScene.includes(loadingProgressApiAnchor)) fail("Could not find LoadingScene progress API anchor");
+  loadingScene = loadingScene.replace(loadingProgressApiAnchor, loadingProgressApiReplacement);
+}
 const loadingPreloadAnchor = `  preload() {
     localPing();`;
 const loadingPreloadReplacement = `  preload() {
@@ -217,6 +267,62 @@ if (!loadingScene.includes(loadingIntroReplacement)) {
   }
   loadingScene = loadingScene.replace(loadingIntroAnchor, loadingIntroReplacement);
 }
+
+const loadingProgressObjectsAnchor = `    const disclaimerText = this.make`;
+const loadingProgressObjectsReplacement = `    this.switchProgressBar = progressBar;
+    this.switchPercentText = percentText;
+    this.switchAssetText = assetText;
+    this.switchProgressMidWidth = midWidth;
+
+    const disclaimerText = this.make`;
+if (!loadingScene.includes(loadingProgressObjectsReplacement)) {
+  if (!loadingScene.includes(loadingProgressObjectsAnchor)) fail("Could not find loading progress object anchor");
+  loadingScene = loadingScene.replace(loadingProgressObjectsAnchor, loadingProgressObjectsReplacement);
+}
+
+const loadingProgressEventAnchor = `      .on(this.LOAD_EVENTS.PROGRESS, (progress: number) => {
+        percentText.setText(\`\${Math.floor(progress * 100)}%\`);
+        // need to reset fill style due to \`clear\` restting it
+        progressBar
+          .clear()
+          .fillStyle(0xffffff, 0.8)
+          .fillRect(midWidth - 320, 360, 640 * progress, 64);
+      })`;
+const loadingProgressEventReplacement = `      .on(this.LOAD_EVENTS.PROGRESS, (progress: number) => {
+        // The Phaser loader is only about 40% of observed time-to-interactive
+        // on Switch. Reserve the remainder for BattleScene construction so
+        // the display cannot claim 100% while the main thread is still busy.
+        this.setSwitchStartupProgress(progress * 0.4);
+      })`;
+if (!loadingScene.includes(loadingProgressEventReplacement)) {
+  if (!loadingScene.includes(loadingProgressEventAnchor)) fail("Could not find loading progress event anchor");
+  loadingScene = loadingScene.replace(loadingProgressEventAnchor, loadingProgressEventReplacement);
+}
+
+const loadingCompleteAnchor = `      .on(this.LOAD_EVENTS.COMPLETE, () => {
+        for (const g of loadingGraphics) {
+          g.destroy();
+        }
+        intro.destroy();
+      });`;
+const loadingCompleteReplacement = `      .on(this.LOAD_EVENTS.COMPLETE, () => {
+        this.setSwitchStartupProgress(0.42, "Preparing game...");
+        intro.destroy();
+      });`;
+if (!loadingScene.includes(loadingCompleteReplacement)) {
+  if (!loadingScene.includes(loadingCompleteAnchor)) fail("Could not find loading completion anchor");
+  loadingScene = loadingScene.replace(loadingCompleteAnchor, loadingCompleteReplacement);
+}
+
+const loadingLaunchAnchor = `    this.scene.start("battle");`;
+const loadingLaunchReplacement = `    // Keep the progress scene alive above BattleScene until its first
+    // interactive frame is fully constructed.
+    this.scene.launch("battle");
+    this.scene.bringToTop(LoadingScene.KEY);`;
+if (!loadingScene.includes(loadingLaunchReplacement)) {
+  if (!loadingScene.includes(loadingLaunchAnchor)) fail("Could not find loading-to-battle launch anchor");
+  loadingScene = loadingScene.replace(loadingLaunchAnchor, loadingLaunchReplacement);
+}
 write(loadingScenePath, loadingScene);
 
 let battleScene = read(battleScenePath);
@@ -242,7 +348,11 @@ const battleCreateReplacement = `  public create(): void {
     (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("battle-scene:create-start", {
       scene: "battle",
     }, true);
-    this.scene.remove(LoadingScene.KEY);`;
+    const switchLoadingScene = this.scene.isActive(LoadingScene.KEY)
+      ? (this.scene.get(LoadingScene.KEY) as LoadingScene)
+      : undefined;
+    switchLoadingScene?.setSwitchStartupProgress(0.45, "Building game world...");
+    if (switchLoadingScene) this.scene.bringToTop(LoadingScene.KEY);`;
 if (!battleScene.includes(battleCreateReplacement)) {
   if (!battleScene.includes(battleCreateAnchor)) {
     fail("Could not find the BattleScene create diagnostic anchor");
@@ -310,6 +420,14 @@ const battleLaunchReplacement = `    this.launchBattle();
       biome: this.arena?.biomeId ?? null,
       wave: this.currentBattle?.waveIndex ?? null,
     }, true);
+    switchLoadingScene?.setSwitchStartupProgress(1, "Ready");
+    if (switchLoadingScene) {
+      // Render one truthful 100% frame, then remove the overlay. The previous
+      // build removed it before synchronous setup and left a stale 100% frame.
+      this.game.events.once(Phaser.Core.Events.POST_RENDER, () => {
+        this.scene.remove(LoadingScene.KEY);
+      });
+    }
   }
 
   update()`;
