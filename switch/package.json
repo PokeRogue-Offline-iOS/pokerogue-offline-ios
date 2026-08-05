@@ -17,9 +17,10 @@
     "build": "node scripts/build.mjs",
     "nro": "node scripts/verify-icon.mjs && nxjs-nro --fat",
     "test:asset-packs": "node --test scripts/asset-pack.test.mjs",
-    "package": "npm run game:build && npm run typecheck && npm run test:asset-packs && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
-    "package:offline": "npm run game:build:offline && npm run typecheck && npm run test:asset-packs && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
-    "check": "npm run typecheck && npm run test:asset-packs && npm run build",
+    "test:runtime-safety": "node --test scripts/runtime-safety.test.mjs",
+    "package": "npm run game:build && npm run typecheck && npm run test:asset-packs && npm run test:runtime-safety && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
+    "package:offline": "npm run game:build:offline && npm run typecheck && npm run test:asset-packs && npm run test:runtime-safety && npm run build && npm run nro && node scripts/package-release.mjs && node scripts/verify-release.mjs",
+    "check": "npm run typecheck && npm run test:asset-packs && npm run test:runtime-safety && npm run build",
     "verify": "node scripts/verify-release.mjs"
   },
   "license": "MIT",

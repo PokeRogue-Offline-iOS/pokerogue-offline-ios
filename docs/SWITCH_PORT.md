@@ -16,9 +16,10 @@ refresh can show a black screen for roughly 35-45 seconds, controller prompts
 are not always Switch-specific, and long sessions can still reach native/GPU
 memory pressure during asset and BGM transitions. The port now releases
 completed SD-card loader responses promptly, avoids ordinary two-BGM decode
-overlap, and caps the Skia GPU cache, but the result still needs extended
-hardware validation. The authoritative evidence, resolved blockers, known bugs, and
-next investigation order are in
+overlap, caps the Skia GPU cache, performs cooldown-limited garbage collection
+at safe boundaries under measured pressure, and records frame/event-loop stalls.
+The result still needs extended hardware validation. The authoritative evidence,
+resolved blockers, known bugs, and next investigation order are in
 [`SWITCH_ALPHA_STATUS.md`](SWITCH_ALPHA_STATUS.md).
 
 The final architecture remains a direct nx.js NRO. It does not use the Android

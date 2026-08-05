@@ -154,6 +154,29 @@ Phaser has populated its cache, and destroys a non-fading previous BGM before
 the replacement starts decoding. These are evidence-driven mitigations, not
 yet hardware verification of long-session stability.
 
+The August 5 diagnostic build also enables nx.js's supported `--expose-gc`
+configuration and adds pressure-aware maintenance. A full collection can run
+after a completed loader batch or critical phase when V8/external/native
+measurements cross conservative thresholds. Clearing an old biome requests one
+collection after its textures and animations have been detached. A 15-second
+cooldown prevents collection loops; nothing collects once per frame. Every
+maintenance entry records its reason, duration, before/after memory and the
+amount actually reclaimed, so hardware results can show whether it helped.
+
+Freeze diagnosis is now split into three signals:
+
+- a compact flight-recorder sample every 10 seconds with the active phase,
+  checkpoint, frame gaps, audio-cache size, memory and WebGL health;
+- a two-second frame watchdog that reports when the JS event loop remains alive
+  but Phaser stops stepping and rendering for four seconds; and
+- an event-loop delay report emitted on recovery when JavaScript itself was
+  blocked for four seconds or longer.
+
+If the process aborts without recovering, the flight recorder narrows the
+unknown interval to at most ten seconds. A native watchdog cannot safely write
+from outside nx.js's JavaScript runtime, so a hard native abort can still end
+without a final JavaScript entry.
+
 ### Slow black-screen startup and reload
 
 Cold startup takes approximately 35-45 seconds before the first visible game
@@ -214,16 +237,19 @@ Recommended order:
 
 1. Re-run the August 2 route through the first rival battle and continue across
    multiple biome/BGM transitions. Confirm each loader batch reports released
-   response bodies, non-fading BGM destruction precedes the next load, and the
-   post-collection native/external baseline does not trend upward each wave.
+   response bodies, non-fading BGM destruction precedes the next load, and each
+   `Switch memory maintenance` entry reports whether GC ran and reclaimed
+   external/native memory.
 2. Stress normal rewards and moderate rerolls separately; confirm the reroll
    guard can recover after pressure drops and does not block the first reroll
    at the former 2250 MiB threshold.
 3. Add Phaser loader-error logging and wait for required animation texture
    keys before playback.
 4. Reproduce the long-session freeze while preserving logs from before the
-   first visible stall through the native failure, and record any input only as
-   timeline context rather than assuming it was the trigger.
+   first visible stall through the native failure. Preserve the final `Freeze
+   flight recorder`, frame-watchdog, event-loop-watchdog and maintenance lines,
+   and record any input only as timeline context rather than assuming it was the
+   trigger.
 5. Add an early loading indicator without touching the WebGL-owned fatal
    screen.
 6. Replace keyboard/Xbox prompt artwork with Switch-specific prompts.

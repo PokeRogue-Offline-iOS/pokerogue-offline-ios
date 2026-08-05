@@ -435,7 +435,7 @@ const biomeClearEndAnchor = `      if (this.textures.exists(key)) {
   }
 
   updateFieldScale`;
-const biomeClearEndReplacement = `      if (this.textures.exists(key)) {
+const previousBiomeClearEndReplacement = `      if (this.textures.exists(key)) {
         this.textures.remove(key);
       }
     }
@@ -449,11 +449,32 @@ const biomeClearEndReplacement = `      if (this.textures.exists(key)) {
   }
 
   updateFieldScale`;
+const biomeClearEndReplacement = `      if (this.textures.exists(key)) {
+        this.textures.remove(key);
+      }
+    }
+
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("biome-assets:clear-complete", {
+      biome,
+      biomeKey: btKey,
+      remainingTextures: keysToClear.filter(key => this.textures.exists(key)),
+      remainingAnimations: keysToClear.filter(key => this.anims.exists(key)),
+    }, true);
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.maintenance?.("biome-assets-cleared", {
+      biome,
+      biomeKey: btKey,
+    }, true);
+  }
+
+  updateFieldScale`;
 if (!battleScene.includes(biomeClearEndReplacement)) {
-  if (!battleScene.includes(biomeClearEndAnchor)) {
+  if (battleScene.includes(previousBiomeClearEndReplacement)) {
+    battleScene = battleScene.replace(previousBiomeClearEndReplacement, biomeClearEndReplacement);
+  } else if (battleScene.includes(biomeClearEndAnchor)) {
+    battleScene = battleScene.replace(biomeClearEndAnchor, biomeClearEndReplacement);
+  } else {
     fail("Could not find the biome cleanup completion diagnostic anchor in BattleScene");
   }
-  battleScene = battleScene.replace(biomeClearEndAnchor, biomeClearEndReplacement);
 }
 
 const resetStartAnchor = `  reset(clearScene = false, clearData = false, reloadI18n = false): void {

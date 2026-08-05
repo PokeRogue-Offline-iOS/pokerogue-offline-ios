@@ -1,6 +1,19 @@
 import { appendLog } from "./logger";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
+const FLIGHT_RECORDER_INTERVAL_MS = 10_000;
+const FRAME_WATCHDOG_INTERVAL_MS = 2_000;
+const FRAME_STALL_THRESHOLD_MS = 4_000;
+const EVENT_LOOP_STALL_THRESHOLD_MS = 4_000;
+const MAINTENANCE_INTERVAL_MS = 45_000;
+const MAINTENANCE_COOLDOWN_MS = 15_000;
+const MIB = 1024 * 1024;
+const MEMORY_PRESSURE_THRESHOLDS = Object.freeze({
+  externalBytes: 320 * MIB,
+  heapUsedBytes: 256 * MIB,
+  nativeFreeBytes: 768 * MIB,
+  nativeUsedBytes: 2_450 * MIB,
+});
 const MAX_LOADER_SAMPLES = 8;
 const MAX_MISSING_TEXTURES = 20;
 const MAX_PHASE_HISTORY = 24;
@@ -60,6 +73,15 @@ interface RuntimeCounters {
   lastRenderAt: number | null;
 }
 
+interface FrameWindow {
+  maxRenderGapMs: number;
+  maxStepGapMs: number;
+  renderGapsOver100Ms: number;
+  renderGapsOver250Ms: number;
+  stepGapsOver100Ms: number;
+  stepGapsOver250Ms: number;
+}
+
 interface PhaseEvent {
   event: "start" | "end";
   name: string;
@@ -76,7 +98,24 @@ interface AudioEvent {
 let previousMemory: MemoryValues | null = null;
 let loaderBatchSequence = 0;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let flightRecorderTimer: ReturnType<typeof setInterval> | null = null;
+let frameWatchdogTimer: ReturnType<typeof setInterval> | null = null;
+let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
+let pendingMaintenanceTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingMaintenanceRequest: { reason: string; detail: unknown; force: boolean } | null = null;
+let lastMaintenanceAt = 0;
+let maintenanceSequence = 0;
+let expectedWatchdogAt = 0;
+let frameStallActive = false;
+let frameStallDetectedAt = 0;
+let frameWindow: FrameWindow = createFrameWindow();
 let lastHeartbeatCounters: RuntimeCounters = {
+  stepCount: 0,
+  renderCount: 0,
+  lastStepAt: null,
+  lastRenderAt: null,
+};
+let lastFlightRecorderCounters: RuntimeCounters = {
   stepCount: 0,
   renderCount: 0,
   lastStepAt: null,
@@ -107,6 +146,17 @@ const decodedAudioBuffers = new Map<
     sampleRate: number | null;
   }
 >();
+
+function createFrameWindow(): FrameWindow {
+  return {
+    maxRenderGapMs: 0,
+    maxStepGapMs: 0,
+    renderGapsOver100Ms: 0,
+    renderGapsOver250Ms: 0,
+    stepGapsOver100Ms: 0,
+    stepGapsOver250Ms: 0,
+  };
+}
 
 function round(value: number, digits = 2): number {
   const factor = 10 ** digits;
@@ -376,6 +426,134 @@ function normalizeLoaderFile(file: any): Record<string, unknown> {
   };
 }
 
+function tryReadMemoryValues(): MemoryValues | null {
+  try {
+    return normalizeMemoryUsage(Switch.memoryUsage());
+  } catch {
+    return null;
+  }
+}
+
+function compactMemory(memory: MemoryValues | null): unknown {
+  if (!memory) {
+    return "unavailable";
+  }
+  return {
+    heapUsedMiB: bytesToMiB(memory.usedHeapSize),
+    heapLimitMiB: bytesToMiB(memory.heapSizeLimit),
+    externalMiB: bytesToMiB(memory.externalMemory),
+    nativeUsedMiB: bytesToMiB(memory.nativeHeapUsed),
+    nativeFreeMiB: bytesToMiB(memory.nativeHeapFree),
+    nativeContexts: memory.numberOfNativeContexts,
+    detachedContexts: memory.numberOfDetachedContexts,
+  };
+}
+
+function readCompactAudioSnapshot(): unknown {
+  const totalEstimatedBytes = [...decodedAudioBuffers.values()].reduce(
+    (sum, buffer) => sum + (buffer.bytes ?? 0),
+    0,
+  );
+  return {
+    context: audioContextState,
+    decodedCacheEntries: decodedAudioBuffers.size,
+    decodedCacheMiB: bytesToMiB(totalEstimatedBytes),
+    recentEvent: audioRecentEvents.at(-1) ?? null,
+  };
+}
+
+function memoryPressureReasons(memory: MemoryValues | null): string[] {
+  if (!memory) {
+    return [];
+  }
+  const reasons: string[] = [];
+  if (memory.externalMemory >= MEMORY_PRESSURE_THRESHOLDS.externalBytes) {
+    reasons.push("external-memory");
+  }
+  if (memory.usedHeapSize >= MEMORY_PRESSURE_THRESHOLDS.heapUsedBytes) {
+    reasons.push("v8-heap");
+  }
+  if (memory.nativeHeapFree <= MEMORY_PRESSURE_THRESHOLDS.nativeFreeBytes) {
+    reasons.push("native-free");
+  }
+  if (memory.nativeHeapUsed >= MEMORY_PRESSURE_THRESHOLDS.nativeUsedBytes) {
+    reasons.push("native-used");
+  }
+  if (memory.numberOfDetachedContexts > 0) {
+    reasons.push("detached-context");
+  }
+  return reasons;
+}
+
+function performMemoryMaintenance(reason: string, detail?: unknown, force = false): void {
+  const now = Date.now();
+  const before = tryReadMemoryValues();
+  const pressureReasons = memoryPressureReasons(before);
+  if (!force && pressureReasons.length === 0) {
+    return;
+  }
+  if (now - lastMaintenanceAt < MAINTENANCE_COOLDOWN_MS) {
+    return;
+  }
+  lastMaintenanceAt = now;
+  const startedAt = performance.now();
+  let gcRequested = false;
+  let gcError: string | null = null;
+  try {
+    const collectGarbage = (globalThis as any).gc;
+    if (typeof collectGarbage === "function") {
+      collectGarbage();
+      gcRequested = true;
+    }
+  } catch (error) {
+    gcError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  }
+  const after = tryReadMemoryValues();
+  appendLog(gcError ? "WARN" : "INFO", "Switch memory maintenance", {
+    sequence: ++maintenanceSequence,
+    reason,
+    detail: detail ?? null,
+    force,
+    pressureReasons,
+    gcAvailable: typeof (globalThis as any).gc === "function",
+    gcRequested,
+    gcError,
+    elapsedMs: round(performance.now() - startedAt),
+    before: compactMemory(before),
+    after: compactMemory(after),
+    reclaimed: before && after
+      ? {
+          externalMiB: bytesToMiB(before.externalMemory - after.externalMemory),
+          heapMiB: bytesToMiB(before.usedHeapSize - after.usedHeapSize),
+          nativeMiB: bytesToMiB(before.nativeHeapUsed - after.nativeHeapUsed),
+        }
+      : "unavailable",
+  });
+}
+
+function requestMemoryMaintenance(reason: string, detail?: unknown, force = false): void {
+  if (pendingMaintenanceRequest) {
+    pendingMaintenanceRequest = {
+      reason: `${pendingMaintenanceRequest.reason},${reason}`,
+      detail: [pendingMaintenanceRequest.detail, detail ?? null],
+      force: pendingMaintenanceRequest.force || force,
+    };
+  } else {
+    pendingMaintenanceRequest = { reason, detail: detail ?? null, force };
+  }
+  if (pendingMaintenanceTimer !== null) {
+    return;
+  }
+  pendingMaintenanceTimer = setTimeout(() => {
+    pendingMaintenanceTimer = null;
+    const request = pendingMaintenanceRequest;
+    pendingMaintenanceRequest = null;
+    if (request) {
+      performMemoryMaintenance(request.reason, request.detail, request.force);
+    }
+  }, 250);
+}
+
 function loaderFileId(key: unknown, type: unknown): string {
   return `${String(type)}\u0000${String(key)}`;
 }
@@ -584,6 +762,13 @@ function instrumentLoader(loader: any, textures: any, sceneName: string): void {
     }
     queuedFiles.clear();
     activeBatch = null;
+    requestMemoryMaintenance("loader-complete", {
+      id: batch?.id ?? null,
+      scene: sceneName,
+      completed: totalComplete,
+      failed: totalFailed,
+      releasedResponseBytes: batch?.releasedResponseBytes ?? 0,
+    });
   });
 
   appendLog("INFO", "Installed loader diagnostics", { scene: sceneName });
@@ -615,18 +800,46 @@ function attachWebGlContext(canvas: any, context: any): void {
   });
 }
 
+function recordFrameGap(kind: "render" | "step", previousAt: number | null, now: number): void {
+  if (previousAt === null) {
+    return;
+  }
+  const gap = now - previousAt;
+  if (kind === "step") {
+    frameWindow.maxStepGapMs = Math.max(frameWindow.maxStepGapMs, gap);
+    if (gap >= 100) {
+      frameWindow.stepGapsOver100Ms++;
+    }
+    if (gap >= 250) {
+      frameWindow.stepGapsOver250Ms++;
+    }
+  } else {
+    frameWindow.maxRenderGapMs = Math.max(frameWindow.maxRenderGapMs, gap);
+    if (gap >= 100) {
+      frameWindow.renderGapsOver100Ms++;
+    }
+    if (gap >= 250) {
+      frameWindow.renderGapsOver250Ms++;
+    }
+  }
+}
+
 function attachPhaserGame(game: any): void {
   if (!game?.events || game.__silverShadowDiagnosticsInstalled) {
     return;
   }
   game.__silverShadowDiagnosticsInstalled = true;
   game.events.on("step", () => {
+    const now = Date.now();
+    recordFrameGap("step", counters.lastStepAt, now);
     counters.stepCount++;
-    counters.lastStepAt = Date.now();
+    counters.lastStepAt = now;
   });
   game.events.on("postrender", () => {
+    const now = Date.now();
+    recordFrameGap("render", counters.lastRenderAt, now);
     counters.renderCount++;
-    counters.lastRenderAt = Date.now();
+    counters.lastRenderAt = now;
   });
   audioCapabilities = game.device?.audio ?? "unavailable";
   audioContextState = {
@@ -692,6 +905,9 @@ function phase(event: "start" | "end", name: string, detail?: unknown): void {
       frames: counters,
     });
   }
+  if (event === "end" && CRITICAL_PHASES.has(name)) {
+    requestMemoryMaintenance(`phase-end:${name}`, detail, false);
+  }
 }
 
 function checkpoint(name: string, detail?: unknown, includeMemory = false): void {
@@ -708,6 +924,88 @@ function checkpoint(name: string, detail?: unknown, includeMemory = false): void
     webgl: readWebGlHealth(includeMemory),
     frames: counters,
   });
+}
+
+function flightRecorder(): void {
+  const now = Date.now();
+  const previous = lastFlightRecorderCounters;
+  const current = { ...counters };
+  const completedWindow = frameWindow;
+  frameWindow = createFrameWindow();
+  appendLog("INFO", "Freeze flight recorder", {
+    uptimeMs: Math.round(performance.now()),
+    checkpoint: lastGameCheckpoint,
+    phase: phaseHistory.at(-1) ?? null,
+    state: readGameState(),
+    frames: {
+      ...current,
+      stepsSincePrevious: current.stepCount - previous.stepCount,
+      rendersSincePrevious: current.renderCount - previous.renderCount,
+      lastStepAgeMs: current.lastStepAt === null ? null : now - current.lastStepAt,
+      lastRenderAgeMs: current.lastRenderAt === null ? null : now - current.lastRenderAt,
+      window: completedWindow,
+    },
+    audio: readCompactAudioSnapshot(),
+    memory: compactMemory(tryReadMemoryValues()),
+    webgl: readWebGlHealth(false),
+  });
+  lastFlightRecorderCounters = current;
+}
+
+function frameWatchdog(): void {
+  const now = Date.now();
+  const eventLoopDelayMs = Math.max(0, now - expectedWatchdogAt);
+  expectedWatchdogAt = now + FRAME_WATCHDOG_INTERVAL_MS;
+  if (eventLoopDelayMs >= EVENT_LOOP_STALL_THRESHOLD_MS) {
+    appendLog("WARN", "Event loop watchdog resumed after a stall", {
+      delayMs: eventLoopDelayMs,
+      checkpoint: lastGameCheckpoint,
+      phase: phaseHistory.at(-1) ?? null,
+      state: readGameState(),
+      frames: counters,
+      audio: readAudioSnapshot(),
+      memory: readMemorySnapshot(),
+      webgl: readWebGlHealth(true),
+    });
+  }
+
+  const lastStepAgeMs = counters.lastStepAt === null ? null : now - counters.lastStepAt;
+  const lastRenderAgeMs = counters.lastRenderAt === null ? null : now - counters.lastRenderAt;
+  const stalled =
+    lastStepAgeMs !== null
+    && lastRenderAgeMs !== null
+    && lastStepAgeMs >= FRAME_STALL_THRESHOLD_MS
+    && lastRenderAgeMs >= FRAME_STALL_THRESHOLD_MS;
+  if (stalled && !frameStallActive) {
+    frameStallActive = true;
+    frameStallDetectedAt = now;
+    appendLog("WARN", "Phaser frame watchdog detected a stall", {
+      lastStepAgeMs,
+      lastRenderAgeMs,
+      eventLoopResponsive: true,
+      checkpoint: lastGameCheckpoint,
+      phase: phaseHistory.at(-1) ?? null,
+      state: readGameState(),
+      frames: counters,
+      audio: readAudioSnapshot(),
+      memory: readMemorySnapshot(),
+      webgl: readWebGlHealth(true),
+    });
+    requestMemoryMaintenance("phaser-frame-stall", {
+      lastStepAgeMs,
+      lastRenderAgeMs,
+    });
+  } else if (!stalled && frameStallActive) {
+    appendLog("INFO", "Phaser frame watchdog recovered", {
+      stalledForMs: now - frameStallDetectedAt,
+      checkpoint: lastGameCheckpoint,
+      phase: phaseHistory.at(-1) ?? null,
+      frames: counters,
+      memory: readMemorySnapshot(),
+    });
+    frameStallActive = false;
+    frameStallDetectedAt = 0;
+  }
 }
 
 function heartbeat(): void {
@@ -747,15 +1045,36 @@ export function installRuntimeDiagnostics(): void {
     attachWebGlContext,
     checkpoint,
     instrumentLoader,
+    maintenance: requestMemoryMaintenance,
     memory: captureMemorySnapshot,
     phase,
     readAudio: readAudioSnapshot,
     setGameStateProvider,
   };
   captureMemorySnapshot("diagnostics-installed");
+  expectedWatchdogAt = Date.now() + FRAME_WATCHDOG_INTERVAL_MS;
   heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL_MS);
+  flightRecorderTimer = setInterval(flightRecorder, FLIGHT_RECORDER_INTERVAL_MS);
+  frameWatchdogTimer = setInterval(frameWatchdog, FRAME_WATCHDOG_INTERVAL_MS);
+  maintenanceTimer = setInterval(
+    () => requestMemoryMaintenance("periodic-pressure-check"),
+    MAINTENANCE_INTERVAL_MS,
+  );
   appendLog("INFO", "Installed bounded runtime diagnostics", {
     heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+    flightRecorderIntervalMs: FLIGHT_RECORDER_INTERVAL_MS,
+    frameWatchdogIntervalMs: FRAME_WATCHDOG_INTERVAL_MS,
+    frameStallThresholdMs: FRAME_STALL_THRESHOLD_MS,
+    eventLoopStallThresholdMs: EVENT_LOOP_STALL_THRESHOLD_MS,
+    maintenanceIntervalMs: MAINTENANCE_INTERVAL_MS,
+    maintenanceCooldownMs: MAINTENANCE_COOLDOWN_MS,
+    memoryPressureThresholdMiB: {
+      external: bytesToMiB(MEMORY_PRESSURE_THRESHOLDS.externalBytes),
+      heapUsed: bytesToMiB(MEMORY_PRESSURE_THRESHOLDS.heapUsedBytes),
+      nativeFree: bytesToMiB(MEMORY_PRESSURE_THRESHOLDS.nativeFreeBytes),
+      nativeUsed: bytesToMiB(MEMORY_PRESSURE_THRESHOLDS.nativeUsedBytes),
+    },
+    exposedGcAvailable: typeof global.gc === "function",
     loaderSampleLimit: MAX_LOADER_SAMPLES,
     missingTextureLimit: MAX_MISSING_TEXTURES,
     phaseHistoryLimit: MAX_PHASE_HISTORY,
