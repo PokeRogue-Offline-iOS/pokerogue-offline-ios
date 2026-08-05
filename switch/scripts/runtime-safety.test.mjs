@@ -74,3 +74,20 @@ test("startup progress reserves completion for a rendered ready frame", () => {
   assert.match(gamePatch, /this\.scene\.launch\("battle"\)/);
   assert.match(gamePatch, /percent >= this\.switchLastLoggedPercent \+ 10/);
 });
+
+test("nx.js canvas textures bypass the temporary OffscreenCanvas upload path", () => {
+  assert.match(gamePatch, /__silverShadowTypedCanvasUploadInstalled/);
+  assert.match(gamePatch, /new Uint8Array\(data\.buffer, data\.byteOffset, data\.byteLength\)/);
+  assert.match(gamePatch, /texture\.pixels = srcCanvas/);
+  assert.match(gamePatch, /webgl:typed-canvas-upload/);
+  assert.match(diagnostics, /textureWrappers/);
+  assert.match(diagnostics, /readGraphicsSnapshot/);
+});
+
+test("Switch UI setup yields measured progress frames from 45 through 99 percent", () => {
+  assert.match(gamePatch, /async setup\(/);
+  assert.match(gamePatch, /Phaser\.Core\.Events\.POST_RENDER, resolve/);
+  assert.match(gamePatch, /await this\.launchBattle\(switchLoadingScene\)/);
+  assert.match(gamePatch, /0\.45 \+ \(completed \/ total\) \* 0\.54/);
+  assert.match(gamePatch, /if \(!this\.tooltipContainer\) return/);
+});

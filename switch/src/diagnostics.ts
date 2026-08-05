@@ -131,6 +131,7 @@ let lastGameCheckpoint: { name: string; detail: unknown; at: number } | null = n
 let phaseHistory: PhaseEvent[] = [];
 let gameStateProvider: (() => unknown) | null = null;
 let webGlContext: any = null;
+let phaserGame: any = null;
 let audioCapabilities: unknown = "game-unavailable";
 let audioContextState: unknown = "context-unavailable";
 let audioLoggedSamples = 0;
@@ -829,6 +830,7 @@ function attachPhaserGame(game: any): void {
     return;
   }
   game.__silverShadowDiagnosticsInstalled = true;
+  phaserGame = game;
   game.events.on("step", () => {
     const now = Date.now();
     recordFrameGap("step", counters.lastStepAt, now);
@@ -864,6 +866,54 @@ function attachPhaserGame(game: any): void {
     runtime: audioContextState,
   });
   appendLog("INFO", "Installed Phaser frame diagnostics");
+}
+
+export function readGraphicsSnapshot(): unknown {
+  if (!phaserGame) {
+    return "game-unavailable";
+  }
+  try {
+    const renderer = phaserGame.renderer;
+    const textureList = phaserGame.textures?.list ?? {};
+    const textureKeys = Object.keys(textureList);
+    let canvasSources = 0;
+    let imageSources = 0;
+    let totalSources = 0;
+    for (const key of textureKeys) {
+      const sources = Array.isArray(textureList[key]?.source) ? textureList[key].source : [];
+      totalSources += sources.length;
+      for (const source of sources) {
+        if (source?.isCanvas) canvasSources++;
+        else if (source?.image) imageSources++;
+      }
+    }
+    return {
+      renderer: renderer?.constructor?.name ?? null,
+      textureWrappers: Array.isArray(renderer?.glTextureWrappers)
+        ? renderer.glTextureWrappers.length
+        : null,
+      framebufferWrappers: Array.isArray(renderer?.glFramebufferWrappers)
+        ? renderer.glFramebufferWrappers.length
+        : null,
+      textureManager: {
+        keys: textureKeys.length,
+        sources: totalSources,
+        canvasSources,
+        imageSources,
+      },
+      scenes: phaserGame.scene?.getScenes?.(true)?.map((scene: any) => ({
+        key: scene.scene?.key ?? null,
+        displayObjects: scene.children?.list?.length ?? null,
+        tweens: scene.tweens?.getTweens?.().length ?? null,
+        timers: scene.time?._active?.length ?? null,
+      })) ?? [],
+    };
+  } catch (error) {
+    return {
+      unavailable: true,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function readGameState(): unknown {
@@ -955,6 +1005,7 @@ function flightRecorder(): void {
       window: completedWindow,
     },
     audio: readCompactAudioSnapshot(),
+    graphics: readGraphicsSnapshot(),
     io: readIoStats(),
     memory: compactMemory(tryReadMemoryValues()),
     webgl: readWebGlHealth(false),
@@ -1038,6 +1089,7 @@ function heartbeat(): void {
       lastRenderAgeMs: current.lastRenderAt === null ? null : now - current.lastRenderAt,
     },
     webgl: readWebGlHealth(true),
+    graphics: readGraphicsSnapshot(),
     audio: readAudioSnapshot(),
     io: readIoStats(),
     memory: readMemorySnapshot(),
@@ -1067,6 +1119,7 @@ export function installRuntimeDiagnostics(): void {
     memory: captureMemorySnapshot,
     phase,
     readAudio: readAudioSnapshot,
+    readGraphics: readGraphicsSnapshot,
     setGameStateProvider,
   };
   captureMemorySnapshot("diagnostics-installed");

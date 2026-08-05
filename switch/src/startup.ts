@@ -9,7 +9,7 @@ import {
   SWITCH_PLATFORM_VERSION,
 } from "./constants";
 import type { AssetPackManifest } from "./asset-packs";
-import { readMemorySnapshot } from "./diagnostics";
+import { readGraphicsSnapshot, readMemorySnapshot } from "./diagnostics";
 import { appendLog } from "./logger";
 
 interface RequiredFile {
@@ -278,6 +278,7 @@ export function showFatalError(error: unknown): void {
     manifestVersion: activeManifest?.schemaVersion ?? null,
     compatibilityShims: activeManifest?.compatibilityShims ?? [],
     memory: readMemorySnapshot(),
+    graphics: readGraphicsSnapshot(),
   };
   appendLog("ERROR", "Fatal startup failure", diagnostics);
 

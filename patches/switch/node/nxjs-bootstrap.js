@@ -12,6 +12,7 @@ const path = require("path");
 const mainPath = path.join("pokerogue-src", "src", "main.ts");
 const battleScenePath = path.join("pokerogue-src", "src", "battle-scene.ts");
 const loadingScenePath = path.join("pokerogue-src", "src", "loading-scene.ts");
+const uiPath = path.join("pokerogue-src", "src", "ui", "ui.ts");
 const phasePath = path.join("pokerogue-src", "src", "phase.ts");
 const phaseManagerPath = path.join("pokerogue-src", "src", "phase-manager.ts");
 const sceneBasePath = path.join("pokerogue-src", "src", "scene-base.ts");
@@ -125,6 +126,119 @@ if (!main.includes(audioEndedGuardReplacement)) {
   main = main.replace(audioEndedGuardAnchor, audioEndedGuardReplacement);
 }
 
+const canvasTextureUploadAnchor = `  const game = new Phaser.Game({`;
+const canvasTextureUploadReplacement = `  const webGlRendererPrototype = (Phaser.Renderer.WebGL.WebGLRenderer as any)?.prototype;
+  if (webGlRendererPrototype && !webGlRendererPrototype.__silverShadowTypedCanvasUploadInstalled) {
+    const nativeCanvasToTexture = webGlRendererPrototype.canvasToTexture;
+    let typedCanvasUploads = 0;
+    let typedCanvasUploadBytes = 0;
+    let typedCanvasUploadFallbacks = 0;
+    webGlRendererPrototype.canvasToTexture = function (
+      this: any,
+      srcCanvas: HTMLCanvasElement,
+      dstTexture?: any,
+      noRepeat = false,
+      flipY = false,
+    ) {
+      const width = Number(srcCanvas?.width) || 0;
+      const height = Number(srcCanvas?.height) || 0;
+      if (!srcCanvas?.getContext || width <= 0 || height <= 0) {
+        return nativeCanvasToTexture.call(this, srcCanvas, dstTexture, noRepeat, flipY);
+      }
+      try {
+        // nx.js' CanvasSource texImage2D overload creates a temporary
+        // OffscreenCanvas for every Phaser Text refresh. Repeated UI updates
+        // fragmented the native arena until that temporary allocation failed.
+        // The typed-array overload uploads the same pixels without creating a
+        // second native canvas/context for every refresh.
+        const context = srcCanvas.getContext("2d", { willReadFrequently: true });
+        if (!context) throw new Error("2D context unavailable for typed canvas upload");
+        const imageData = context.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        const pixels = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        const gl = this.gl;
+        let minFilter = gl.NEAREST;
+        let magFilter = gl.NEAREST;
+        const pow = Phaser.Math.Pow2.IsSize(width, height);
+        const wrapping = !noRepeat && pow ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+        if (this.config.antialias) {
+          minFilter = pow && this.mipmapFilter ? this.mipmapFilter : gl.LINEAR;
+          magFilter = gl.LINEAR;
+        }
+        let texture = dstTexture;
+        if (!texture) {
+          texture = this.createTexture2D(
+            0,
+            minFilter,
+            magFilter,
+            wrapping,
+            wrapping,
+            gl.RGBA,
+            pixels,
+            width,
+            height,
+            true,
+            true,
+            flipY,
+          );
+        } else {
+          texture.update(
+            pixels,
+            width,
+            height,
+            flipY,
+            wrapping,
+            wrapping,
+            minFilter,
+            magFilter,
+            texture.format,
+          );
+        }
+        // Preserve Phaser's original context-restore source instead of
+        // retaining this one-upload ImageData view.
+        texture.pixels = srcCanvas;
+        typedCanvasUploads++;
+        typedCanvasUploadBytes += pixels.byteLength;
+        if (typedCanvasUploads === 1 || typedCanvasUploads % 250 === 0) {
+          (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(
+            "webgl:typed-canvas-upload",
+            {
+              uploads: typedCanvasUploads,
+              uploadedMiB: Number((typedCanvasUploadBytes / 1048576).toFixed(2)),
+              fallbacks: typedCanvasUploadFallbacks,
+              latestSize: [width, height],
+              textureWrappers: this.glTextureWrappers?.length ?? null,
+            },
+          );
+        }
+        return texture;
+      } catch (error) {
+        typedCanvasUploadFallbacks++;
+        if (typedCanvasUploadFallbacks <= 4) {
+          (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(
+            "webgl:typed-canvas-upload-fallback",
+            {
+              fallback: typedCanvasUploadFallbacks,
+              size: [width, height],
+              message: error instanceof Error ? error.message : String(error),
+            },
+            true,
+          );
+        }
+        return nativeCanvasToTexture.call(this, srcCanvas, dstTexture, noRepeat, flipY);
+      }
+    };
+    webGlRendererPrototype.__silverShadowTypedCanvasUploadInstalled = true;
+  }
+
+  const game = new Phaser.Game({`;
+if (!main.includes(canvasTextureUploadReplacement)) {
+  if (!main.includes(canvasTextureUploadAnchor)) {
+    fail("Could not find the Phaser canvas texture upload anchor in src/main.ts");
+  }
+  main = main.replace(canvasTextureUploadAnchor, canvasTextureUploadReplacement);
+}
+
 const createdAnchor = `  game.sound.pauseOnBlur = false;`;
 const previousCreatedReplacement = `  game.sound.pauseOnBlur = false;
   (globalThis as Record<string, unknown>).__SILVERSHADOW_POKEROGUE_STAGE__ = "phaser-game-created";`;
@@ -146,6 +260,83 @@ if (!main.includes(createdReplacement)) {
   }
 }
 write(mainPath, main);
+
+let ui = read(uiPath);
+const uiSetupAnchor = `  setup(): void {
+    this.setName(\`ui-\${UiMode[this.mode]}\`);
+    for (const handler of this.handlers) {
+      handler.setup();
+    }
+    this.overlay = globalScene.add.rectangle(0, 0, globalScene.scaledCanvas.width, globalScene.scaledCanvas.height, 0);`;
+const uiSetupReplacement = `  async setup(
+    onProgress?: (completed: number, total: number, stage: string) => void,
+  ): Promise<void> {
+    this.setName(\`ui-\${UiMode[this.mode]}\`);
+    const totalSteps = this.handlers.length + 3;
+    let completedSteps = 0;
+    const completeStep = async (stage: string) => {
+      completedSteps++;
+      onProgress?.(completedSteps, totalSteps, stage);
+      if (onProgress) {
+        // UI construction occupied the main thread for ~28 seconds on nx.js.
+        // Yield after each handler so Phaser can render measured progress.
+        await new Promise<void>(resolve => {
+          globalScene.game.events.once(Phaser.Core.Events.POST_RENDER, resolve);
+        });
+      }
+    };
+    for (const handler of this.handlers) {
+      handler.setup();
+      await completeStep(handler.constructor.name);
+    }
+    this.overlay = globalScene.add.rectangle(0, 0, globalScene.scaledCanvas.width, globalScene.scaledCanvas.height, 0);`;
+if (!ui.includes(uiSetupReplacement)) {
+  if (!ui.includes(uiSetupAnchor)) fail("Could not find UI setup batching anchor");
+  ui = ui.replace(uiSetupAnchor, uiSetupReplacement);
+}
+const uiTooltipStepAnchor = `    this.setupTooltip();
+
+    this.achvBar = new AchvBar();`;
+const uiTooltipStepReplacement = `    this.setupTooltip();
+    await completeStep("tooltip");
+
+    this.achvBar = new AchvBar();`;
+if (!ui.includes(uiTooltipStepReplacement)) {
+  if (!ui.includes(uiTooltipStepAnchor)) fail("Could not find UI tooltip progress anchor");
+  ui = ui.replace(uiTooltipStepAnchor, uiTooltipStepReplacement);
+}
+const uiBarsStepAnchor = `    globalScene.uiContainer.add(this.achvBar);
+
+    this.savingIcon = new SavingIconContainer();`;
+const uiBarsStepReplacement = `    globalScene.uiContainer.add(this.achvBar);
+    await completeStep("achievement bar");
+
+    this.savingIcon = new SavingIconContainer();`;
+if (!ui.includes(uiBarsStepReplacement)) {
+  if (!ui.includes(uiBarsStepAnchor)) fail("Could not find UI achievement progress anchor");
+  ui = ui.replace(uiBarsStepAnchor, uiBarsStepReplacement);
+}
+const uiSavingStepAnchor = `    globalScene.uiContainer.add(this.savingIcon);
+  }`;
+const uiSavingStepReplacement = `    globalScene.uiContainer.add(this.savingIcon);
+    await completeStep("saving indicator");
+  }`;
+if (!ui.includes(uiSavingStepReplacement)) {
+  if (!ui.includes(uiSavingStepAnchor)) fail("Could not find UI saving progress anchor");
+  ui = ui.replace(uiSavingStepAnchor, uiSavingStepReplacement);
+}
+const uiUpdateGuardAnchor = `  update(): void {
+    if (this.tooltipContainer.visible) {`;
+const uiUpdateGuardReplacement = `  update(): void {
+    // BattleScene can render between async setup batches. The tooltip is the
+    // last shared UI object created, so skip updates until it exists.
+    if (!this.tooltipContainer) return;
+    if (this.tooltipContainer.visible) {`;
+if (!ui.includes(uiUpdateGuardReplacement)) {
+  if (!ui.includes(uiUpdateGuardAnchor)) fail("Could not find partial UI update guard anchor");
+  ui = ui.replace(uiUpdateGuardAnchor, uiUpdateGuardReplacement);
+}
+write(uiPath, ui);
 
 let loadingScene = read(loadingScenePath);
 const loadingProgressApiAnchor = `  readonly LOAD_EVENTS = Phaser.Loader.Events;
@@ -344,7 +535,7 @@ if (!battleScene.includes(battlePreloadReplacement)) {
 
 const battleCreateAnchor = `  public create(): void {
     this.scene.remove(LoadingScene.KEY);`;
-const battleCreateReplacement = `  public create(): void {
+const battleCreateReplacement = `  public async create(): Promise<void> {
     (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("battle-scene:create-start", {
       scene: "battle",
     }, true);
@@ -354,10 +545,17 @@ const battleCreateReplacement = `  public create(): void {
     switchLoadingScene?.setSwitchStartupProgress(0.45, "Building game world...");
     if (switchLoadingScene) this.scene.bringToTop(LoadingScene.KEY);`;
 if (!battleScene.includes(battleCreateReplacement)) {
-  if (!battleScene.includes(battleCreateAnchor)) {
+  const previousBattleCreateReplacement = battleCreateReplacement.replace(
+    "  public async create(): Promise<void> {",
+    "  public create(): void {",
+  );
+  if (battleScene.includes(previousBattleCreateReplacement)) {
+    battleScene = battleScene.replace(previousBattleCreateReplacement, battleCreateReplacement);
+  } else if (!battleScene.includes(battleCreateAnchor)) {
     fail("Could not find the BattleScene create diagnostic anchor");
+  } else {
+    battleScene = battleScene.replace(battleCreateAnchor, battleCreateReplacement);
   }
-  battleScene = battleScene.replace(battleCreateAnchor, battleCreateReplacement);
 }
 
 const battleLaunchAnchor = `    this.launchBattle();
@@ -373,7 +571,7 @@ const previousBattleLaunchReplacement = `    this.launchBattle();
   }
 
   update()`;
-const battleLaunchReplacement = `    this.launchBattle();
+const battleLaunchReplacement = `    await this.launchBattle(switchLoadingScene);
     const runtimeDiagnostics = (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__;
     runtimeDiagnostics?.setGameStateProvider?.(() => {
       const currentPhase = this.phaseManager?.getCurrentPhase?.();
@@ -432,7 +630,13 @@ const battleLaunchReplacement = `    this.launchBattle();
 
   update()`;
 if (!battleScene.includes(battleLaunchReplacement)) {
-  if (battleScene.includes(previousBattleLaunchReplacement)) {
+  const previousAwaitlessBattleLaunchReplacement = battleLaunchReplacement.replace(
+    "    await this.launchBattle(switchLoadingScene);",
+    "    this.launchBattle();",
+  );
+  if (battleScene.includes(previousAwaitlessBattleLaunchReplacement)) {
+    battleScene = battleScene.replace(previousAwaitlessBattleLaunchReplacement, battleLaunchReplacement);
+  } else if (battleScene.includes(previousBattleLaunchReplacement)) {
     battleScene = battleScene.replace(previousBattleLaunchReplacement, battleLaunchReplacement);
   } else if (battleScene.includes(battleLaunchAnchor)) {
     battleScene = battleScene.replace(battleLaunchAnchor, battleLaunchReplacement);
@@ -641,7 +845,7 @@ if (!battleScene.includes(resetClearSceneReplacement)) {
 
 const launchBattleStartAnchor = `  launchBattle() {
     const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
-const launchBattleStartReplacement = `  launchBattle() {
+const launchBattleStartReplacement = `  async launchBattle(switchLoadingScene?: LoadingScene): Promise<void> {
     const switchLaunchStartedAt = performance.now();
     const switchLaunchCheckpoint = (stage: string) =>
       (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.(\`battle-launch:\${stage}\`, {
@@ -651,8 +855,17 @@ const launchBattleStartReplacement = `  launchBattle() {
     switchLaunchCheckpoint("start");
     const biome = activeOverrides.STARTING_BIOME_OVERRIDE || BiomeId.PLAINS;`;
 if (!battleScene.includes(launchBattleStartReplacement)) {
-  if (!battleScene.includes(launchBattleStartAnchor)) fail("Could not find launchBattle start timing anchor");
-  battleScene = battleScene.replace(launchBattleStartAnchor, launchBattleStartReplacement);
+  const previousLaunchBattleStartReplacement = launchBattleStartReplacement.replace(
+    "  async launchBattle(switchLoadingScene?: LoadingScene): Promise<void> {",
+    "  launchBattle() {",
+  );
+  if (battleScene.includes(previousLaunchBattleStartReplacement)) {
+    battleScene = battleScene.replace(previousLaunchBattleStartReplacement, launchBattleStartReplacement);
+  } else if (!battleScene.includes(launchBattleStartAnchor)) {
+    fail("Could not find launchBattle start timing anchor");
+  } else {
+    battleScene = battleScene.replace(launchBattleStartAnchor, launchBattleStartReplacement);
+  }
 }
 
 const launchResetAnchor = `    this.reset(false, false, true);
@@ -671,13 +884,29 @@ if (!battleScene.includes(launchResetReplacement)) {
 const launchUiAnchor = `    this.ui.setup();
 
     this.phaseManager.toTitleScreen(true);`;
-const launchUiReplacement = `    this.ui.setup();
+const launchUiReplacement = `    await this.ui.setup(
+      switchLoadingScene
+        ? (completed, total) => {
+            const progress = 0.45 + (completed / total) * 0.54;
+            switchLoadingScene.setSwitchStartupProgress(progress, "Preparing interface...");
+          }
+        : undefined,
+    );
     switchLaunchCheckpoint("ui-setup-complete");
 
     this.phaseManager.toTitleScreen(true);`;
 if (!battleScene.includes(launchUiReplacement)) {
-  if (!battleScene.includes(launchUiAnchor)) fail("Could not find launchBattle UI timing anchor");
-  battleScene = battleScene.replace(launchUiAnchor, launchUiReplacement);
+  const previousLaunchUiReplacement = `    this.ui.setup();
+    switchLaunchCheckpoint("ui-setup-complete");
+
+    this.phaseManager.toTitleScreen(true);`;
+  if (battleScene.includes(previousLaunchUiReplacement)) {
+    battleScene = battleScene.replace(previousLaunchUiReplacement, launchUiReplacement);
+  } else if (!battleScene.includes(launchUiAnchor)) {
+    fail("Could not find launchBattle UI timing anchor");
+  } else {
+    battleScene = battleScene.replace(launchUiAnchor, launchUiReplacement);
+  }
 }
 
 const resetDestroyAnchor = `        onComplete: () => {
@@ -707,7 +936,7 @@ const resetDestroyReplacement = `        onComplete: () => {
             children: this.children?.list?.length ?? null,
           }, true);
           // TODO: \`launchBattle\` calls \`reset(false, false, true)\`
-          this.launchBattle();
+          void this.launchBattle();
           switchDiagnostics?.checkpoint?.("scene-reset:launch-returned", {
             elapsedMs: Math.round(performance.now() - switchResetStartedAt),
           }, true);
