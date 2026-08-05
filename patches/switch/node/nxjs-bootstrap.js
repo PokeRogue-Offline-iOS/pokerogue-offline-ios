@@ -993,6 +993,21 @@ const resetClearSceneReplacement = `    if (clearScene) {
       switchDiagnostics?.checkpoint?.("scene-reset:clear-scene-start", {
         elapsedMs: Math.round(performance.now() - switchResetStartedAt),
       }, true);
+      // Both variant manifests are cached during the initial preload. This
+      // call therefore swaps the selected data synchronously and atomically;
+      // it must not leave an SD-card read racing scene destruction.
+      this.initVariantData();
+      switchDiagnostics?.checkpoint?.("scene-reset:variant-data-ready", {
+        elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+      }, true);
+
+      audioManager.fadeOutBgm(250);`;
+if (!battleScene.includes(resetClearSceneReplacement)) {
+  const previousResetClearSceneReplacement = `    if (clearScene) {
+      (globalThis as any).__SILVERSHADOW_TITLE_RETURN_STARTED_AT__ = switchResetStartedAt;
+      switchDiagnostics?.checkpoint?.("scene-reset:clear-scene-start", {
+        elapsedMs: Math.round(performance.now() - switchResetStartedAt),
+      }, true);
       // Reload variant data in case sprite set has changed
       this.initVariantData();
       switchDiagnostics?.checkpoint?.("scene-reset:variant-data-requested", {
@@ -1000,11 +1015,64 @@ const resetClearSceneReplacement = `    if (clearScene) {
       }, true);
 
       audioManager.fadeOutBgm(250);`;
-if (!battleScene.includes(resetClearSceneReplacement)) {
-  if (!battleScene.includes(resetClearSceneAnchor)) {
+  if (battleScene.includes(previousResetClearSceneReplacement)) {
+    battleScene = battleScene.replace(previousResetClearSceneReplacement, resetClearSceneReplacement);
+  } else if (!battleScene.includes(resetClearSceneAnchor)) {
     fail("Could not find the BattleScene clear-scene diagnostic anchor");
+  } else {
+    battleScene = battleScene.replace(resetClearSceneAnchor, resetClearSceneReplacement);
   }
-  battleScene = battleScene.replace(resetClearSceneAnchor, resetClearSceneReplacement);
+}
+
+const variantDataAnchor = `  async initVariantData(): Promise<void> {
+    clearVariantData();
+    const otherVariantData = await cachedFetch("./images/pokemon/variant/_masterlist.json").then(r => r.json());
+    for (const k of Object.keys(otherVariantData)) {
+      variantData[k] = otherVariantData[k];
+    }
+    if (!this.experimentalSprites) {
+      return;
+    }
+    const expVariantData = await cachedFetch("./images/pokemon/variant/_exp_masterlist.json").then(r => r.json());
+    deepMergeSpriteData(variantData, expVariantData);
+  }`;
+const variantDataReplacement = `  async initVariantData(): Promise<void> {
+    type SwitchVariantCache = {
+      standard?: Record<string, any>;
+      experimental?: Record<string, any>;
+    };
+    const switchGlobal = globalThis as any;
+    const cache: SwitchVariantCache = switchGlobal.__SILVERSHADOW_VARIANT_DATA_CACHE__ ??= {};
+    if (!cache.standard || !cache.experimental) {
+      const [standard, experimental] = await Promise.all([
+        cachedFetch("./images/pokemon/variant/_masterlist.json").then(r => r.json()),
+        cachedFetch("./images/pokemon/variant/_exp_masterlist.json").then(r => r.json()),
+      ]);
+      cache.standard = standard;
+      cache.experimental = experimental;
+      switchGlobal.__SILVERSHADOW_DIAGNOSTICS__?.checkpoint?.("variant-data:cache-ready", {
+        standardKeys: Object.keys(standard).length,
+        experimentalKeys: Object.keys(experimental).length,
+      }, true);
+    }
+
+    // Do not clear the live table until every input is resident. On later
+    // scene resets this method has no await path, so callers that retain the
+    // upstream void contract still receive a complete atomic swap.
+    clearVariantData();
+    const standard = cache.standard!;
+    for (const k of Object.keys(standard)) {
+      variantData[k] = standard[k];
+    }
+    if (this.experimentalSprites) {
+      deepMergeSpriteData(variantData, cache.experimental!);
+    }
+  }`;
+if (!battleScene.includes(variantDataReplacement)) {
+  if (!battleScene.includes(variantDataAnchor)) {
+    fail("Could not find the BattleScene variant-data lifecycle anchor");
+  }
+  battleScene = battleScene.replace(variantDataAnchor, variantDataReplacement);
 }
 
 const launchBattleStartAnchor = `  launchBattle() {
@@ -1771,6 +1839,50 @@ if (!backgroundMusic.includes(bgmNativeLoopReplacement)) {
   backgroundMusic = backgroundMusic.replace(bgmNativeLoopAnchor, bgmNativeLoopReplacement);
 }
 
+const bgmFadeAnchor = `  public fadeOut(duration: number, fixed = false, destroy = true): void {
+    const realDuration = fixed ? fixedInt(duration) : duration;
+    this.withSound(sound => {
+      SoundFade.fadeOut(globalScene, sound, realDuration, false);
+    });
+    globalScene.time.delayedCall(realDuration + 100, () => {
+      if (this.destroyed) {
+        return;
+      }
+      if (destroy) {
+        this.destroy();
+      } else if (this.sound) {
+        this.sound.pause();
+      }
+    });
+  }`;
+const bgmFadeReplacement = `  public fadeOut(duration: number, fixed = false, destroy = true): void {
+    // SoundFade repeatedly writes a live WebAudio gain parameter. The pinned
+    // the latest instruction abort began before that first frame completed.
+    // Immediate pause/destroy uses the same native lifecycle already proven
+    // by ordinary BGM handoffs and avoids retaining an overlapping decode.
+    (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-fade-native-bypassed", {
+      key: this.key,
+      requestedDuration: duration,
+      fixed,
+      destroy,
+      wasPlaying: this.sound?.isPlaying ?? false,
+    }, true);
+    if (destroy) {
+      this.destroy();
+    } else {
+      this.pause();
+    }
+  }`;
+if (!backgroundMusic.includes(bgmFadeReplacement)) {
+  if (!backgroundMusic.includes(bgmFadeAnchor)) {
+    fail("Could not find the BackgroundMusic native fade anchor");
+  }
+  backgroundMusic = backgroundMusic.replace(bgmFadeAnchor, bgmFadeReplacement);
+}
+
+backgroundMusic = backgroundMusic.replace('import { fixedInt } from "#utils/common";\n', "");
+backgroundMusic = backgroundMusic.replace('import SoundFade from "phaser3-rex-plugins/plugins/soundfade";\n', "");
+
 const bgmPlayAnchor = `      if (!sound.isPlaying) {
         sound.play();
       }`;
@@ -1897,6 +2009,27 @@ const bgmHandoffAnchor = `    const previous = this.currentBgm;
       newBgm.play(volume);
     }`;
 const bgmHandoffReplacement = `    const previous = this.currentBgm;
+    const requestedFade = Boolean(fadeOutPrevious && previous?.isPlaying);
+    // Never overlap decoded BGM buffers on Switch. The native gain-fade path
+    // is unsafe in beta.6, while immediate destruction is hardware-proven.
+    previous?.destroy();
+    const newBgm = new BackgroundMusic(resolvedName, loop, loopPoint);
+    this.currentBgm = newBgm;
+
+    globalScene.ui.bgmBar.setBgmToBgmBar(resolvedName);
+
+    const volume = this.getVolume(VolumeSetting.BGM);
+
+    if (requestedFade) {
+      (globalThis as any).__SILVERSHADOW_DIAGNOSTICS__?.audio?.("bgm-crossfade-native-bypassed", {
+        from: previous?.key ?? null,
+        to: resolvedName,
+        requestedDuration: fadeDuration,
+      }, true);
+    }
+    newBgm.play(volume);`;
+if (!audioManager.includes(bgmHandoffReplacement)) {
+  const previousBgmHandoffReplacement = `    const previous = this.currentBgm;
     const shouldOverlapForFade = Boolean(fadeOutPrevious && previous?.isPlaying);
     if (!shouldOverlapForFade) {
       // BackgroundMusic starts decoding in its constructor. Release the old
@@ -1917,12 +2050,15 @@ const bgmHandoffReplacement = `    const previous = this.currentBgm;
     } else {
       newBgm.play(volume);
     }`;
-if (!audioManager.includes(bgmHandoffReplacement)) {
-  if (!audioManager.includes(bgmHandoffAnchor)) {
+  if (audioManager.includes(previousBgmHandoffReplacement)) {
+    audioManager = audioManager.replace(previousBgmHandoffReplacement, bgmHandoffReplacement);
+  } else if (!audioManager.includes(bgmHandoffAnchor)) {
     fail("Could not find the AudioManager BGM handoff anchor");
+  } else {
+    audioManager = audioManager.replace(bgmHandoffAnchor, bgmHandoffReplacement);
   }
-  audioManager = audioManager.replace(bgmHandoffAnchor, bgmHandoffReplacement);
 }
+audioManager = audioManager.replace('import { fixedInt } from "#utils/common";\n', "");
 write(audioManagerPath, audioManager);
 
 let partyHealPhase = read(partyHealPhasePath);

@@ -149,6 +149,10 @@ for (const marker of [
   "run-seed:reserved",
   "new-run-selection",
   "audio/bgm/menu.mp3",
+  "scene-reset:variant-data-ready",
+  "variant-data:cache-ready",
+  "bgm-fade-native-bypassed",
+  "bgm-crossfade-native-bypassed",
 ]) {
   if (!entry.includes(marker)) {
     throw new Error(`Compiled Switch entry is missing required stabilization marker: ${marker}`);

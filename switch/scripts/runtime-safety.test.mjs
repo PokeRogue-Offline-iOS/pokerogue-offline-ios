@@ -78,6 +78,15 @@ test("logging is bounded and audio teardown crosses a native settle window", () 
   assert.match(gamePatch, /settleMs: 1500/);
 });
 
+test("Switch title returns avoid concurrent variant reads and native BGM gain fades", () => {
+  assert.match(gamePatch, /__SILVERSHADOW_VARIANT_DATA_CACHE__/);
+  assert.match(gamePatch, /scene-reset:variant-data-ready/);
+  assert.match(gamePatch, /variant-data:cache-ready/);
+  assert.match(gamePatch, /bgm-fade-native-bypassed/);
+  assert.match(gamePatch, /bgm-crossfade-native-bypassed/);
+  assert.match(gamePatch, /const requestedFade = Boolean/);
+});
+
 test("startup progress reserves completion for a rendered ready frame", () => {
   assert.match(gamePatch, /setSwitchStartupProgress\(progress \* 0\.4\)/);
   assert.match(gamePatch, /setSwitchStartupProgress\(0\.42, "Preparing game\.\.\."\)/);
