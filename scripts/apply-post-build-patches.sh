@@ -20,4 +20,11 @@ if [[ "$PLATFORM" == "mobile" || "$PLATFORM" == "android" ]]; then
 
 fi
 
+# ── Android only ─────────────────────────────────────────────────────────────
+if [[ "$PLATFORM" == "android" ]]; then
+
+  apply_patch "android-trigger-axis-fix.js" android
+
+fi
+
 echo "All post-build patches applied successfully (platform: $PLATFORM)."

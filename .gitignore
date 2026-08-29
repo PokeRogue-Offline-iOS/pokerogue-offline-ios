@@ -19,6 +19,7 @@ release/
 
 # ── Capacitor / Android ─────────────────────────────────────────────────────
 android/
+!patches/android/
 *.apk
 *.aab
 *.keystore
